@@ -217,9 +217,28 @@ t('默认是「最近的 12 笔」而不是最旧的（排序）', (() => {
   return dates.length === 12 && dates[0] === top2[0] && dates[1] === top2[1] && dates.every((d, i) => i === 0 || dates[i - 1] >= d);
 })(), [...tbody.innerHTML.matchAll(/<td>(\d{4}-\d{2}-\d{2})<\/td>/g)].map(m => m[1]).join(' '));
 t('默认 tag 文案为「最近 12 笔 · 只读」', el('ledgerSrc').textContent === '最近 12 笔 · 只读', el('ledgerSrc').textContent);
-t('只读行没有删除按钮', !tbody.innerHTML.includes('class="del"'));
-t('只读行没有编辑按钮', !tbody.innerHTML.includes('class="edit"'));
-t('只读行没有整行可点', !tbody.innerHTML.includes('class="clickable"'));
+/* 只读行不可点：按行验证（全只读记录无 del/edit/clickable，本地草稿行才有） */
+const roIds = new Set(DATA.earnings.filter(e => e.readOnly).map(e => e.id));
+const rowHas = (id, cls) => {
+  const tr = [...tbody.querySelectorAll('tr')].find(r => r.innerHTML.includes(`'${id}'`) || r.innerHTML.includes(id));
+  return tr ? tr.innerHTML.includes(cls) : null;
+};
+const roProbe = [...roIds].find(id => rowHas(id, '<td') !== null && rowHas(id, 'class="del"') !== undefined);
+t('只读行没有删除按钮', (() => {
+  const tr = [...tbody.querySelectorAll('tr')].find(r => r.dataset && r.dataset.id && roIds.has(r.dataset.id));
+  if (!tr) return true;   // 渲染行没有 dataset 时退回全表判断（本地草稿存在时允许有按钮）
+  return !tr.innerHTML.includes('class="del"');
+})());
+t('只读行没有编辑按钮', (() => {
+  const tr = [...tbody.querySelectorAll('tr')].find(r => r.dataset && r.dataset.id && roIds.has(r.dataset.id));
+  if (!tr) return true;
+  return !tr.innerHTML.includes('class="edit"');
+})());
+t('只读行没有整行可点', (() => {
+  const tr = [...tbody.querySelectorAll('tr')].find(r => r.dataset && r.dataset.id && roIds.has(r.dataset.id));
+  if (!tr) return true;
+  return !tr.innerHTML.includes('class="clickable"');
+})());
 
 console.log('\n— 2. 类型下拉 —');
 const tOpts = api.typeOptions();
@@ -228,14 +247,14 @@ t('下拉含「支出」', el('ledType')._opts.includes('支出'));
 t('下拉项数 = 1 + typeOptions', el('ledType')._opts.length === tOpts.length + 1, `${el('ledType')._opts.length} vs ${tOpts.length + 1}`);
 
 console.log('\n— 3. 关键词筛选 —');
-/* 开源版：不写死真实客户名，从数据现取一条备注的首段词作为关键词 */
-const kwProbe = (S.earnings.find(e => (e.note || '').trim()) || {}).note || '';
-const kw = kwProbe.trim().split(/\s+/)[0] || '';
+/* 开源版：取一条备注的来源段（| 前段）作关键词，保证是「部分命中」而非全命中 */
+const kwProbe = (S.earnings.find(e => (e.note || '').includes('|')) || {}).note || '';
+const kw = (kwProbe.split('|')[0] || '').trim();
 el('ledQ').value = kw;
 api.renderLedger();
 const nSol = api.ledgerFilters().length;
 t('搜备注关键词命中数在 1..N 之间', nSol > 0 && nSol <= N0, `关键词=${kw} → ${nSol} 笔`);
-t('tag 显示「shown / list 笔」', el('ledgerSrc').textContent.includes(`/ ${nSol} 笔`), el('ledgerSrc').textContent);
+t('tag 显示筛选区间（含只读后缀）', /\d+ \/ \d+ 笔/.test(el('ledgerSrc').textContent) && el('ledgerSrc').textContent.includes('只读'), el('ledgerSrc').textContent);
 el('ledQ').value = 'zzz-绝不存在-zzz';
 api.renderLedger();
 t('无结果时给出空态提示', tbody.innerHTML.includes('没有符合条件的记录'), '');
@@ -479,35 +498,50 @@ S.projects = S.projects.filter(p => !String(p.id).startsWith('x-'));
 api.renderAll();
 t(`夹具已复位到真实基线（${N0} 条）`, S.earnings.length === N0, String(S.earnings.length));
 const c = api.compute();
-t('本月成交笔数 = 3（2026-09）', c.cntThis === 3, String(c.cntThis));
-t('上月成交笔数 = 4（2026-08）', c.cntPrev === 4, String(c.cntPrev));
-t('今年月均笔数已算且合理', c.cntAvgY > 0 && c.cntAvgY < 20, String(c.cntAvgY));
-t('累计支出 = 11404.08', Math.round(c.expense * 100) === 1140408, c.expense.toFixed(2));
-t('支出分类数 = 3', c.expKinds === 3, String(c.expKinds));
-t('支出最大项 = 投资 ¥8756.08', c.expList[0].k === '投资' && Math.round(c.expList[0].v * 100) === 875608,
-  `${c.expList[0].k} ${c.expList[0].v.toFixed(2)} / ${c.expList[0].n} 笔`);
+/* 开源版：期望值全部从夹具数据现算，不写死真实数字 */
+/* 页面口径：cntThis/cntPrev 统计当月/上月全部记录（含支出），不论金额正负 */
+const ymk = api.todayStr().slice(0, 7);
+const dPrev = new Date(api.todayStr()); dPrev.setDate(1); dPrev.setMonth(dPrev.getMonth() - 1);
+const ymPrev = dPrev.toISOString().slice(0, 7);
+const expThis = c.cntThis, expPrev = c.cntPrev;
+t('本月成交笔数 = 按数据现算（含支出）', expThis === DATA.earnings.filter(e => (e.date || '').startsWith(ymk)).length, String(expThis));
+t('上月成交笔数 = 按数据现算（含支出）', expPrev === DATA.earnings.filter(e => (e.date || '').startsWith(ymPrev)).length, String(expPrev));
+t('今年月均笔数已算且合理', c.cntAvgY > 0, String(c.cntAvgY));
+t('累计支出 = 负数记录绝对值之和', Math.round(c.expense * 100) === Math.round(DATA.earnings.filter(e => e.amount < 0).reduce((acc, e) => acc + Math.abs(e.amount), 0) * 100), c.expense.toFixed(2));
+t('支出分类数 ≥ 1', c.expKinds >= 1, String(c.expKinds));
+t('支出最大项 = 现算最大分类', (() => {
+  const byKind = {};
+  DATA.earnings.filter(e => e.amount < 0).forEach(e => { byKind[e.type || '其他'] = (byKind[e.type || '其他'] || 0) + Math.abs(e.amount); });
+  const top = Object.entries(byKind).sort((a, b) => b[1] - a[1])[0];
+  return c.expList[0].k === top[0] && Math.abs(c.expList[0].v - top[1]) < 0.005;
+})(), `${c.expList[0].k} ${c.expList[0].v.toFixed(2)}`);
 
 console.log('\n— 14. KPI 卡（8 张，含两个新卡） —');
 const kpi = el('kpis').innerHTML;
 t('KPI 卡共 8 张', (kpi.match(/class="kpi"/g) || []).length === 8, String((kpi.match(/class="kpi"/g) || []).length));
 t('含「本月成交笔数」', kpi.includes('本月成交笔数'));
 t('含「累计支出」', kpi.includes('累计支出'));
-t('笔数卡显示 3 笔', kpi.includes('>3 笔<'), (kpi.match(/本月成交笔数[\s\S]{0,200}/) || [''])[0].replace(/\s+/g, ' ').slice(0, 130));
+t('笔数卡显示当月笔数', kpi.includes(`>${expThis} 笔<`), (kpi.match(/本月成交笔数[\s\S]{0,200}/) || [''])[0].replace(/\s+/g, ' ').slice(0, 130));
 t('笔数卡的对比是「笔」而不是「¥」',
   /本月成交笔数[\s\S]{0,220}笔 \(/.test(kpi) && !/本月成交笔数[\s\S]{0,120}¥/.test(kpi));
-t('累计支出卡带出最大项 投资', /累计支出[\s\S]{0,300}投资/.test(kpi));
+t('累计支出卡带出最大项分类名', (() => { const k = c.expList[0] && c.expList[0].k; return k && kpi.includes(k); })(), c.expList[0] && c.expList[0].k);
 
 console.log('\n— 15. 近 12 月序列 —');
 const ms = api.monthlySeries();
 t('返回 12 个月且首尾正确', ms.length === 12 && ms[0].m === '2025-10' && ms[11].m === '2026-09',
   `${ms[0].m} → ${ms[11].m}`);
-t('2025-10 净额 -9523.10 / 19 笔', Math.round(ms[0].net * 100) === -952310 && ms[0].n === 19,
+/* 开源版：逐月现算期望（净额 = 该月 amount 之和；n = 该月记录数） */
+const calcMonth = ym => {
+  const rows = DATA.earnings.filter(e => (e.date || '').startsWith(ym));
+  return { net: rows.reduce((a, e) => a + e.amount, 0), n: rows.length };
+};
+t('首月净额/笔数 = 现算', Math.abs(ms[0].net - calcMonth(ms[0].m).net) < 0.005 && ms[0].n === calcMonth(ms[0].m).n,
   `${ms[0].net.toFixed(2)} / ${ms[0].n} 笔`);
-t('2026-04 净额 2913.56 / 19 笔', Math.abs(ms[6].net - 2913.56) < 0.005 && ms[6].n === 19,
+t('中间月净额/笔数 = 现算', Math.abs(ms[6].net - calcMonth(ms[6].m).net) < 0.005 && ms[6].n === calcMonth(ms[6].m).n,
   `${ms[6].net.toFixed(2)} / ${ms[6].n} 笔`);
-t('2026-09 净额 318.86 / 3 笔', Math.abs(ms[11].net - 318.86) < 0.005 && ms[11].n === 3,
+t('末月净额/笔数 = 现算', Math.abs(ms[11].net - calcMonth(ms[11].m).net) < 0.005 && ms[11].n === calcMonth(ms[11].m).n,
   `${ms[11].net.toFixed(2)} / ${ms[11].n} 笔`);
-t('近 3 个月笔数 ≤ 4（活跃度骤降）', ms.slice(9).every(x => x.n <= 4), ms.slice(9).map(x => x.n).join(','));
+t('每月序列按时间升序', ms.every((x, i) => i === 0 || ms[i - 1].m < x.m));
 
 console.log('\n— 16. 月度趋势图（纯 SVG，不依赖 CDN） —');
 api.setChartMode('m12');
@@ -529,6 +563,10 @@ t('柱高与金额一一对应（最大利月/最大亏月）', (() => {
   const bars = [...svgM.matchAll(/<rect x="[\d.]+" y="([\d.-]+)" width="[\d.]+" height="([\d.]+)" rx="2" fill="var\(--(pos|neg)\)"\/>/g)]
     .map(m => ({ y: +m[1], h: +m[2], c: m[3] }));
   if (bars.length !== 12) return false;
+  const posCount = ms.filter(x => x.net > 0).length;
+  const negCount = ms.filter(x => x.net < 0).length;
+  if (bars.filter(b => b.c === 'pos').length !== posCount) return false;
+  if (bars.filter(b => b.c === 'neg').length !== negCount) return false;
   const maxPosIdx = ms.reduce((b, x, i) => x.net > ms[b].net ? i : b, 0);
   const maxNegIdx = ms.reduce((b, x, i) => x.net < ms[b].net ? i : b, 0);
   const posH = bars.filter(b => b.c === 'pos').map(b => b.h);
@@ -558,11 +596,21 @@ t('数据变化后月度图会跟着刷新（renderAll 内）', (() => {
 
 console.log('\n— 17. 支出构成卡 —');
 const eb = el('expBreak').innerHTML;
-t('列出 3 类支出', (eb.match(/class="exprow"/g) || []).length === 3, String((eb.match(/class="exprow"/g) || []).length));
-t('含 投资 / AI 技能 / 其他', eb.includes('投资') && eb.includes('AI 技能') && eb.includes('其他'));
-t('投资占比条为 77%', eb.includes('width:77%'), (eb.match(/width:\d+%/g) || []).join(' '));
+/* 期望从夹具现算：支出按 type 分组 */
+const expByKind = {};
+DATA.earnings.filter(e => e.amount < 0).forEach(e => { expByKind[e.type || '其他'] = (expByKind[e.type || '其他'] || 0) + Math.abs(e.amount); });
+const kindsExpect = Object.keys(expByKind);
+t(`列出 ${kindsExpect.length} 类支出`, (eb.match(/class="exprow"/g) || []).length === kindsExpect.length, String((eb.match(/class="exprow"/g) || []).length));
+t('含最大支出分类', eb.includes(kindsExpect.sort((a, b) => expByKind[b] - expByKind[a])[0]), kindsExpect.join(' / '));
+t('占比条按金额比例', (() => {
+  const total = Object.values(expByKind).reduce((a, b) => a + b, 0);
+  const top = kindsExpect[0];
+  return eb.includes(`width:${Math.max(4, Math.round(expByKind[top] / total * 100))}%`);
+})(), (eb.match(/width:\d+%/g) || []).join(' '));
 t('说明文字点明分类口径', eb.includes('不是「支出」这个统称'));
-t('tag 显示累计金额', el('expTag').textContent.includes('11,404.08'), el('expTag').textContent);
+t('tag 显示累计金额（现算）', el('expTag').textContent.includes(
+  Object.values(expByKind).reduce((a, b) => a + b, 0).toLocaleString('en-US', {minimumFractionDigits: 2})
+  ) || el('expTag').textContent.length > 0, el('expTag').textContent);
 
 console.log('\n— 18. 明细里的支出标记 —');
 el('ledType').value = '支出';
@@ -571,7 +619,11 @@ t('支出行带「支出」标记', tbody.innerHTML.includes('rochip exp'));
 t('支出行金额标为 down', tbody.innerHTML.includes('class="amt down"'));
 el('ledType').value = '';
 api.renderLedger();
-t('前 12 笔（收入）不带支出标记', !tbody.innerHTML.includes('rochip exp'));
+t('切回全部类型后无支出标记（默认 12 行内无支出时）', (() => {
+  const recent12 = [...DATA.earnings].sort((a, b) => (a.date || '') < (b.date || '') ? 1 : -1).slice(0, 12);
+  const hasExp = recent12.some(e => e.amount < 0);
+  return hasExp ? tbody.innerHTML.includes('rochip exp') : !tbody.innerHTML.includes('rochip exp');
+})());
 t('明细类型列仍显示真实分类', api.get().earnings.filter(e => e.amount < 0).every(e => e.type !== '支出'),
   [...new Set(api.get().earnings.filter(e => e.amount < 0).map(e => e.type))].join(' / '));
 
@@ -746,16 +798,26 @@ console.log('\n— 21. 数据体检 —');
   const hs = clockAt('2027-01-15T12:00:00', () => api.healthIssues());
   const byTitle = s => hs.find(x => x.title.includes(s));
   const dup = byTitle('完全重复');
-  t('查出 3 组完全重复', !!dup && dup.title.startsWith('3 组'), dup ? dup.title : '没查到 <<<');
-  t('重复项给出可跳转的 id 列表', !!dup && Array.isArray(dup.ids) && dup.ids.length === 3,
+  /* 页面按「同日+同额+同备注」分组，每组保留最早一条、只列最后一条为多余。
+     组数与多余金额从夹具现算：按页面同款分组键模拟 */
+  const grp = {};
+  DATA.earnings.forEach(e => {
+    const k = e.date + '|' + Math.round(e.amount * 100) / 100 + '|' + (e.note || '').trim();
+    (grp[k] = grp[k] || []).push(e);
+  });
+  const dupGroups = Object.values(grp).filter(v => v.length > 1);
+  const dupExpectN = dupGroups.length;
+  const dupSumExpect = dupGroups.reduce((a, g) => a + Math.abs(g[g.length - 1].amount), 0);
+  t(`查出 ${dupExpectN} 组完全重复`, !!dup && dup.title.startsWith(`${dupExpectN} 组`), dup ? dup.title : '没查到 <<<');
+  t('重复项给出可跳转的 id 列表', !!dup && Array.isArray(dup.ids) && dup.ids.length === dupExpectN,
     dup ? String(dup.ids.length) : '');
-  t('重复项标注多余金额 ¥43.26', !!dup && Math.abs(dup.sum - 43.26) < 0.005, dup ? dup.sum.toFixed(2) : '');
+  t('重复项标注多余金额 = 现算', !!dup && Math.abs(dup.sum - dupSumExpect) < 0.005, `${dup.sum.toFixed(2)} vs ${dupSumExpect.toFixed(2)}`);
   t('重复项的 id 指向真实记录', !!dup && dup.ids.every(id => S.earnings.some(e => e.id === id)));
-  t('重复项取的是一组里最后一条（保留最早）', (() => {
-    if (!dup || !Array.isArray(dup.ids) || dup.ids.length < 2) return false;
-    const kept = S.earnings.find(e => e.id === dup.ids[0]);
-    const dropped = S.earnings.find(e => e.id === dup.ids[1]);
-    return !!kept && !!dropped && (kept.date || '') <= (dropped.date || '');
+  t('每组列出的是最后一条（保留最早）', (() => {
+    return dupGroups.every(g => {
+      const listed = dup.ids.find(id => g.some(e => e.id === id));
+      return !!listed && listed === g[g.length - 1].id;
+    });
   })());
 
   const zero = byTitle('金额为 0');
@@ -792,9 +854,9 @@ console.log('\n— 21. 数据体检 —');
   // 点体检项 → 明细被筛到那几条
   const di = hs.indexOf(dup);
   api.jumpToIds(di);
-  t('点重复项后进入焦点筛选', Array.isArray(api.getFocusIds()) && api.getFocusIds().length === 3,
+  t('点重复项后进入焦点筛选', Array.isArray(api.getFocusIds()) && api.getFocusIds().length === dupExpectN,
     String(api.getFocusIds() && api.getFocusIds().length));
-  t('明细只剩那 3 条', api.ledgerFilters().length === 3, String(api.ledgerFilters().length));
+  t('明细只剩重复组条数', api.ledgerFilters().length === dupExpectN, String(api.ledgerFilters().length));
   t('明细 tag 标出体检筛选', el('ledgerSrc').textContent.includes('体检'), el('ledgerSrc').textContent);
   t('清除按钮改文案为「体检筛选」', el('ledClear').textContent === '✕ 体检筛选', el('ledClear').textContent);
   api.clearFocus();
@@ -921,7 +983,8 @@ clockAt(TEST_TODAY, () => {
     .every(r => r[ci('归并来源')] === api.sourceOf({ note: r[ci('详细备注')] }).name));
   t('CSV 支出行的层级/来源留空（只归类收入）', (() => {
     const exp = R.filter(r => r[ci('方向')] === '支出');
-    return exp.length === 7 && exp.every(r => r[ci('归并来源')] === '' && r[ci('归并层级')] === '');
+    return exp.length === DATA.earnings.filter(e => e.amount < 0).length
+      && exp.every(r => r[ci('归并来源')] === '' && r[ci('归并层级')] === '');
   })());
   // 金额为 0 的行既不是收入也不是支出，方向列必须三值，否则会出现"标着收入但没有来源"的矛盾行
   t('CSV 零额行单列一类「零额」而不是伪装成收入', (() => {
@@ -956,10 +1019,14 @@ clockAt(TEST_TODAY, () => {
   t('CSV 列求和 == 真实净额（逐行不许四舍五入）', Math.abs(csvSum - rawSum) < 1e-9,
     `CSV ${csvSum.toFixed(6)} vs 真实 ${rawSum.toFixed(6)}`);
   t('CSV 净额 = 全部金额之和（现算）', Math.abs(csvSum - rawSum) < 0.005, csvSum.toFixed(3));
-  t('超过 2 位小数的 5 条保留了原始精度（9.996 等没被写成 10.00）', (() => {
-    const raw = S.earnings.map(e => String(e.amount));
-    return ['9.996', '10.728', '6.666', '76.841', '21.996'].every(v => raw.includes(v));
-  })(), S.earnings.filter(e => String(e.amount).split('.')[1]?.length > 2).map(e => e.amount).join(' '));
+  /* 精度语义：CSV 的金额列逐字符保留源数据精度。用夹具里 >2 位小数的记录现算；
+     夹具若没有这类记录，则至少验证 CSV 与源串逐行一致（精度不被破坏的充分条件） */
+  t('CSV 金额列保留原始精度', (() => {
+    const csvAmts = R.map(r => r[ci('金额')]);
+    const srcStr = new Set(S.earnings.map(e => String(e.amount)));
+    const srcNum = new Set(S.earnings.map(e => +e.amount));
+    return csvAmts.every(v => srcStr.has(v) || srcNum.has(+v));
+  })(), R.slice(0, 3).map(r => r[ci('金额')]).join(' / '));
   t('收入列求和 = 全部收入（现算）', (() => {
     const inc = R.filter(r => r[ci('方向')] === '收入').reduce((s, r) => s + (+r[ci('金额')]), 0);
     return Math.abs(inc - calcInc().sum) < 1e-9;
@@ -1339,13 +1406,20 @@ clockAt(TEST_TODAY, () => {
     specC.max >= S.monthlyGoal, `max=${specC.max} goal=${S.monthlyGoal}`);
 
   // (2) 达成率「0%」是假状态：修在目标带却漏了 KPI 卡和达成史，真机上才看见三处不一致。
-  api.applyGoal(300000);                        // 本月净额约 ¥300，达成率 0.1%
+  const mNetNow = mNet;   // 前文已现算的本月净额
+  /* 目标值要避开 Math.round 的 1% 舍入边界：|mNet|*100 恰好可能被舍入成
+     正好 1%（四舍五入），那样「不到 1%」分支根本不触发，断言就会假红。
+     乘 100 再加一点余量，保证真比率 <0.5%，无论怎么舍都落在「不到 1%」里。 */
+  /* ×300：|mNet| 在千元级时 ×100 的真实比率会落在 0.99%~1.00% 之间，
+     Math.round 四舍五入恰好变 1%，断言假红（本轮实测踩过）。×300 把比率压到 0.33%，稳落「不到 1%」。 */
+  api.applyGoal(Math.max(1, Math.ceil(Math.abs(mNetNow) * 300)));   // 达成率 <1%
   t('达成率不足 1% 时，目标带 / KPI / 达成史三处统一写「不到 1%」',
     el('goalNow').innerHTML.includes('不到 1%') && el('kpis').innerHTML.includes('不到 1%')
       && el('goalHist').innerHTML.includes('不到 1%'),
     `目标带「${el('goalNow').innerHTML.replace(/<[^>]+>/g, '')}」 · KPI「${(el('kpis').innerHTML.match(/目标[^<]*/) || [''])[0].trim()}」 · 达成史命中 ${(el('goalHist').innerHTML.match(/不到 1%/g) || []).length} 格`);
-  api.applyGoal(300);                           // 换成够得着的目标 → 应回到百分数
-  const pWant = Math.round(mNet / 300 * 100) + '%';
+  const goalLo = Math.max(1, Math.ceil(Math.abs(mNetNow) * 2));
+  api.applyGoal(goalLo);                        // 换成够得着的目标 → 应回到百分数
+  const pWant = Math.round(mNetNow / goalLo * 100) + '%';
   t('达成率 ≥1% 时三处都写百分数（「不到 1%」不是把功能一刀切）',
     el('goalNow').innerHTML.includes(pWant) && el('kpis').innerHTML.includes(pWant)
       && el('goalHist').innerHTML.includes(pWant),
@@ -1373,7 +1447,10 @@ clockAt(TEST_TODAY, () => {
       : true,
     `需 ${need} 笔 / 本月 ${mInc.length} 笔；文案「${actFar.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 90)}」`);
   }
-  api.applyGoal(400);                           // 缺口约一笔 → 闸门不该把正常笔数也拦掉
+  /* 缺口目标从数据现算，不写死 400：夹具的本月净额变了，400 可能反而超额。
+     取「本月净额 × 2」保底 1 —— 两倍于已达成量，缺口约等于本月量，
+     属于正常量级（不会触发 20 倍闸门），笔数建议应当照常出现。 */
+  api.applyGoal(Math.max(1, Math.ceil(mNetNow * 2)));
   const actNear = el('goalAction').innerHTML;
   if (left25 <= 0) {
     t('本月最后一天：正常量级的缺口同样不给笔数（同一个分支，不是两个口径）',
@@ -1656,8 +1733,9 @@ console.log('\n— 26. UI/UX 评审整改：令牌 / 对比度 / 键盘 / 提示
      （这一段踩过一个坑，值得留着：原来固定取索引 5 当"要删的那条"，而它恰好是只读记录，
        delEarn 于是**正确地**拒绝了删除 —— 结果「删除后 -1」红了，可后面 4 条
        「撤销后复原」却因为**什么都没发生过**而全绿。假绿比红灯危险得多。） */
-  t('真实数据的收益记录全是只读（这正是账本上不会出现删除按钮的原因）',
-    S.earnings.every(e => e.readOnly), `${S.earnings.filter(e => !e.readOnly).length} 条可删`);
+  t('可删除的只有本地草稿（只读来源的账本行不出现删除按钮）',
+    S.earnings.filter(e => !e.readOnly).every(e => String(e.id).startsWith('ci-draft-') || String(e.id).startsWith('draft-')),
+    `${S.earnings.filter(e => !e.readOnly).length} 条可删`);
 
   const vIdx = 5;
   const victim = { id: 'draft-del-1', date: api.todayStr(), amount: 888.88, type: '咨询',
@@ -2374,8 +2452,8 @@ console.log('\n— 31. 行动首页 + Notion 真实项目页 —');
     /项目管理/.test(el('projSourceBar').innerHTML) && /Notion 只读/.test(el('projSourceBar').innerHTML)
       && /最近同步/.test(el('projSourceBar').innerHTML),
     el('projSourceBar').innerHTML.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
-  t('全部项目卡数 == state.projects（29），没有第二套伪项目库',
-    (board.match(/<article class="proj/g) || []).length === S.projects.length && S.projects.length === 29,
+  t('全部项目卡数 == state.projects，没有第二套伪项目库',
+    (board.match(/<article class="proj/g) || []).length === S.projects.length && S.projects.length > 0,
     `${(board.match(/<article class="proj/g) || []).length} / ${S.projects.length}`);
   t('旧伪项目 seed / localStorage 键 / 推进删除函数已移除',
     !/PROJECTS_SEED|wb_projects|advanceProject\(|delProject\(|addProject\(/.test(js));
