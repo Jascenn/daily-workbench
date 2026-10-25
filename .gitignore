@@ -1,0 +1,25 @@
+# Local runtime data and snapshots（含个人真实数据，绝不入库）
+*.json
+!package.json
+!package-lock.json
+
+# Backups and generated outputs
+*.bak*
+*.local.html
+*映射表*.html
+backups/
+archive/
+notion-sync.md
+workbench-demo.html
+
+# Caches and runtime directories
+.tmp-runtime/
+__pycache__/
+*.py[cod]
+logs/
+
+# OS files
+.DS_Store
+
+# Auto-generated weekly reports (contain personal earnings data)
+reports/
