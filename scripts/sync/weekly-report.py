@@ -8,7 +8,7 @@ import os
 import sys
 from datetime import date, datetime, timedelta
 
-DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def _load(name):

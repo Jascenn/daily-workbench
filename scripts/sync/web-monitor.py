@@ -55,7 +55,7 @@ def _ai_usage_section() -> dict | None:
         return {"error": "AI 用量模块加载失败：%s" % str(exc)[:160]}
 
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 OUT = ROOT / "web-presence.json"
 BLOG_REPO = Path(os.environ.get("WB_BLOG_REPO", "~/blog").expanduser())
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X) WorkbenchMonitor/1.0"

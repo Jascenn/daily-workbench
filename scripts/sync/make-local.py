@@ -28,7 +28,7 @@ import shutil
 import sys
 import time
 
-DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC = os.path.join(DIR, "workbench.html")
 DATA = os.path.join(DIR, "data.json")
 SECTIONS = os.path.join(DIR, "sections.json")

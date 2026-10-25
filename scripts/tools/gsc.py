@@ -28,7 +28,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 CACHE = ROOT / "gsc-cache.json"
 KEY_FILE = Path(os.path.expanduser("~/.config/daily-workbench/gsc-service-account.json"))
 

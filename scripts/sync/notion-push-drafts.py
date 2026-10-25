@@ -22,7 +22,7 @@ import sys
 import urllib.error
 import urllib.request
 
-DIR = pathlib.Path(__file__).resolve().parent.parent
+DIR = pathlib.Path(__file__).resolve().parent.parent.parent
 DATA = DIR / "data.json"
 TOKEN_FILE = pathlib.Path.home() / ".config/daily-workbench/sync-token"
 API = "http://127.0.0.1:8787/data.json"

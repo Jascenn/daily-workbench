@@ -47,7 +47,7 @@ import os
 import urllib.request
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 CACHE = ROOT / "words-cache.json"
 SEEN_FILE = ROOT / "words-seen.json"
 

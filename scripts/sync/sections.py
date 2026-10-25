@@ -48,7 +48,7 @@ import os
 import re
 import sys
 
-DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT = os.path.join(DIR, "sections.json")
 DATA = os.path.join(DIR, "data.json")
 

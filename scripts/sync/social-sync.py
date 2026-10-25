@@ -34,7 +34,7 @@ from urllib.parse import quote, urlparse
 from xml.etree import ElementTree as ET
 
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 OUT = ROOT / "social.json"
 
 # ===== 个人化配置：开源默认值是示例，实际使用时改这里或用环境变量覆盖 =====
