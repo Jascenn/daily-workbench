@@ -66,6 +66,10 @@ bash scripts/sync-now.sh
 - **删除可撤销**：不打断式撤销条，优于确认弹窗
 - 设计规范见 `designs/workbench/DESIGN.md`
 
+## 更新日志
+
+见 [CHANGELOG.md](CHANGELOG.md)。
+
 ## 测试
 
 ```bash
