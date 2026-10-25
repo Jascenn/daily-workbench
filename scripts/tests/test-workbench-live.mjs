@@ -244,7 +244,7 @@ const probe = async (path, withToken) => {
   return { code: r.status, len: (await r.arrayBuffer()).byteLength };
 };
 
-const mustBlock = ['/workbench.local.html', '/archive/notion-sync.md', '/scripts/sections.py']
+const mustBlock = ['/workbench.local.html', '/archive/notion-sync.md', '/scripts/sync/sections.py']
   .filter(p => fs.existsSync(DIR + p));
 t('探测清单里的敏感文件在磁盘上确实存在（否则下面的 404 会是"文件本来就没有"）',
   mustBlock.length === 3, mustBlock.join(' ') || '(一个都没有，探测无效)');

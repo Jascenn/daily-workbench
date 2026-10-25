@@ -5,11 +5,11 @@ Serves the folder statically and exposes a shared JSON store at /data.json:
   GET  /data.json  -> current canonical store (used by the workbench UI)
   POST /data.json  -> atomically replace the store (called by the workbench on save)
   GET  /sections.json -> 派生快照：资讯 / 写作 / 复盘 三个「功能类型」区的数据
-                         （只读，由 scripts/sections.py 生成，页面不写回）
+                         （只读，由 scripts/sync/sections.py 生成，页面不写回）
   GET  /social.json -> 自媒体只读快照：账号、逐条内容、草稿能力与数据边界
-                       （只读，由 scripts/social-sync.py 生成，页面只写本地今日计划）
+                       （只读，由 scripts/sync/social-sync.py 生成，页面只写本地今日计划）
   GET  /web-presence.json -> 网站健康、博客 RSS 与流量接入状态
-                             （只读，由 scripts/web-monitor.py 每 5 分钟刷新）
+                             （只读，由 scripts/sync/web-monitor.py 每 5 分钟刷新）
   GET  /api/status -> {"served": true}  (lets the UI detect online mode)
   POST /api/sync   -> run scripts/sync-now.sh and return its output
                       (lets the UI's 「同步一次」 button trigger a real Notion pull;
@@ -50,8 +50,8 @@ from urllib.parse import urlparse, parse_qs
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(DIR, "data.json")
-# 派生快照（资讯/写作/复盘）。**只读**：页面永远不写它，只由 scripts/sections.py 生成。
-# 与 data.json 分开存的原因见 scripts/sections.py 文件头：data.json 是 Notion 同步产物、
+# 派生快照（资讯/写作/复盘）。**只读**：页面永远不写它，只由 scripts/sync/sections.py 生成。
+# 与 data.json 分开存的原因见 scripts/sync/sections.py 文件头：data.json 是 Notion 同步产物、
 # 有写入护栏，混进去会被「同步一次」冲掉。
 SECTIONS = os.path.join(DIR, "sections.json")
 SOCIAL = os.path.join(DIR, "social.json")
@@ -134,7 +134,7 @@ def _jev_call(text):
 RSS_DATA = os.path.expanduser(
     os.environ.get("WB_RSS_DATA",
     "~/Documents/Obsidian/.obsidian/plugins/qiaomu-ai-rss/data.json").expanduser())
-SECTIONS_SCRIPT = os.path.join(DIR, "scripts", "sections.py")
+SECTIONS_SCRIPT = os.path.join(DIR, "scripts", "sync", "sections.py")
 PORT = 8787
 TOKEN_FILE = os.path.expanduser("~/.config/daily-workbench/sync-token")
 SYNC_SCRIPT = os.path.join(DIR, "scripts", "sync-now.sh")
@@ -579,7 +579,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 # 明确报"还没生成 + 怎么生成"，而不是笼统 404：
                 # 这个文件是派生的，第一次跑、或换了机器都会缺。
                 self._send(404, {"error": "no sections",
-                                 "hint": "先跑 python3 scripts/sections.py --write 生成派生快照"})
+                                 "hint": "先跑 python3 scripts/sync/sections.py --write 生成派生快照"})
             return
         if p == "/social.json":
             # 与 data.json / sections.json 同一把令牌。里面没有密钥，但含个人账号与
@@ -592,7 +592,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     self._send(200, f.read())
             except FileNotFoundError:
                 self._send(404, {"error": "no social snapshot",
-                                 "hint": "先跑 python3 scripts/social-sync.py 生成自媒体快照"})
+                                 "hint": "先跑 python3 scripts/sync/social-sync.py 生成自媒体快照"})
             return
         if p == "/web-presence.json":
             if not self._authorized():
@@ -603,7 +603,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     self._send(200, f.read())
             except FileNotFoundError:
                 self._send(404, {"error": "no website snapshot",
-                                 "hint": "先跑 python3 scripts/web-monitor.py 生成网站监控快照"})
+                                 "hint": "先跑 python3 scripts/sync/web-monitor.py 生成网站监控快照"})
             return
         if p == "/mpdt-export.json" or p == "/mpdt-detail.json":
             # mpdt 导出已并入 social.json，这两个中间产物不再单独对外提供，
@@ -635,12 +635,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return
         p = urlparse(self.path).path
         if p == "/api/weekly":
-            # 周报生成：跑 scripts/weekly-report.py 重新生成本周 Markdown，
+            # 周报生成：跑 scripts/sync/weekly-report.py 重新生成本周 Markdown，
             # 落盘 reports/ 后返回最新一份全文。脚本只读本地快照、只写 reports/。
             if not self._authorized():
                 self._send(401, {"error": "unauthorized"})
                 return
-            script = os.path.join(DIR, "scripts", "weekly-report.py")
+            script = os.path.join(DIR, "scripts", "sync", "weekly-report.py")
             if not os.path.exists(script):
                 self._send(500, {"error": "weekly-report script missing", "path": script})
                 return

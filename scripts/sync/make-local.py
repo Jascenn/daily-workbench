@@ -14,8 +14,8 @@
 ⚠️ 三份种子都要参与 --check 比对，否则漏掉一份就会把过期离线页当成最新。
 
 用法：
-    python3 scripts/make-local.py            # 用 data.json + sections.json 重新生成
-    python3 scripts/make-local.py --check    # 只比对，不写文件
+    python3 scripts/sync/make-local.py            # 用 data.json + sections.json 重新生成
+    python3 scripts/sync/make-local.py --check    # 只比对，不写文件
 
 约定：workbench.html 是唯一模板，本脚本只做"注入数据"这一件事，绝不改模板。
 每次 data.json / sections.json 变化后应重跑本脚本（每日自动化会调用）。
@@ -39,7 +39,7 @@ BACKUP_DIR = os.path.join(DIR, "backups")
 
 SEED_MARK = 'id="wb-seed"'
 SEED_TMPL = (
-    '<script id="wb-seed">/* 离线种子：内嵌 data.json 快照，由 scripts/make-local.py 生成 */\n'
+    '<script id="wb-seed">/* 离线种子：内嵌 data.json 快照，由 scripts/sync/make-local.py 生成 */\n'
     'try{localStorage.setItem("wb",%s);}catch(e){}\n'
     '</script>\n'
 )
@@ -132,19 +132,19 @@ def main():
     sections = None
     if not args.no_sections:
         if not os.path.exists(SECTIONS):
-            raise SystemExit("缺少 %s —— 先跑 python3 scripts/sections.py --write" % SECTIONS)
+            raise SystemExit("缺少 %s —— 先跑 python3 scripts/sync/sections.py --write" % SECTIONS)
         with open(SECTIONS, encoding="utf-8") as f:
             sections = json.load(f)
     social = None
     if not args.no_social:
         if not os.path.exists(SOCIAL):
-            raise SystemExit("缺少 %s —— 先跑 python3 scripts/social-sync.py" % SOCIAL)
+            raise SystemExit("缺少 %s —— 先跑 python3 scripts/sync/social-sync.py" % SOCIAL)
         with open(SOCIAL, encoding="utf-8") as f:
             social = json.load(f)
     web = None
     if not args.no_web:
         if not os.path.exists(WEB_PRESENCE):
-            raise SystemExit("缺少 %s —— 先跑 python3 scripts/web-monitor.py" % WEB_PRESENCE)
+            raise SystemExit("缺少 %s —— 先跑 python3 scripts/sync/web-monitor.py" % WEB_PRESENCE)
         with open(WEB_PRESENCE, encoding="utf-8") as f:
             web = json.load(f)
 

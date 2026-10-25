@@ -32,7 +32,7 @@ fi
 echo "✓ 前置检查通过（ntn 存在，代理通路 401）"
 
 # 1. 只读拉取并写入 data.json（经本地同步服务，自动轮转备份 + 骤降保护）
-if ! "$PY" scripts/notion-sync.py; then
+if ! "$PY" scripts/sync/notion-sync.py; then
     echo "✗ 同步失败，data.json 未被修改。"
     exit 4
 fi
@@ -43,19 +43,19 @@ fi
 #    为什么同步后要重建：写作区的「客户内容」读的是 data.json 里 category=客户服务 的项目，
 #    刚同步完那份才是新的；不重建就会停在上一次的状态。
 #    （2026-09-30 补：原来这里只有 make-local，sections.json 得靠人记得手跑。）
-"$PY" scripts/sections.py --write || exit 6
+"$PY" scripts/sync/sections.py --write || exit 6
 # 只作信息展示，不判死：紧接 --write 之后，跨零点那一瞬可能刚好翻一天
 # （days_since 按日历日算，跨零点全体 +1）—— 那种红不是缺陷，不该让整条同步失败。
-"$PY" scripts/sections.py --check || true
+"$PY" scripts/sync/sections.py --check || true
 
 # 3. 刷新自媒体只读快照。X 授权可用时读取公开账号与最近推文，失败时才回落历史报告；
 #    知识星球继续读逐条导出。尚未接数据通道的公众号 / 小红书保持“未核验”，绝不写成 0。
-"$PY" scripts/social-sync.py || exit 7
+"$PY" scripts/sync/social-sync.py || exit 7
 
 # 4. 重建离线兜底页，让 file:// 打开也是新数据
-"$PY" scripts/web-monitor.py || echo "⚠ 网站监控刷新失败，保留上一份快照"
-"$PY" scripts/make-local.py || exit 5
-"$PY" scripts/make-local.py --check >/dev/null 2>&1
+"$PY" scripts/sync/web-monitor.py || echo "⚠ 网站监控刷新失败，保留上一份快照"
+"$PY" scripts/sync/make-local.py || exit 5
+"$PY" scripts/sync/make-local.py --check >/dev/null 2>&1
 echo "✓ 离线兜底页已更新（含类型区与自媒体快照）"
 
 echo "===== 同步完成 ====="

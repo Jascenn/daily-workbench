@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <style>
   /* ── 设计令牌（唯一真源）──────────────────────────────────────────────
-     2026-09-29 UI/UX 评审（designs/workbench/评审报告-20260929.md）：
+     2026-09-29 UI/UX 评审（结论已并入 docs/DESIGN.md）：
      ① 浅色主题原有 9 组文字对比不达标（最差 warn/card 2.15:1，需 4.5）；
      ② 字号 12 档 / 圆角 13 档，且没有任何 --radius / --space / --fs 令牌。
      这里把"阶"建成真源，语义名（--accent 等）只是它的别名 ——
@@ -1370,7 +1370,7 @@
   </div><!-- /screenLedger -->
 
   <!-- ── 类型：资讯 ────────────────────────────────────────────────────────
-       数据来自 Obsidian 的 qiaomu-ai-rss 插件（只读派生快照，见 scripts/sections.py）。
+       数据来自 Obsidian 的 qiaomu-ai-rss 插件（只读派生快照，见 scripts/sync/sections.py）。
        这个区要回答的是"有什么新东西"和"我的订阅源还活着吗"，所以最上面先摆新鲜度。 -->
   <div class="screen workspace-screen" id="screenNews" hidden>
     <header class="workspace-head">
@@ -3045,7 +3045,7 @@ function renderNoteHistory(){
 function esc(s){ s=(s==null)?"":String(s); return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
 /* ---------- 功能类型区（资讯 / 写作 / 复盘） ----------
-   数据来自 /sections.json：一份**只读派生快照**，由 scripts/sections.py 从 Obsidian 插件
+   数据来自 /sections.json：一份**只读派生快照**，由 scripts/sync/sections.py 从 Obsidian 插件
    与 Notion 项目库汇总生成。页面从不写它（写回只有记账那条 data.json 路径）。
    离线时用 make-local.py 内嵌进 localStorage["wb_sections"] 的那份。
 
@@ -3292,7 +3292,7 @@ async function loadSections(){
         try{localStorage.setItem("wb_sections",JSON.stringify(sections));}catch(e){}
         return; }
       secErr = (r.status===404)
-        ? "服务端还没有 sections.json。在终端跑一次：python3 scripts/sections.py --write"
+        ? "服务端还没有 sections.json。在终端跑一次：python3 scripts/sync/sections.py --write"
         : "读取类型区失败：HTTP "+r.status;
     }catch(e){ secErr="服务未响应："+e.message; }
   }else if(SERVED&&!TOKEN){ secErr="链接里没有访问令牌，读不到类型区数据。"; }
@@ -3316,7 +3316,7 @@ async function loadSocial(){
         try{localStorage.setItem("wb_social",JSON.stringify(social));}catch(e){}
         return; }
       socialErr=r.status===404
-        ? "服务端还没有 social.json。在终端跑一次：python3 scripts/social-sync.py"
+        ? "服务端还没有 social.json。在终端跑一次：python3 scripts/sync/social-sync.py"
         : "读取自媒体数据失败：HTTP "+r.status;
     }catch(e){ socialErr="自媒体快照服务未响应："+e.message; }
   }else if(SERVED&&!TOKEN){ socialErr="链接里没有访问令牌，读不到自媒体数据。"; }
@@ -4293,7 +4293,7 @@ function renderReview(s){
 }
 
 /* ---------- 自动周报：POST /api/weekly 生成 → 复盘页展示 ----------
-   服务端跑 scripts/weekly-report.py，从本地快照汇总成 Markdown 落盘 reports/。
+   服务端跑 scripts/sync/weekly-report.py，从本地快照汇总成 Markdown 落盘 reports/。
    进复盘页先 GET 最近一份（不重新算），点按钮才 POST 重新生成。 */
 let weeklyLoading=false;
 async function genWeekly(){
@@ -4649,25 +4649,25 @@ function openSources(){
       "scripts/sync-now.sh → notion-sync.py（ntn CLI + Surge 代理）→ data.json"),
     row("资讯订阅（RSS）",(sections&&sections.sections?"已接入":"未加载"),secErrNow?"warn":"ok",
       "订阅源在「资讯」页签管理，支持探查新源。栏目节奏（天数/阈值）由上游统一计算，页面只展示。",
-      "scripts/sections.py --write → sections.json；写入 Obsidian qiaomu-ai-rss data.json"),
+      "scripts/sync/sections.py --write → sections.json；写入 Obsidian qiaomu-ai-rss data.json"),
     row("写作 / 复盘",secErrNow?"读取失败":"已接入",secErrNow?"warn":"ok",
       "与资讯同一份 sections.json，按栏目区分阈值；写作 45 天 / 复盘 30 天。",
       "Obsidian 知识库目录扫描 → sections.json"),
     row("X（Twitter）",socialT==="—"?"未加载":"快照 "+socialT,"ok",
       "只读公开数据：账号资料 + 最近时间线的公开浏览/赞/评/转发。官方统计 API 未接入。",
-      "scripts/social-sync.py → social.json"),
+      "scripts/sync/social-sync.py → social.json"),
     row("小红书","快照 "+socialT,"ok",
       "已通过会话 Cookie 接通，只读本人主页与公开笔记互动，不自动发布。",
-      "scripts/social-sync.py（凭据 ~/.config/xfetch/session.json）→ social.json"),
+      "scripts/sync/social-sync.py（凭据 ~/.config/xfetch/session.json）→ social.json"),
     row("公众号","素材已接入 · 统计待认证","warn",
       "未认证订阅号没有官方统计接口；已保留草稿凭据（本机环境变量），素材 7 篇。IP 白名单需与出口 IP 一致。",
-      "scripts/social-sync.py → social.json"),
+      "scripts/sync/social-sync.py → social.json"),
     row("知识星球","历史快照 · 每日核验","warn",
       "平台无稳定逐条接口，数据停在最后一次后台导出；每天发布状态人工核验，定期导出回填。",
       "本机导出 → social.json"),
     row("网站 / 博客 / AI 用量","检测 "+webT,webT==="—"?"warn":"ok",
       "三个站点可用性每 5 分钟检测；博客更新走 RSS；访问数据来自 Notion 每日 09:00 汇总；AI 用量扫本机会话日志。搜索流量当前"+(gsc.error?"密钥失效，按知识库《GSC 密钥更换指南》处理。":"已接入。"),
-      "scripts/web-monitor.py + ai_usage.py → web-presence.json；GSC 密钥 ~/.config/daily-workbench/gsc-service-account.json")].join("");
+      "scripts/sync/web-monitor.py + ai_usage.py → web-presence.json；GSC 密钥 ~/.config/daily-workbench/gsc-service-account.json")].join("");
   renderDraftPush();
   openOv("sourcesOv");
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # 自动周报：把本周的收益 / 各平台发布 / 内容表现 / 站点 / 同步成功率
 # 汇总成一份 Markdown 落盘到 reports/。全部数据来自本地快照，不联网、不写回任何源。
-# 手动：python3 scripts/weekly-report.py；服务端：POST /api/weekly。
+# 手动：python3 scripts/sync/weekly-report.py；服务端：POST /api/weekly。
 
 import json
 import os
@@ -131,7 +131,7 @@ def build_report(today=None):
         lines.append("")
 
     lines.append("---")
-    lines.append("*本报告由 scripts/weekly-report.py 从本地快照生成，数据口径与工作台页面一致。*")
+    lines.append("*本报告由 scripts/sync/weekly-report.py 从本地快照生成，数据口径与工作台页面一致。*")
     return "\n".join(lines) + "\n"
 
 

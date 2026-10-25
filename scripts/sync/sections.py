@@ -35,10 +35,10 @@
 
 用法
 ----
-    python3 scripts/sections.py            # 打印摘要
-    python3 scripts/sections.py --write    # 写 sections.json
-    python3 scripts/sections.py --check    # 只比对，不写（退出码 0/2，别用管道读）
-    python3 scripts/sections.py --now 2026-09-29T12:00:00   # 固定"现在"，便于测试
+    python3 scripts/sync/sections.py            # 打印摘要
+    python3 scripts/sync/sections.py --write    # 写 sections.json
+    python3 scripts/sync/sections.py --check    # 只比对，不写（退出码 0/2，别用管道读）
+    python3 scripts/sync/sections.py --now 2026-09-29T12:00:00   # 固定"现在"，便于测试
 """
 import argparse
 import datetime as dt
@@ -545,7 +545,7 @@ def build(now=None):
             "obsidianRoot": OBSIDIAN,
             "staleThresholds": STALE_DAYS,
             "newsWindowDays": NEWS_WINDOW_DAYS,
-            "note": "派生快照，随时可重新生成。不要手工编辑；改数据请改上游（Obsidian / Notion）后重跑 scripts/sections.py --write。",
+            "note": "派生快照，随时可重新生成。不要手工编辑；改数据请改上游（Obsidian / Notion）后重跑 scripts/sync/sections.py --write。",
         },
         "sections": [
             collect_news(now),

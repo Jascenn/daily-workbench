@@ -11,7 +11,7 @@ const DATA = JSON.parse(fs.readFileSync(DIR + 'data.json', 'utf8'));
 // （Σ分组 == 篇数、近期+归档 == 总数），用手搓数据守恒恒成立，等于没测。
 let SECTIONS;
 try { SECTIONS = JSON.parse(fs.readFileSync(DIR + 'sections.json', 'utf8')); }
-catch (e) { console.error('缺少 sections.json —— 先跑：python3 scripts/sections.py --write'); process.exit(2); }
+catch (e) { console.error('缺少 sections.json —— 先跑：python3 scripts/sync/sections.py --write'); process.exit(2); }
 /* 资讯分页断言的前提是「窗口内条数 > NEWS_PAGE」：真实快照窗口内常常不足 20 条，
    min(NEWS_PAGE,…) 恒等于窗口内条数，把分页变异掉断言照样绿 —— 被数据豁免。
    这里在喂给页面之前把前 NEWS_PAGE+5 条压进窗口，保证上限真的参与约束。
@@ -25,7 +25,7 @@ catch (e) { console.error('缺少 sections.json —— 先跑：python3 scripts/
 }
 let SOCIAL;
 try { SOCIAL = JSON.parse(fs.readFileSync(DIR + 'social.json', 'utf8')); }
-catch (e) { console.error('缺少 social.json —— 先跑：python3 scripts/social-sync.py'); process.exit(2); }
+catch (e) { console.error('缺少 social.json —— 先跑：python3 scripts/sync/social-sync.py'); process.exit(2); }
 
 console.log(`被测文件：${HTML}\n`);
 
@@ -1393,7 +1393,7 @@ clockAt(TEST_TODAY, () => {
 
 /* ══════════════════════════════════════════════════════════════════════════
    26. UI/UX 评审整改（2026-09-29）回归断言
-   评审报告：designs/workbench/评审报告-20260929.md（83 条规则库 + WCAG 2.1 AA）
+   评审结论：见 docs/DESIGN.md（83 条规则库 + WCAG 2.1 AA）
    这一节同时是"别退回去"的哨兵：对比度、令牌纪律、键盘可达、提示通道
    —— 全都是靠人眼不靠不住的东西，只能靠断言守住。
    ══════════════════════════════════════════════════════════════════════════ */
@@ -2160,7 +2160,7 @@ console.log('\n— 27. 第四轮整改：跳转链 / 表头 / 命中区 / Enter 
   /* 把真实的 days 全喂一遍。上一版这里写的是 agoTxt(0)==='今天' 加一句同义反复的
      "不会变成负数" —— 那等于没测：它没有碰任何真实数据，也不可能红。
      真正该守的两件事：① 渲染不许退化成 NaN/undefined；② "未来时间戳夹到 0"
-     发生在**上游**（scripts/sections.py 的 days_since），页面永远看不到负数。 */
+     发生在**上游**（scripts/sync/sections.py 的 days_since），页面永远看不到负数。 */
   const allDays = S.sections.flatMap(s =>
     (s.items || []).map(i => i.days).concat((s.feeds || []).map(f => f.days)));
   t('全部真实 days 都能渲染成人话（无 NaN / undefined / null）',

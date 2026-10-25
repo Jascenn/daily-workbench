@@ -19,8 +19,8 @@
               那个库只有「项目一/项目二」两条 Notion 模板示例，字段也对不上）
 
 用法：
-  python3 scripts/notion-sync.py --dry     # 只拉取并打印，不写文件
-  python3 scripts/notion-sync.py           # 拉取并写入 data.json（经同步服务，自动备份）
+  python3 scripts/sync/notion-sync.py --dry     # 只拉取并打印，不写文件
+  python3 scripts/sync/notion-sync.py           # 拉取并写入 data.json（经同步服务，自动备份）
 """
 import datetime
 import json

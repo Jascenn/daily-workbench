@@ -6,8 +6,8 @@
                 （2026-10-12 用户确认：7.94B tokens / $5,739.82 / 69,941 请求，
                 覆盖全部走中转的工具和旧设备；接口侧 access token 未配置，
                 配好后在 TOKEN_FILE 里放 accessToken 即可自动切实时查询）
-  2. codex   —— 本机 ~/.codex 会话日志统计（scripts/token-usage.py 的口径，
-                只含本机 Codex，仅作下钻参考）
+  2. codex   —— 本机 ~/.codex 会话日志统计（可选模块 token-usage.py，开源版默认
+                不带；存在时自动启用，不存在时如实返回 unavailable）
   3. jev     —— TypeSafe Jev 语义模型实时探测（走本机 7890 代理，
                 一次最小 systemone 判断调用，同时取回官方 token 用量）
 
@@ -182,7 +182,7 @@ def _codex_drilldown(cached: dict) -> dict:
     """本机 Codex 会话日志统计（每次监控轮询都重新扫描，保证总量准实时）。"""
     prev = cached.get("codex")
     if not TOKEN_USAGE.exists():
-        return {"ok": False, "error": "scripts/token-usage.py 不存在"}
+        return {"ok": False, "unavailable": True, "note": "optional module token-usage.py not present (not shipped in the open-source repo)"}
     try:
         proc = subprocess.run(
             ["python3", str(TOKEN_USAGE), "--json"], capture_output=True, timeout=120)

@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  logic:
+    name: Logic tests (499 assertions)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Seed sample fixtures
+        run: |
+          python3 - <<'PY'
+          import json, pathlib
+          # CI 跑逻辑断言需要一份 data.json。仓库不带真实数据，
+          # 用访客模式的示例数据生成结构相同的夹具。
+          html = pathlib.Path("workbench.html").read_text()
+          import re
+          # 从源码里提取 guestSample 的骨架太脆；直接构造最小合法夹具。
+          fixture = {
+              "projects": [], "earnings": [], "notes": {}, "predictions": [],
+              "monthlyGoal": 30000, "notionStatus": "local", "lastNotionSync": None,
+              "owner": "CI", "sourceMap": {"rules": [], "notMerged": [], "decisions": {}}
+          }
+          pathlib.Path("data.json").write_text(json.dumps(fixture, ensure_ascii=False))
+          for name in ("sections.json", "social.json"):
+              pathlib.Path(name).write_text(json.dumps({"version": 1, "guest": True}, ensure_ascii=False))
+          PY
+      - name: Run logic tests
+        run: node scripts/tests/test-workbench-logic.mjs
+
+  smoke:
+    name: UX smoke (147 checks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/tests/smoke-ux.mjs
+
+  python:
+    name: Python compile check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python3 -m py_compile app.py scripts/sync/*.py scripts/tools/*.py scripts/tests/*.py
+      - run: bash -n scripts/sync-now.sh scripts/tools/*.sh scripts/diagnostics/*.sh

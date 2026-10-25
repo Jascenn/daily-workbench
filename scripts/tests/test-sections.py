@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""scripts/sections.py 的断言测试。
+"""scripts/sync/sections.py 的断言测试。
 
     python3 scripts/tests/test-sections.py
 
@@ -54,7 +54,7 @@ NOW = dt.datetime(2026, 9, 29, 12, 0, 0)   # 固定"现在"，让所有天数断
 OBJ = S.build(NOW)
 SEC = {s["id"]: s for s in OBJ["sections"]}
 
-print("被测：scripts/sections.py  固定 now=%s" % NOW)
+print("被测：scripts/sync/sections.py  固定 now=%s" % NOW)
 
 # ─────────────────────────────────────────────────────────────── 1. 结构
 print("\n1. 产物结构")

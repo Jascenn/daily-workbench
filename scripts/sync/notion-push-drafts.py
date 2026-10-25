@@ -8,8 +8,8 @@
 只碰 source=="local" 的记录；source=="notion"（只读拉取来的）绝不动。
 
 用法：
-  python3 scripts/notion-push-drafts.py              # 演练，只打印将要写什么
-  python3 scripts/notion-push-drafts.py --confirm    # 真的写入
+  python3 scripts/sync/notion-push-drafts.py              # 演练，只打印将要写什么
+  python3 scripts/sync/notion-push-drafts.py --confirm    # 真的写入
 
 写入成功后，本地那几条会被标成 source:"notion" / readOnly:true，
 下次同步会以 Notion 为准（不会重复写）。
@@ -94,7 +94,7 @@ def main():
     if not confirm:
         print("【演练模式】以上内容**尚未**写入 Notion。")
         print("确认无误后加 --confirm 真写：")
-        print("  python3 scripts/notion-push-drafts.py --confirm")
+        print("  python3 scripts/sync/notion-push-drafts.py --confirm")
         print()
         print("将要提交的请求体示例（第 1 条）：")
         print(json.dumps(build_page(drafts[0]), ensure_ascii=False, indent=2)[:900])

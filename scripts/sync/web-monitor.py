@@ -34,7 +34,7 @@ def _gsc_section() -> dict | None:
 def _words_section() -> dict | None:
     """新词雷达每周新词快照。
 
-    数据由 scripts/words.py 拉取雷达站 words.json 并缓存（最多 6 小时刷新
+    数据由 scripts/sync/words.py 拉取雷达站 words.json 并缓存（最多 6 小时刷新
     一次）；用 words-seen.json 记录已提醒的周，有新周才报一次。永不抛异常。"""
     try:
         from words import words_snapshot
