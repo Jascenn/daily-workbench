@@ -1,0 +1,9 @@
+# Default owner for all changes.
+* @Jascenn
+
+# External-sync and server code define the data boundary.
+/app.py @Jascenn
+/scripts/ @Jascenn
+
+# Workflow changes should always be reviewed.
+/.github/workflows/ @Jascenn
