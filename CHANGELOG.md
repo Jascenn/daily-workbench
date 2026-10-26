@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add a pull-request template with privacy, honest-state and verification checks.
+- Add baseline repository hygiene files and monthly GitHub Actions update checks.
+
 ## [1.0.0] - 2026-10-26
 
 Initial public release.
