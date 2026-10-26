@@ -10,8 +10,8 @@ jobs:
     name: Logic tests (491 assertions)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       # 仓库不带真实数据：先用夹具生成器造三份伪数据快照（data/sections/social），
@@ -27,8 +27,8 @@ jobs:
     name: Python compile check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: python3 -m py_compile app.py scripts/sync/*.py scripts/tools/*.py scripts/tests/*.py
