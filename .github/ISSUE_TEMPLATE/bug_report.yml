@@ -1,0 +1,62 @@
+name: Bug report
+description: Report incorrect data, synchronization, or interface behavior
+title: "fix: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include real earnings, client names, platform credentials, or
+        local absolute paths. Use the guest-mode fixtures when possible.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: "main / bb680bc"
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Data mode
+      options:
+        - Guest fixtures
+        - Local synthetic data
+        - Real local data, redacted
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should happen
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Redacted logs or screenshots
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety checks
+      options:
+        - label: I removed real financial, customer, credential, and local path data.
+          required: true
+        - label: This is not a private vulnerability report.
+          required: true

@@ -94,4 +94,5 @@ python3 scripts/tests/mutate-workbench.py     # 69 变异必须全红
 
 ## License
 
-MIT
+MIT. See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution conventions and
+[SECURITY.md](SECURITY.md) for private vulnerability reporting.

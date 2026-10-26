@@ -1,0 +1,32 @@
+name: Feature request
+description: Propose a new workbench capability
+title: "feat: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: data
+    attributes:
+      label: Data sources and read-only boundary
+      description: Identify any new source, missing-data state, and write-back risk.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submit checks
+      options:
+        - label: I searched existing issues and pull requests.
+          required: true
+        - label: I did not include real private data.
+          required: true
