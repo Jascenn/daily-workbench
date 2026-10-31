@@ -25,8 +25,10 @@ bash scripts/tools/open-workbench.sh   # 打印带令牌的本地链接
 ```bash
 node scripts/tests/test-workbench-logic.mjs   # 必须全绿
 node scripts/tests/smoke-ux.mjs               # 必须全绿
-python3 scripts/tests/mutate-workbench.py     # 69 条变异必须全红
-python3 -m py_compile app.py scripts/sync/*.py scripts/tools/*.py
+python3 scripts/tests/mutate-workbench.py     # 70 条变异必须全红
+python3 scripts/tests/test-sync-timings.py    # 分阶段耗时解析必须全绿
+python3 scripts/tests/test-sync-timeout.py    # 超时清理与日志留痕必须全绿
+python3 -m py_compile app.py scripts/sync/*.py scripts/tools/*.py scripts/tests/*.py
 ```
 
 ## 提交规范

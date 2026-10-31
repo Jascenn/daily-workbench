@@ -1,5 +1,5 @@
 name: Feature request
-description: Propose a new workbench capability
+description: Propose a development-mirror change
 title: "feat: "
 body:
   - type: textarea
@@ -17,8 +17,8 @@ body:
   - type: textarea
     id: data
     attributes:
-      label: Data sources and read-only boundary
-      description: Identify any new source, missing-data state, and write-back risk.
+      label: Data and privacy impact
+      description: Note new sources, storage paths, and read-only boundaries.
     validations:
       required: true
   - type: checkboxes

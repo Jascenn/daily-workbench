@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""用 ntn（经 Surge 代理）调用 Notion 公共 API 的小工具。
-所有调用都走 HTTPS_PROXY，因此不受 WorkBuddy/Electron 直连问题影响。
+"""用 ntn 调用 Notion 公共 API 的小工具。
+默认直连；环境变量里的重复代理会被清掉，避免与系统代理叠加。
 """
 import json
 import os
@@ -8,8 +8,11 @@ import subprocess
 import sys
 
 NTN = "/usr/local/bin/ntn"
-ENV = dict(os.environ, HTTPS_PROXY="http://127.0.0.1:7890",
-           HTTP_PROXY="http://127.0.0.1:7890")
+ENV = dict(os.environ)
+for _proxy_key in (
+        "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
+        "http_proxy", "https_proxy", "all_proxy"):
+    ENV.pop(_proxy_key, None)
 
 
 def api(path, method="POST", body=None, timeout=60):

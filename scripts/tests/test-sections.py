@@ -20,15 +20,17 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import datetime as dt
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-sys.path.insert(0, os.path.join(ROOT, "scripts"))
+SYNC_DIR = os.path.join(ROOT, "scripts", "sync")
+sys.path.insert(0, SYNC_DIR)
 import sections as S  # noqa: E402
 
 PY = sys.executable
-SRC_PY = os.path.join(ROOT, "scripts", "sections.py")   # 被测源码本身：有些断言要读它（如"不许退回旧写法"）
+SRC_PY = os.path.join(SYNC_DIR, "sections.py")   # 被测源码本身：有些断言要读它（如"不许退回旧写法"）
 PASS = FAIL = 0
 
 
@@ -173,7 +175,7 @@ for sub in subs:
 t("② 每个源的最新时间 == 用它的 entries 独立重算出来的",
   not bad, "、".join(bad) or "%d 个源一致" % len(subs))
 t("dead 判定 == days > feedStaleDays（标记与判据不许各说各话）",
-  all(f["dead"] == (f["days"] is None or f["days"] > news["feedStaleDays"]) for f in news["feeds"]),
+  all(f["dead"] == (f["days"] is not None and f["days"] > news["feedStaleDays"]) for f in news["feeds"]),
   "停更 %d 个" % sum(1 for f in news["feeds"] if f["dead"]))
 t("feedStaleDays 由上游给出（页面不硬编码）", isinstance(news.get("feedStaleDays"), int), news.get("feedStaleDays"))
 
@@ -200,11 +202,50 @@ t("① 正文字数 == 只算 第*章.md 的字数之和（独立重算）",
 _allmd = sum(len(rd(f)) for f in glob.glob(os.path.join(proj, "*.md")))
 t("正文字数 **小于** 目录里所有 md 之和（证明「排除设定与节选」真的生效了）",
   b0.get("chars") < _allmd, "正文 %d < 全部 md %d" % (b0.get("chars"), _allmd))
+_book_id = str(b0.get("bookId") or "")
+_chapter_ids = [str(c.get("chapterId") or "") for c in (b0.get("chapters") or [])]
+t("作品与所有章节都有稳定 ID，且不暴露本机绝对路径",
+  re.fullmatch(r"book_[0-9a-f]{20}", _book_id)
+  and all(re.fullmatch(r"chapter_[0-9a-f]{20}", x) for x in _chapter_ids)
+  and "path" not in b0
+  and all("path" not in c for c in (b0.get("chapters") or [])),
+  "%s / %d 个章节 ID" % (_book_id, len(_chapter_ids)))
+_again = S.build(NOW)
+_again_b0 = next(s for s in _again["sections"] if s["id"] == "writing")["books"][0]
+t("重复生成时作品与章节 ID 完全不变（前端书签不会漂移）",
+  _again_b0.get("bookId") == b0.get("bookId")
+  and [c.get("chapterId") for c in _again_b0.get("chapters", [])]
+      == [c.get("chapterId") for c in b0.get("chapters", [])])
 t("目标篇幅是从总纲里读出来的（不是我猜的）",
   b0.get("target") and b0["target"]["min"] == 20000 and b0["target"]["max"] == 50000,
   json.dumps(b0.get("target"), ensure_ascii=False))
 t("目标区间下限 > 0（页面拿它当分母算进度，为 0 会除零）",
   b0.get("target", {}).get("min", 0) > 0)
+_outline_url = S.obsidian_url(os.path.join(proj, "章节目录.md"))
+t("章节目录深链指向固定 Obsidian-Tech vault，并去掉 .md 后缀",
+  b0.get("outlineUrl") == _outline_url
+  and _outline_url.startswith("obsidian://open?vault=Obsidian-Tech&file=")
+  and "%E7%AB%A0%E8%8A%82%E7%9B%AE%E5%BD%95" in _outline_url
+  and ".md" not in _outline_url,
+  b0.get("outlineUrl", ""))
+_bad_chapter_urls = []
+for c in b0.get("chapters") or []:
+    f = os.path.join(proj, c["name"] + ".md")
+    want = S.obsidian_url(f) if os.path.isfile(f) else ""
+    if c.get("obsidianUrl") != want:
+        _bad_chapter_urls.append("%s: %r != %r" % (c["name"], c.get("obsidianUrl"), want))
+t("已写章节生成真实文件深链，未写章节不伪造链接",
+  not _bad_chapter_urls,
+  "、".join(_bad_chapter_urls[:3]) or "%d 章逐项一致" % len(b0.get("chapters") or []))
+_source_docs = (b0.get("docs") or []) + (b0.get("drafts") or [])
+t("设定、大纲与其它稿件都带固定 vault 深链",
+  bool(_source_docs) and all(
+    str(d.get("obsidianUrl") or "").startswith("obsidian://open?vault=Obsidian-Tech&file=")
+    for d in _source_docs),
+  "%d 份" % len(_source_docs))
+t("深链生成器拒绝 Obsidian-Tech 根目录之外的路径",
+  S.obsidian_url("/tmp/outside-obsidian-vault.md") == "",
+  S.obsidian_url("/tmp/outside-obsidian-vault.md") or "(已拒绝)")
 _data = rdj(os.path.join(ROOT, "data.json"))
 _want_cli = [p for p in (_data.get("projects") or []) if (p.get("category") or "").strip() == "客户服务"]
 t("② 客户内容条数 == data.json 里 category=客户服务 的项目数（独立重算）",
@@ -219,6 +260,36 @@ t("② 客户状态分布 == 从上游 status 独立统计出来的（不写死�
 t("客户状态 hint 里写的是真实分布",
   any(_cs and all(str(v) in s.get("hint", "") for v in _cs.values()) for s in wr["stats"] if s["k"] == "客户内容"),
   [s["hint"] for s in wr["stats"] if s["k"] == "客户内容"])
+
+# 独立稿件与新小说使用临时目录验证，不能在真实 Obsidian 里造样例。
+with tempfile.TemporaryDirectory() as tmp:
+    old_root = S.writing_store.OBSIDIAN_ROOT
+    old_writing = S.writing_store.WRITING_ROOT
+    try:
+        temp_obsidian = os.path.join(tmp, "Obsidian-Tech")
+        temp_projects = os.path.join(temp_obsidian, "projects")
+        temp_novel = os.path.join(temp_obsidian, "创作", "小说", "新书")
+        temp_docs = os.path.join(temp_obsidian, "创作", "公众号")
+        os.makedirs(temp_novel)
+        os.makedirs(temp_docs)
+        with open(os.path.join(temp_novel, "章节目录.md"), "w", encoding="utf-8") as f:
+            f.write("# 《新书》章节目录\n\n## 第一章 开端\n")
+        with open(os.path.join(temp_docs, "周记.md"), "w", encoding="utf-8") as f:
+            f.write("---\ntitle: 周记\ncontent-type: 公众号\nstatus: 草稿\n---\n\n正文\n")
+        S.writing_store.OBSIDIAN_ROOT = temp_obsidian
+        S.writing_store.WRITING_ROOT = temp_projects
+        temp_wr = S.collect_writing(NOW, {})
+        temp_titles = {b.get("title") for b in temp_wr.get("books") or []}
+        t("新小说从 创作/小说/ 被发现，旧 projects/ 路径仍兼容",
+          temp_titles == {"新书"}, "发现作品：" + "、".join(sorted(temp_titles)))
+        t("公众号独立稿件进入统一写作区，并带稳定 ID 与类型",
+          len(temp_wr.get("documents") or []) == 1
+          and temp_wr["documents"][0]["contentType"] == "公众号"
+          and re.fullmatch(r"doc_[0-9a-f]{20}", temp_wr["documents"][0]["documentId"]),
+          json.dumps(temp_wr.get("documentTypes"), ensure_ascii=False))
+    finally:
+        S.writing_store.OBSIDIAN_ROOT = old_root
+        S.writing_store.WRITING_ROOT = old_writing
 
 # ─────────────────────────────────────────────────────────────── 7. 复盘
 print("\n7. 复盘区：分组守恒")
@@ -235,9 +306,32 @@ t("分组无重名且每类非空", len(set(g["name"] for g in rv["groups"])) ==
 t("缺 frontmatter 的笔记落在「未标注」里而不是消失",
   all(n["productType"] for n in rv["items"]),
   "未标注 %d 篇" % sum(1 for n in rv["items"] if n["productType"] == "未标注"))
+_bad_review_urls = []
+for n in rv["items"]:
+    f = next((x for x in _notes if os.path.basename(x)[:-3] == n["title"]), None)
+    want = S.obsidian_url(f) if f else ""
+    if n.get("obsidianUrl") != want:
+        _bad_review_urls.append("%s: %r != %r" % (n["title"], n.get("obsidianUrl"), want))
+t("复盘笔记深链与真实文件逐条对应，没有臆造页面",
+  not _bad_review_urls,
+  "、".join(_bad_review_urls[:3]) or "%d 篇逐项一致" % len(rv["items"]))
 t("按日期降序（最近的在最前）",
   [n["date"] or "" for n in rv["items"]] == sorted((n["date"] or "" for n in rv["items"]), reverse=True),
   (rv["items"][0]["date"] or "")[:10] + " … " + (rv["items"][-1]["date"] or "")[:10])
+t("复盘条目带列表摘要，且不像 frontmatter/标题那样开头",
+  all(isinstance(n.get("summary"), str) for n in rv["items"])
+  and all(not n["summary"].startswith(("---", "#")) for n in rv["items"] if n["summary"]),
+  "空摘要 %d 篇" % sum(1 for n in rv["items"] if not n.get("summary")))
+t("复盘 noteId 稳定（note_ + 20 位 hex），产物里没有 path 字段",
+  all(re.fullmatch(r"note_[0-9a-f]{20}", n.get("noteId") or "") for n in rv["items"])
+  and all("path" not in n for n in rv["items"]),
+  "%d 个稳定 ID" % len(rv["items"]))
+_sm = {s["k"]: s["v"] for s in rv["stats"]}
+_d30 = sum(1 for n in rv["items"] if n["days"] is not None and n["days"] <= 30)
+_d90 = sum(1 for n in rv["items"] if n["days"] is not None and n["days"] <= 90)
+t("近30/90天篇数与用 items 的 days 独立重算一致",
+  _sm.get("近30天") == "%d 篇" % _d30 and _sm.get("近90天") == "%d 篇" % _d90,
+  "30天 %s / 90天 %s" % (_sm.get("近30天"), _sm.get("近90天")))
 
 # ─────────────────────────────────────────────────────────────── 8. 阈值与纯文本
 print("\n8. 过期阈值与「UI 文案必须是纯文本」")
@@ -248,8 +342,11 @@ t("阈值与 meta 里声明的一致", all(OBJ["meta"]["staleThresholds"][i] == 
 t("stale == (days is None or days > threshold)，三处口径同源",
   all(s["freshness"]["stale"] == (s["freshness"]["days"] is None or s["freshness"]["days"] > s["freshness"]["threshold"])
       for s in OBJ["sections"]))
-t("资讯区在真实数据下确实是「已过期」（阈值 3 天被真的用上了，不是摆设）",
-  SEC["news"]["freshness"]["stale"], "%s 天 > %s 天" % (SEC["news"]["freshness"]["days"], SEC["news"]["freshness"]["threshold"]))
+future = S.build(dt.datetime(2026, 12, 1))
+future_news = next(s for s in future["sections"] if s["id"] == "news")
+t("把观察时间推后 30 天，资讯区会按阈值判为「已过期」（阈值 3 天被真的用上了，不是摆设）",
+  future_news["freshness"]["stale"],
+  "%s 天 > %s 天" % (future_news["freshness"]["days"], future_news["freshness"]["threshold"]))
 t("新鲜度 basis 明说是「最新内容」而不是插件的 updatedAt",
   "最新内容" in SEC["news"]["freshness"]["basis"] and "updatedAt" in SEC["news"]["note"],
   SEC["news"]["freshness"]["basis"])
@@ -284,7 +381,7 @@ t("同一个 now 生成两次，字节完全相同（否则 --check 没有意义
 
 
 def run(args):
-    p = subprocess.run([PY, os.path.join(ROOT, "scripts", "sections.py")] + args,
+    p = subprocess.run([PY, SRC_PY] + args,
                        capture_output=True, text=True, cwd=ROOT)
     return p.returncode, (p.stdout + p.stderr).strip()
 

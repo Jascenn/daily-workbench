@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""New-word radar snapshot for the WorkBuddy workbench.
+"""New-word radar snapshot for the Daily Workbench.
 
 Pure standard library: no pip packages needed. Fetches the public
 words.json from the word-radar site and reports whether a new week of
@@ -51,7 +51,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 CACHE = ROOT / "words-cache.json"
 SEEN_FILE = ROOT / "words-seen.json"
 
-WORDS_URL = os.environ.get("WB_WORDS_URL", "")  # 你的每日一词 JSON 源；留空则该模块禁用
+WORDS_URL = "https://word-radar-jascens-projects.vercel.app/words.json"
 
 REFRESH_HOURS = 6
 HTTP_TIMEOUT = 15
@@ -89,7 +89,7 @@ def _cache_fresh_enough(cached: dict | None) -> bool:
 
 def _refresh() -> dict:
     req = urllib.request.Request(
-        WORDS_URL, headers={"User-Agent": "WorkBuddy-words/1.0"})
+        WORDS_URL, headers={"User-Agent": "DailyWorkbench-words/1.0"})
     with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
         payload = json.loads(resp.read().decode("utf-8"))
     weeks = payload.get("weeks") or []

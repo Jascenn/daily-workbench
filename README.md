@@ -1,98 +1,50 @@
-# Daily Workbench（每日工作台）
+# 每日工作台（Daily Workbench）
 
-[![CI](https://github.com/Jascenn/daily-workbench/actions/workflows/ci.yml/badge.svg)](https://github.com/Jascenn/daily-workbench/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+本地优先的个人经营工作台：Notion 数据同步 + 白名单回写 + 本地草稿，覆盖收益、项目、客户、时间、资讯、写作、自媒体运营、知识库与复盘。
 
-本地优先的个人经营工作台：Notion 只读同步 + 本地草稿记账，覆盖收益、项目、客户、时间、资讯、写作、自媒体运营与复盘。单文件前端 + 零依赖 Python 标准库后端，所有外部系统只读。
+> **仓库说明**：这个仓库是 `daily-workbench` 的私有开发镜像，用于真实数据管道和个人历史记录；公开版本在 [Jascenn/daily-workbench](https://github.com/Jascenn/daily-workbench)。真实数据、客户信息和本机配置不得进入 Git。
 
-## 特性
-
-- **行动优先首屏**：先给「今天先做三件事」（项目推进 / 数据体检 / 月度目标缺口），经营指标在后
-- **Notion 只读同步**：收益、项目、客户库只读拉取；本地「记一笔」草稿显式确认后才推送回 Notion
-- **收益归并引擎**：`sourceMap` 规则随数据下发，把同一客户的不同备注写法归并成组，笔数/金额守恒有测试守护
-- **数据体检**：重复记录、零额记录、断档、项目关联率，每项可跳转到具体记录
-- **多源自媒体快照**：X / 公众号 / 小红书 / 知识星球，未接入的通道如实标注「未核验」，绝不伪装成 0
-- **网站与博客监控**：可用性 5 分钟检测、RSS 更新、GSC 搜索流量、Umami 访问数据
-- **访客模式**：全部示例数据，与真实数据完全隔离，可直接当 demo 演示
-- **AI 增强插件（可选）**：接 TypeSafe Jev 做内容质量分析，不开就按原逻辑走
-- **同步日志**：启动日志式的步骤明细，最近 20 条可回看
-
-## 快速开始
-
-```bash
-# 1. 启动本地服务（纯标准库，无 pip 依赖，Python 3.10+）
-python3 app.py
-
-# 2. 生成令牌并打开工作台
-bash scripts/tools/open-workbench.sh
-```
-
-服务监听 `127.0.0.1:8787`，所有数据接口要求令牌（首次启动自动生成到 `~/.config/daily-workbench/sync-token`）。没有配置任何外部数据源也能用——访客模式和本地记账不依赖它们。
-
-### 数据接入（全部可选）
-
-配置以下环境变量接入真实数据源（或直接改脚本顶部常量）：
-
-| 变量 | 用途 |
-|---|---|
-| `WB_NOTION_INCOME_DS` / `WB_NOTION_EXPENSE_DS` / `WB_NOTION_PROJECT_DS` / `WB_NOTION_CLIENT_DS` | Notion 数据源 ID |
-| `WB_OBSIDIAN_VAULT` | Obsidian 知识库路径（资讯/写作/复盘快照来源） |
-| `WB_X_HANDLE` | X (Twitter) 账号 handle |
-| `WB_WECHAT_ACCOUNT` | 公众号名称 |
-| `WB_ZSXQ_GROUPS` | 知识星球群名（逗号分隔） |
-| `WB_PROXY` | 同步走的代理（默认 `http://127.0.0.1:7890`） |
-| `WB_RSS_DATA` | Obsidian RSS 插件数据文件路径 |
-
-Notion 同步还需要 [ntn CLI](https://github.com) 与有效令牌；自媒体通道各自需要对应的登录凭据（X 走 xreach 会话、公众号走 APPID/Secret + IP 白名单、知识星球走网页 cookie token）。没有配置的通道在页面上显示「未接入」，不影响其它功能。
-
-```bash
-# 手动刷新全部数据
-bash scripts/sync-now.sh
-```
+提交约定见 [CONTRIBUTING.md](CONTRIBUTING.md)；安全问题按
+[SECURITY.md](SECURITY.md) 私下报告。
 
 ## 架构
 
-```
-app.py                  本地服务：令牌鉴权、原子写入 + 轮转备份、骤降护栏、并发同步锁
-workbench.html          单文件前端（HTML+CSS+JS 全内联，无构建、无框架，设计令牌化）
-scripts/
-  sync-now.sh           一键同步管道
-  sync/                 管道步骤：Notion 拉取 → 类型区快照 → 自媒体 → 网站监控 → 离线页
-  tools/                独立工具：打开链接、装 launchd、GSC、AI 用量、Notion API
-  diagnostics/          诊断探针（非关键路径）
-  tests/                499 逻辑断言 + 147 冒烟 + 69 变异 + live 端到端
-docs/
-  DESIGN.md             设计规范与决策记录
-  sync-pipeline.md      数据流图与管道不变式
-```
+- `app.py`：本地服务（127.0.0.1:8787，launchd `com.lingyi.workbench.syncserver`）。所有数据接口都要求令牌（`~/.config/daily-workbench/sync-token`），静态文件走白名单。
+- `workbench.html`：单文件前端。数据分四路读取：
+  - `/data.json` — Notion 同步产物（收益、项目、客户、跟进、专注记录）；收益只读，项目与客户资料走显式白名单回写
+  - `/sections.json` — 资讯 / 写作 / 复盘派生快照（`scripts/sync/sections.py` 生成）
+  - `/social.json` — 自媒体只读快照（X / 小红书 / 公众号 / 知识星球，`scripts/sync/social-sync.py` 生成）
+  - `/knowledge.json` — Obsidian 全库只读索引（同由 `scripts/sync/social-sync.py` 生成）
+- `scripts/`：各数据源的同步与快照脚本默认只读；Notion 回写只由本地服务中的显式用户操作触发。
+- `scripts/sync/writing_store.py`：Obsidian 正文的稳定 ID、路径边界、哈希冲突检测、备份与原子写入；工作台只接收 `bookId` / `chapterId`，不接收任意本机路径。
+- `data.json`、`sections.json`、`social.json`、`knowledge.json`、`web-presence.json` 等本地数据文件不入库（见 `.gitignore`）。
 
-数据流与每步产物见 [docs/sync-pipeline.md](docs/sync-pipeline.md)。
+项目回写支持编辑负责人、关联任务和来源记录。关系选择器只读取 Notion 页面标题、状态与日期摘要；保存时仍由 `app.py` 按字段白名单回写，不读取页面正文，也不改动 rollup / 公式字段。
+
+写作的正文唯一真源是 `Obsidian-Tech/projects/` 里的 Markdown。工作台可以直接编辑、预览和保存已存在章节，停止输入 2 秒自动保存，`⌘S` / `Ctrl+S` 立即保存；保存前校验 SHA-256，检测到 Obsidian 外部修改时返回冲突，备份到 `backups/obsidian-writing/` 后再原子替换。Notion 只承载项目、客户、状态等元数据，不作为正文真源，避免双写覆盖。
+
+## 运行
+
+```bash
+# 服务（默认已由 launchd 常驻；手动启动）
+python3 app.py
+
+# 打开带令牌的工作台链接
+bash scripts/tools/open-workbench.sh
+
+# 重新生成派生快照
+python3 scripts/sync/sections.py --write
+python3 scripts/sync/social-sync.py     # 同时生成 social.json 与 knowledge.json
+python3 scripts/sync/web-monitor.py
+
+# Notion 只读同步（收益 + 项目）
+python3 scripts/sync/notion-sync.py
+```
 
 ## 设计约定
 
-- **未知不写 0**：数据缺失时如实说「未接入 / 未核验」，不造数
-- **只读边界**：Notion、Obsidian、自媒体平台全部只读；写操作只落本地，且显式确认
-- **不骗人的 UI**：过期数据标「已过期」，离线标「仅本地缓存」，同步失败显示真实原因
-- **删除可撤销**：不打断式撤销条，优于确认弹窗
-- 设计细节见 [docs/DESIGN.md](docs/DESIGN.md)
-
-## 测试
-
-```bash
-node scripts/tests/test-workbench-logic.mjs   # 499 断言（期望值从数据现算）
-node scripts/tests/smoke-ux.mjs               # 147 冒烟
-python3 scripts/tests/mutate-workbench.py     # 69 变异必须全红
-```
-
-## 更新日志
-
-见 [CHANGELOG.md](CHANGELOG.md)。
-
-## Contributing
-
-欢迎 issue 与 PR，约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。
-
-## License
-
-MIT. See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution conventions and
-[SECURITY.md](SECURITY.md) for private vulnerability reporting.
+- 行动优先：首屏先给"今天先做三件事"，指标放后面。
+- 未知不写 0：数据缺失时如实说"未接入 / 未核验"，不造数。
+- 写入边界：收益、Obsidian 和自媒体平台保持只读；项目资料、客户资料和已完成专注记录只在用户显式点击后，按字段白名单回写 Notion。
+- 访客模式：全部示例数据，与真实数据隔离（`GUEST_*` 常量）。
+- 设计规范见 [docs/DESIGN.md](docs/DESIGN.md)。

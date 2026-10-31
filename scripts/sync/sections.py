@@ -47,13 +47,19 @@ import json
 import os
 import re
 import sys
+from urllib.parse import quote
+
+import writing_store
 
 DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT = os.path.join(DIR, "sections.json")
 DATA = os.path.join(DIR, "data.json")
 
-OBSIDIAN = os.path.expanduser(os.environ.get("WB_OBSIDIAN_VAULT", "~/Documents/Obsidian"))
-RSS_PATH = os.path.join(OBSIDIAN, ".obsidian", "plugins", "qiaomu-ai-rss", "data.json")
+OBSIDIAN = os.path.expanduser("~/Documents/Obsidian-Tech")
+QIAOMU_RSS_PATH = os.path.join(
+    OBSIDIAN, ".obsidian", "plugins", "qiaomu-ai-rss", "data.json")
+# 订阅真源在工作台自己的 rss-store.json；缺失时从 Qiaomu 插件文件只读导入一次
+RSS_PATH = os.path.join(DIR, "rss-store.json")
 WRITING_DIR = os.path.join(OBSIDIAN, "projects")
 REVIEW_DIR = os.path.join(OBSIDIAN, "调试经验")
 REVIEW_MOC = "调试经验 MOC.md"
@@ -73,6 +79,24 @@ FEED_STALE_DAYS = 100
 # 改成按日历日算之后它没有消费者了，直接删掉 ——
 # 留一个没人用的常量，下次有人看到它就会想"是不是该用它算天数"，
 # 于是把已经修好的口径又改回去（和页面上那条"--shadow-md 现在有消费者"是同一类卫生要求）。
+
+
+def obsidian_url(path):
+    """生成只指向本地 Obsidian-Tech vault 的深链，路径不进入网页数据以外的系统。"""
+    root = os.path.realpath(OBSIDIAN)
+    full = os.path.realpath(path)
+    try:
+        if os.path.commonpath((root, full)) != root:
+            return ""
+    except ValueError:
+        return ""
+    rel = os.path.relpath(full, root).replace(os.sep, "/")
+    if rel.endswith(".md"):
+        rel = rel[:-3]
+    return "obsidian://open?vault=%s&file=%s" % (
+        quote(os.path.basename(root), safe=""),
+        quote(rel, safe=""),
+    )
 
 
 # ---------------------------------------------------------------- 时间工具
@@ -203,6 +227,36 @@ def short(s, n=140):
     return s if len(s) <= n else s[:n - 1] + "…"
 
 
+def _review_summary(text):
+    """复盘列表摘要：剥 frontmatter 后取第一个非标题段落，压成一行、截 100 字。
+
+    只服务列表「一眼扫」，不做完整 Markdown 解析；解析错位的极限后果是摘要少了
+    或多了一截，不影响任何数字。wikilink 取别名（没有别名取目标），普通链接取
+    锚文本，行内代码剥反引号 —— 进 HTML 文本节点的字段不该带标记符号。
+    """
+    body = text
+    if text.startswith("---"):
+        parts = text.split("---", 2)
+        if len(parts) == 3:
+            body = parts[2]
+    for block in re.split(r"\n\s*\n", body):
+        lines = [ln.strip() for ln in block.splitlines() if ln.strip()]
+        content = [ln for ln in lines if not ln.startswith("#")]
+        if not content:
+            continue
+        para = " ".join(ln.lstrip("->*").strip() for ln in content)
+        para = re.sub(
+            r"!?\[\[([^\]|]+)(?:\|([^\]]+))?\]\]",
+            lambda m: (m.group(2) or m.group(1)).strip(),
+            para,
+        )
+        para = re.sub(r"!?\[([^\]]*)\]\([^)]*\)", r"\1", para)
+        para = re.sub(r"`{1,3}([^`]*)`{1,3}", r"\1", para)
+        if para.strip():
+            return short(para, 100)
+    return ""
+
+
 # ---------------------------------------------------------------- 资讯
 
 def collect_news(now):
@@ -210,9 +264,9 @@ def collect_news(now):
     if not isinstance(d, dict):
         return {
             "id": "news", "name": "资讯", "icon": "📰",
-            "source": "Obsidian 插件 qiaomu-ai-rss",
+            "source": "工作台自有订阅库 rss-store.json",
             "sourcePath": RSS_PATH, "empty": True,
-            "note": "读不到订阅插件的数据文件。检查 Obsidian 里 qiaomu-ai-rss 插件是否还在、data.json 是否被移动。",
+            "note": "读不到订阅数据文件 rss-store.json。全新环境先显式执行一次 scripts/sync/sections.py --import-qiaomu 导入。",
             "stats": [], "items": [], "feeds": [], "freshness": freshness(None, now, "news"),
         }
 
@@ -256,7 +310,9 @@ def collect_news(now):
             "id": e.get("id"),
             "title": (e.get("titleZh") or e.get("title") or "(无标题)").strip(),
             "link": e.get("link") or "",
-            "source": e.get("sourceName") or name_by_id.get(sid) or sid or "未知源",
+            # 来源名以订阅名（name_by_id）为权威：插件条目里的 sourceName 可能与
+            # 订阅名不一致（2026-10-31 实测源名漂移），不一致时健康表和条目会挂不上。
+            "source": name_by_id.get(sid) or e.get("sourceName") or sid or "未知源",
             "published": iso(ts),
             "days": days_since(ts, now),
             "read": e.get("id") in read_ids,
@@ -278,27 +334,49 @@ def collect_news(now):
 
     # 每个源的新鲜度：这才是这个区真正的价值 —— 一眼看出哪几个源已经死了
     feeds = []
+    source_meta = d.get("sourceMeta") or {}
+    group_names = {
+        g.get("id"): g.get("name") or ""
+        for g in (d.get("subscriptionGroups") or [])
+        if g.get("id")
+    }
     for s in subs:
         es = s.get("entries") or []
         ts = [parse_ts(e.get("publishedTs")) or parse_ts(e.get("published")) for e in es]
         ts = [t for t in ts if t]
         last = max(ts) if ts else None
         dd = days_since(last, now)
+        sid = s.get("id") or ""
+        meta = source_meta.get(sid) if isinstance(source_meta.get(sid), dict) else {}
+        gid = meta.get("groupId") or ""
+        group = s.get("group") or group_names.get(gid) or ""
+        paused = bool(s.get("paused"))
         feeds.append({
+            "id": sid,
             "name": s.get("name") or "(未命名源)",
-            "group": s.get("group") or "",
+            "group": group,
+            "groupId": gid,
             "url": s.get("url") or "",
             "count": len(es),
             "latest": iso(last),
             "days": dd,
-            "dead": (dd is None) or (dd > FEED_STALE_DAYS),
+            # 零条目源（从没抓到过内容）没有「最后一次更新」可言，标停更反而让
+            # days=None 无法和判据对齐，先按未验证处理，不算 dead。
+            "dead": (not paused) and (dd is not None and dd > FEED_STALE_DAYS),
+            "paused": paused,
+            "error": str(s.get("error") or ""),
+            "errorCount": int(s.get("errorCount") or 0),
+            "lastAttemptAt": iso(parse_ts(s.get("lastAttemptAt") or None)),
+            "lastErrorAt": iso(parse_ts(s.get("lastErrorAt") or None)),
+            "updatedAt": iso(parse_ts(s.get("updatedAt") or None)),
         })
     feeds.sort(key=lambda f: (f["days"] is None, -(f["days"] or 0)))
 
     dead = [f for f in feeds if f["dead"]]
     groups = []
     for g in (d.get("subscriptionGroups") or []):
-        groups.append({"name": g.get("name") or "(未分组)",
+        groups.append({"id": g.get("id") or "",
+                       "name": g.get("name") or "(未分组)",
                        "count": sum(1 for f in feeds if f["group"] == g.get("name"))})
 
     stats = [
@@ -311,7 +389,7 @@ def collect_news(now):
 
     return {
         "id": "news", "name": "资讯", "icon": "📰",
-        "source": "Obsidian 插件 qiaomu-ai-rss",
+        "source": "工作台自有订阅库 rss-store.json",
         "sourcePath": RSS_PATH,
         "empty": not items,
         # ⚠️ note / hint / stats 的文案**一律纯文本**：它们会被页面用 textContent 直接显示，
@@ -339,10 +417,15 @@ CH_NUM = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, 
 
 
 def collect_writing(now, data=None):
-    proj = os.path.join(WRITING_DIR, "雨夜与玻璃幕墙")
-    books = []
-    if os.path.isdir(proj):
-        books.append(build_book(proj, now))
+    # 小说沿用 projects/ 的旧结构；公众号、Twitter、知识星球等独立稿件进
+    # 创作/，两类都在这里汇成同一个写作工作区，避免页面出现两套真源。
+    books = [build_book(book, now) for book in writing_store.discover_books()]
+    documents = []
+    for doc in writing_store.discover_documents():
+        item = {k: v for k, v in doc.items() if k not in ("path", "root")}
+        item["days"] = days_since(parse_ts(item.get("modifiedAt")), now)
+        documents.append(item)
+    documents.sort(key=lambda item: item.get("modifiedAt") or "", reverse=True)
 
     # 客户内容：来自 data.json 的 projects，category=客户服务（都是要给客户交付的教程/内容）
     clients = []
@@ -369,16 +452,27 @@ def collect_writing(now, data=None):
     book_items = sum(len(b.get("chapters") or []) for b in books)
     written = sum(b.get("writtenCount") or 0 for b in books)
     chars = sum(b.get("chars") or 0 for b in books)
-    latest_file = max((b["_latest"] for b in books if b.get("_latest")), default=None)
+    latest_candidates = [b["_latest"] for b in books if b.get("_latest")]
+    latest_candidates += [parse_ts(d.get("modifiedAt")) for d in documents
+                          if parse_ts(d.get("modifiedAt"))]
+    latest_file = max(latest_candidates, default=None)
     for b in books:
         b.pop("_latest", None)
 
-    total = book_items + len(clients)
+    doc_types = {}
+    for doc in documents:
+        key = doc.get("contentType") or "其它"
+        doc_types[key] = doc_types.get(key, 0) + 1
+    doc_type_txt = "、".join("%s %d" % (k, v)
+                             for k, v in sorted(doc_types.items(), key=lambda kv: -kv[1])) or "—"
+
+    total = book_items + len(documents) + len(clients)
     stats = [
-        {"k": "原创作品", "v": "%d 部" % len(books), "hint": "Obsidian projects/ 下的创作项目"},
+        {"k": "原创作品", "v": "%d 部" % len(books), "hint": "Obsidian projects/ 与 创作/小说 下的作品"},
         {"k": "章节进度", "v": "%d / %d" % (written, book_items), "hint": "已写正文的章节数 / 目录里的章节数"},
         {"k": "正文字数", "v": "{:,}".format(chars),
          "hint": "只统计 第*章.md，不含设定与节选（避免与正文重复计数）"},
+        {"k": "独立稿件", "v": "%d 篇" % len(documents), "hint": "创作/ 下的公众号、Twitter、知识星球稿件；%s" % doc_type_txt},
         {"k": "客户内容", "v": "%d 项" % len(clients), "hint": "Notion 里 category=客户服务 的项目；状态：%s" % cstat_txt},
         {"k": "最近改动", "v": ("%s（%d 天前）" % (latest_file.strftime("%Y-%m-%d"), days_since(latest_file, now))) if latest_file else "—",
          "hint": "以文件修改时间为准"},
@@ -386,39 +480,43 @@ def collect_writing(now, data=None):
 
     return {
         "id": "writing", "name": "写作", "icon": "✍️",
-        "source": "Obsidian projects/ + Notion 项目库（客户服务）",
+        "source": "Obsidian projects/ + 创作/ + Notion 项目库（客户服务）",
         "sourcePath": WRITING_DIR,
         "empty": total == 0,
-        "note": "「正文字数」只算 第*章.md：同目录还有一份《节选》，与第一章内容大面积重合，"
-                "两边相加会让字数虚高。",
+        "note": "小说正文字数只算 第*章.md，不含设定与节选；独立稿件按 创作/ 下的 Markdown 文件逐篇计数。",
         "freshness": freshness(latest_file, now, "writing"),
         "stats": stats,
         "books": books,
+        "documents": documents,
+        "documentTypes": doc_types,
         "clients": clients,
         "clientStatus": cstat,
         "items": [],
     }
 
 
-def build_book(path, now):
+def build_book(book, now):
+    path = book["path"]
     outline = read_text(os.path.join(path, "章节目录.md"))
     chapters = []
-    for m in re.finditer(r"^##\s+(.+?)\s*$", outline, re.M):
-        title = m.group(1).strip()
-        if title.startswith("《") or title in ("章节目录",):
-            continue
-        # 正文文件名只取到"第X章"（如 第一章.md），标题后面还跟着一句梗概
-        stem = re.match(r"^(第[一二三四五六七八九十百]+章|尾声)", title)
-        name = (stem.group(1) if stem else title)
-        f = os.path.join(path, name + ".md")
-        exists = os.path.isfile(f)
+    book_id = book["bookId"]
+    for chapter in book.get("chapters") or []:
+        title = chapter.get("title") or chapter.get("name") or ""
+        name = chapter.get("name") or title
+        f = chapter.get("path") or os.path.join(path, name + ".md")
+        exists = bool(chapter.get("written"))
         body = read_text(f) if exists else ""
         chapters.append({
+            "bookId": book_id,
+            "chapterId": chapter["chapterId"],
             "title": title,
             "name": name,
             "written": exists,
             "chars": len(body) if exists else 0,
             "summary": short(title[len(name):].strip(), 80),
+            "obsidianUrl": obsidian_url(f) if exists else "",
+            "modifiedAt": (dt.datetime.fromtimestamp(os.path.getmtime(f)).isoformat(timespec="seconds")
+                           if exists else None),
         })
 
     # 正文字数：只统计 第*章.md。节选与第一章重合，加进去会虚高（见 note）。
@@ -435,13 +533,14 @@ def build_book(path, now):
             docs.append({
                 "title": nm[:-3], "chars": len(t),
                 "type": fm.get("type", ""), "productType": fm.get("product-type", ""),
+                "obsidianUrl": obsidian_url(f),
             })
     drafts = []
     for f in sorted(glob.glob(os.path.join(path, "*.md"))):
         nm = os.path.basename(f)
         if nm in ("项目总纲.md", "人物设定.md", "章节目录.md") or re.match(r"^第.+章\.md$", nm):
             continue
-        drafts.append({"title": nm[:-3], "chars": len(read_text(f))})
+        drafts.append({"title": nm[:-3], "chars": len(read_text(f)), "obsidianUrl": obsidian_url(f)})
 
     # 篇幅目标：从总纲里读"（2 万 - 5 万字）"，这是作者自己定的，不是我猜的
     target = None
@@ -449,14 +548,18 @@ def build_book(path, now):
     if m:
         target = {"min": int(m.group(1)) * 10000, "max": int(m.group(2)) * 10000}
 
-    acts = len(re.findall(r"^###\s+第[一二三]幕", read_text(os.path.join(path, "项目总纲.md")), re.M))
+    outline_text = read_text(os.path.join(path, "项目总纲.md"))
+    acts = len(re.findall(r"^###\s+第[一二三]幕", outline_text, re.M))
+    genre_match = re.search(r"^- 类型：(.+)$", outline_text, re.M)
+    genre = genre_match.group(1).strip() if genre_match else "创作项目"
     all_files = glob.glob(os.path.join(path, "*.md"))
     latest = dt.datetime.fromtimestamp(max(os.path.getmtime(f) for f in all_files)) if all_files else None
 
     return {
-        "title": "雨夜与玻璃幕墙",
-        "path": path,
-        "genre": "黑暗都市 / 社会政治 / 现实悬疑",
+        "bookId": book_id,
+        "title": book.get("bookTitle") or os.path.basename(path),
+        "outlineUrl": obsidian_url(os.path.join(path, "章节目录.md")),
+        "genre": genre,
         "acts": acts,
         "target": target,
         "chars": chars,
@@ -482,6 +585,10 @@ def collect_review(now):
         d = parse_ts(fm.get("date")) or dt.datetime.fromtimestamp(os.path.getmtime(f))
         notes.append({
             "title": nm[:-3],
+            # 稳定 ID 与 app.py 的 /api/review/note 同源（同一套 root + kind）。
+            # 页面拿 ID 要正文，路径永远不出现在产物里。
+            "noteId": writing_store.stable_id("note", f, writing_store.OBSIDIAN_ROOT),
+            "summary": _review_summary(t),
             "date": iso(d),
             "days": days_since(d, now),
             "chars": len(t),
@@ -490,6 +597,7 @@ def collect_review(now):
             "products": as_list(fm.get("product")),
             "status": fm.get("status") or "",
             "modified": iso(dt.datetime.fromtimestamp(os.path.getmtime(f))),
+            "obsidianUrl": obsidian_url(f),
         })
     notes.sort(key=lambda x: (x["date"] is None, x["date"] or ""), reverse=False)
     notes.reverse()
@@ -508,6 +616,10 @@ def collect_review(now):
         if n["status"]:
             status_c[n["status"]] = status_c.get(n["status"], 0) + 1
 
+    # 时间维度由 items 里预计算好的 days 现算，页面上没有第二套口径。
+    d30 = sum(1 for n in notes if n["days"] is not None and n["days"] <= 30)
+    d90 = sum(1 for n in notes if n["days"] is not None and n["days"] <= 90)
+
     # 守恒：分组总数必须等于笔记数，否则就是分组时丢了（这类断言比"分成几组"有用得多）
     assert sum(g["count"] for g in groups) == len(notes), "复盘分组丢笔记"
 
@@ -516,6 +628,8 @@ def collect_review(now):
         {"k": "涉及类型", "v": "%d 类" % len(groups), "hint": "按 frontmatter 的 product-type 分组"},
         {"k": "品类数", "v": "%d 个" % len({p for n in notes for p in n["products"]}), "hint": "product 字段去重后"},
         {"k": "标注状态", "v": "%d / %d" % (sum(status_c.values()), len(notes)), "hint": "未标注状态的 %d 篇" % (len(notes) - sum(status_c.values()))},
+        {"k": "近30天", "v": "%d 篇" % d30, "hint": "date 距今 30 天内"},
+        {"k": "近90天", "v": "%d 篇" % d90, "hint": "date 距今 90 天内"},
     ]
 
     return {
@@ -586,7 +700,22 @@ def main():
     ap.add_argument("--check", action="store_true", help="只比对，不写（退出码 0=最新 / 2=需要重建）")
     ap.add_argument("--now", help="固定'现在'（ISO），便于测试；默认取系统时间")
     ap.add_argument("--quiet", action="store_true")
+    ap.add_argument("--import-qiaomu", action="store_true",
+                    help="一次性种子：从 Obsidian Qiaomu 插件只读导入 rss-store.json（已存在则跳过，运行时无插件依赖）")
     args = ap.parse_args()
+
+    if args.import_qiaomu and not os.path.exists(RSS_PATH):
+        try:
+            with open(QIAOMU_RSS_PATH, encoding="utf-8") as f:
+                seed = json.load(f)
+            if isinstance(seed, dict):
+                tmp = RSS_PATH + ".tmp"
+                with open(tmp, "w", encoding="utf-8") as f:
+                    json.dump(seed, f, ensure_ascii=False, indent=2)
+                os.replace(tmp, RSS_PATH)
+                print("[rss-store] 已从 Qiaomu 插件导入订阅数据 → %s" % RSS_PATH)
+        except (OSError, ValueError) as e:
+            print("[rss-store] 导入失败：%s" % e)
 
     now = parse_ts(args.now) if args.now else dt.datetime.now()
     obj = build(now)

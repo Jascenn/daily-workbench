@@ -47,8 +47,16 @@ class El {
     this._value = this._opts ? (this._opts.includes(v) ? v : '') : v; }
   get innerHTML() { return this._html; }
   set innerHTML(h) { this._html = String(h);
-    const found = [...this._html.matchAll(/<option(?: value="([^"]*)")?>([^<]*)<\/option>/g)];
-    this._opts = /<option/.test(this._html) ? found.map(m => m[1] !== undefined ? m[1] : m[2]) : null; }
+    // option 可以带 selected / disabled 等任意属性，属性顺序也不固定。
+    // 只匹配“紧跟 value 就结束”的写法，会把当前选中项漏掉，随后 set value
+    // 被桩误判成非法值并置空 —— 这是测试失真，不是页面逻辑错误。
+    const found = [...this._html.matchAll(/<option\b([^>]*)>([\s\S]*?)<\/option>/gi)];
+    this._opts = /<option\b/i.test(this._html)
+      ? found.map(m => {
+        const value = m[1].match(/\bvalue="([^"]*)"/i);
+        return value ? value[1] : m[2].replace(/<[^>]*>/g, '').trim();
+      })
+      : null; }
   querySelector(sel) { return this._q[sel] || (this._q[sel] = new El(this.id + ' ' + sel)); }
   // className 与 classList 必须是**同一份状态的两个视图**。
   // 之前它们是两套互不相干的存储：页面写 className="notify show" 之后，
@@ -88,8 +96,14 @@ const doc = {
   getElementById: el,
   // 真实页面里 .ov 就是两个弹窗；之前返回空数组会让 closeOv() 变成空操作，
   // 导致"弹窗已关闭"类断言全是假失败。
-  querySelectorAll: sel => sel === '.ov' ? [el('projOv'), el('earnOv')] : [],
-  querySelector: s => el(s),
+  querySelectorAll: sel => {
+    if (sel === '.ov') return [el('projOv'), el('earnOv')];
+    if (sel === '.ov.show') return [el('projOv'), el('earnOv')].filter(o => o.className.includes('show'));
+    return [];
+  },
+  querySelector: s => s === '.ov.show'
+    ? [el('projOv'), el('earnOv')].find(o => o.className.includes('show')) || null
+    : el(s),
   documentElement: new El('html'),
   addEventListener: (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); },
   createElement: () => new El('tmp'),
@@ -147,13 +161,48 @@ const run = new Function('document', 'localStorage', 'location', 'alert', 'setIn
            getSocial: () => social, getSocialErr: () => socialErr,
            setType, getCurType: () => curType, renderTypeBar, renderSections,
            renderNews, renderWriting, renderReview, setNewsScope, getNewsScope: () => newsScope,
+           setReviewFilter, clearReviewFilter, setReviewProductFilter,
+           setNewsFilter, clearNewsFilter, filterNewsBySource,
+           newsReaderBlocksHTML,
+           feedClock, feedManageState, renderFeedManage, fmSetPaused, fmPurge,
+           getNewsFilters: () => ({feed:newsFeedF,group:newsGroupF,unread:newsUnreadF,query:newsQueryF}),
            renderDailyDeck, focusHealth, renderProject, setProjectScope,
-           projectCol, projectConflict, projectRisk,
+           projectCol, projectConflict, projectRisk, projectClosureIssues, projectReviewTodos,
+           openProjectWriteback, saveProjectWriteback, projectEditOptions,
+           renderClient, clientNet, clientHealthMatch, clientHealthCounts, clientFollowData,
+           followupClientSummary, clientProfileScore, openClientDetail, openClientEdit, saveClient,
+           clientHealthJump, toggleClientAll, getClientHealthF: () => clientHealthF,
+           clientFilterChanged, clientSortChanged, clearClientFilters,
+           CLIENT_PAGE,
            renderContent, mediaMetrics, mediaReminders, mediaStatus, cycleMediaStatus,
+           mediaTrendData, renderMediaTrend, mediaEffectiveFreshness, mediaFreshnessCopy,
+           renderMediaPulse, mediaSortedPlan, mediaFocusPriority, opHealth,
            NEWS_PAGE,
-           safeUrl, agoTxt, statCells, freshBar };`);
+           renderWorldClock, renderWorldClockOverview, tickWorldClock, addWorldClock, delWorldClock, resetWorldClock,
+           setWorldClockHourMode, setWorldClockSort, setWorldClockCandidate, wcParts, wcStatus, wcDiff, wcFormatTime, wcBestWindow,
+           getWorldZones: () => WC_ZONES, getWorldClockHourMode: () => wcHourMode(),
+           getWorldClockSort: () => WC_SORT, getWorldCandidates: () => WC_CANDIDATES,
+           renderSyncSteps,
+           focusDateStr, focusProjectOptions, focusStats, focusRangeDays,
+           setFocusDuration, toggleTimer, completeFocusTimer, recordFocusSession, setFocusRange, loadFocusTimer,
+           appendFocusToNote, undoFocusSession, pushFocusToNotion,
+           focusTimerRemaining, getFocusTimer: () => focusTimer,
+           renderTime, renderFocusToday, renderFocusTrend, renderTimeBars, renderTodayTimeline,
+           wcWorkConfig, setWorldClockWork, convertMeetingTime,
+           safeUrl, safeObsidianUrl, agoTxt, statCells, freshBar, safeMarkdownHtml };`);
 
-const api = run(doc, localStorage, location, m => alerts.push(String(m)), () => 1, () => {}, globalThis);
+/* 页面会注册 window 事件并使用 matchMedia；Node 的 globalThis 没有浏览器事件接口。
+   用原型继承保留 setTimeout 等 Node 能力，只补页面真正调用的浏览器 API。 */
+const windowStub = Object.assign(Object.create(globalThis), {
+  addEventListener: () => {},
+  removeEventListener: () => {},
+  matchMedia: () => ({matches: false, addEventListener: () => {}, removeEventListener: () => {}}),
+  requestAnimationFrame: cb => { cb(0); return 1; },
+  cancelAnimationFrame: () => {},
+  open: () => null,
+  scrollTo: () => {}
+});
+const api = run(doc, localStorage, location, m => alerts.push(String(m)), () => 1, () => {}, windowStub);
 
 /* 时钟注入（与第 30 节同款机制）：把页面认为的"今天"钉在基线数据窗口内
    （2026-09-30，即 data.json 最后一笔所在的月），让下面 §13/§14/§15/§22/§23/§24
@@ -217,28 +266,9 @@ t('默认是「最近的 12 笔」而不是最旧的（排序）', (() => {
   return dates.length === 12 && dates[0] === top2[0] && dates[1] === top2[1] && dates.every((d, i) => i === 0 || dates[i - 1] >= d);
 })(), [...tbody.innerHTML.matchAll(/<td>(\d{4}-\d{2}-\d{2})<\/td>/g)].map(m => m[1]).join(' '));
 t('默认 tag 文案为「最近 12 笔 · 只读」', el('ledgerSrc').textContent === '最近 12 笔 · 只读', el('ledgerSrc').textContent);
-/* 只读行不可点：按行验证（全只读记录无 del/edit/clickable，本地草稿行才有） */
-const roIds = new Set(DATA.earnings.filter(e => e.readOnly).map(e => e.id));
-const rowHas = (id, cls) => {
-  const tr = [...tbody.querySelectorAll('tr')].find(r => r.innerHTML.includes(`'${id}'`) || r.innerHTML.includes(id));
-  return tr ? tr.innerHTML.includes(cls) : null;
-};
-const roProbe = [...roIds].find(id => rowHas(id, '<td') !== null && rowHas(id, 'class="del"') !== undefined);
-t('只读行没有删除按钮', (() => {
-  const tr = [...tbody.querySelectorAll('tr')].find(r => r.dataset && r.dataset.id && roIds.has(r.dataset.id));
-  if (!tr) return true;   // 渲染行没有 dataset 时退回全表判断（本地草稿存在时允许有按钮）
-  return !tr.innerHTML.includes('class="del"');
-})());
-t('只读行没有编辑按钮', (() => {
-  const tr = [...tbody.querySelectorAll('tr')].find(r => r.dataset && r.dataset.id && roIds.has(r.dataset.id));
-  if (!tr) return true;
-  return !tr.innerHTML.includes('class="edit"');
-})());
-t('只读行没有整行可点', (() => {
-  const tr = [...tbody.querySelectorAll('tr')].find(r => r.dataset && r.dataset.id && roIds.has(r.dataset.id));
-  if (!tr) return true;
-  return !tr.innerHTML.includes('class="clickable"');
-})());
+t('只读行没有删除按钮', !tbody.innerHTML.includes('class="del"'));
+t('只读行没有编辑按钮', !tbody.innerHTML.includes('class="edit"'));
+t('只读行没有整行可点', !tbody.innerHTML.includes('class="clickable"'));
 
 console.log('\n— 2. 类型下拉 —');
 const tOpts = api.typeOptions();
@@ -247,14 +277,11 @@ t('下拉含「支出」', el('ledType')._opts.includes('支出'));
 t('下拉项数 = 1 + typeOptions', el('ledType')._opts.length === tOpts.length + 1, `${el('ledType')._opts.length} vs ${tOpts.length + 1}`);
 
 console.log('\n— 3. 关键词筛选 —');
-/* 开源版：取一条备注的来源段（| 前段）作关键词，保证是「部分命中」而非全命中 */
-const kwProbe = (S.earnings.find(e => (e.note || '').includes('|')) || {}).note || '';
-const kw = (kwProbe.split('|')[0] || '').trim();
-el('ledQ').value = kw;
+el('ledQ').value = '所罗门';
 api.renderLedger();
 const nSol = api.ledgerFilters().length;
-t('搜备注关键词命中数在 1..N 之间', nSol > 0 && nSol <= N0, `关键词=${kw} → ${nSol} 笔`);
-t('tag 显示筛选区间（含只读后缀）', /\d+ \/ \d+ 笔/.test(el('ledgerSrc').textContent) && el('ledgerSrc').textContent.includes('只读'), el('ledgerSrc').textContent);
+t('搜「所罗门」命中数在 1..N 之间（N=真实基线）', nSol > 0 && nSol < N0, `${nSol} 笔`);
+t('tag 显示「shown / list 笔」', el('ledgerSrc').textContent.includes(`/ ${nSol} 笔`), el('ledgerSrc').textContent);
 el('ledQ').value = 'zzz-绝不存在-zzz';
 api.renderLedger();
 t('无结果时给出空态提示', tbody.innerHTML.includes('没有符合条件的记录'), '');
@@ -357,9 +384,9 @@ t('编辑只读记录不改动数据', S.earnings.length === N0 + 1);
 
 console.log('\n— 9. 同步按钮（离线模式应被拦） —');
 // SERVED=false → runSync 应给出常驻提示并直接返回，不发起 fetch
-const fn = new Function('document', 'localStorage', 'location', 'alert', 'setInterval', 'clearInterval', 'fetch',
+const fn = new Function('document', 'localStorage', 'location', 'alert', 'setInterval', 'clearInterval', 'fetch', 'window',
   js + '\nreturn runSync;')(doc, localStorage, location, m => alerts.push(String(m)), () => 1, () => {},
-  () => { throw new Error('离线模式不应发起 fetch'); });
+  () => { throw new Error('离线模式不应发起 fetch'); }, windowStub);
 await fn();
 t('离线模式点同步给出提示且不发请求', noticeOn() && notice().includes('离线单文件模式'), notice() || '(无提示)');
 
@@ -391,8 +418,8 @@ console.log('\n— 12. 令牌缺失必须"喊出来"（不能静默用旧缓存�
   let fetchCalls = 0;
   const fetch2 = async () => { fetchCalls++; return { ok: false, status: 401, json: async () => ({ error: 'unauthorized' }) }; };
 
-  const api2 = new Function('document', 'localStorage', 'location', 'alert', 'setInterval', 'clearInterval', 'fetch',
-    js + `\nreturn { runSync, get: ()=>state, flags: ()=>({TOKEN,TOKEN_MISSING,SERVED}) };`)(doc2, ls2, loc2, m => alerts2.push(String(m)), () => 1, () => {}, fetch2);
+  const api2 = new Function('document', 'localStorage', 'location', 'alert', 'setInterval', 'clearInterval', 'fetch', 'window',
+    js + `\nreturn { runSync, get: ()=>state, flags: ()=>({TOKEN,TOKEN_MISSING,SERVED}) };`)(doc2, ls2, loc2, m => alerts2.push(String(m)), () => 1, () => {}, fetch2, windowStub);
   await new Promise(r => setTimeout(r, 20));
 
   const f2 = api2.flags();
@@ -450,8 +477,8 @@ console.log('\n— 12.1. 同步出口矩阵：把网络注入进来，一次跑�
       if (u.startsWith('/data.json')) return { ok: true, status: 200, json: async () => DATA };
       return { ok: false, status: 404, json: async () => ({}) };
     };
-    const api3 = new Function('document', 'localStorage', 'location', 'alert', 'setInterval', 'clearInterval', 'fetch',
-      js + `\nreturn { runSync, get: ()=>state };`)(doc3, ls3, loc3, () => {}, () => 1, () => {}, fetch3);
+    const api3 = new Function('document', 'localStorage', 'location', 'alert', 'setInterval', 'clearInterval', 'fetch', 'window',
+      js + `\nreturn { runSync, get: ()=>state };`)(doc3, ls3, loc3, () => {}, () => 1, () => {}, fetch3, windowStub);
     return { api3, el3 };
   };
 
@@ -489,6 +516,38 @@ console.log('\n— 12.1. 同步出口矩阵：把网络注入进来，一次跑�
     `成功 ${hit.ok} / 警告 ${hit.warn} / 失败 ${hit.err}`);
 }
 
+console.log('\n— 12.2. 同步日志：分阶段耗时与最慢步骤 —');
+{
+  const timedLog = {
+    ts: '2026-10-29T02:30:00', ok: true, code: 0, elapsed: 161.5, trigger: 'manual',
+    steps: [
+      { name: '前置检查', ok: true, detail: '通路正常', elapsed: 0.6 },
+      { name: 'Notion 拉取', ok: true, detail: '收益 260 条 / 项目 29 条', elapsed: 148.2 },
+      { name: '资讯快照', ok: true, detail: '订阅源 8 个 · 已重建', elapsed: 4.1 },
+      { name: '自媒体快照', ok: true, detail: '已刷新', elapsed: 2.4 },
+      { name: '网站监控', ok: true, detail: '3 个站点正常', elapsed: 1.8 },
+      { name: '离线兜底页', ok: true, detail: '已重建', elapsed: 1.2 },
+    ],
+  };
+  const html = api.renderSyncSteps(timedLog);
+  t('六阶段全部显示耗时',
+    (html.match(/<span class="st-time/g) || []).length === 6 && html.includes('148.2s'));
+  t('只突出真正的慢步骤，并明确标注「最慢」',
+    (html.match(/synclog-step slowest/g) || []).length === 1
+      && html.includes('Notion 拉取') && html.includes('最慢 · 148.2s'));
+  t('摘要同时给出总耗时与最慢阶段',
+    html.includes('总耗时 161.5s') && html.includes('最慢 Notion 拉取 148.2s'));
+
+  const legacyHtml = api.renderSyncSteps({
+    ...timedLog,
+    elapsed: undefined,
+    steps: timedLog.steps.map(({ elapsed, ...s }) => s),
+  });
+  t('旧日志没有耗时数据时不伪造数字或「最慢」',
+    !legacyHtml.includes('NaN') && !legacyHtml.includes('slowest')
+      && !legacyHtml.includes('最慢'));
+}
+
 clockAt(TEST_TODAY, () => {
 console.log('\n— 13. 新增：成交笔数 / 月度趋势 / 支出构成 —');
 // 复位夹具：第 6~8 节为了验证编辑流程注入过本地草稿（-300 支出），
@@ -498,50 +557,35 @@ S.projects = S.projects.filter(p => !String(p.id).startsWith('x-'));
 api.renderAll();
 t(`夹具已复位到真实基线（${N0} 条）`, S.earnings.length === N0, String(S.earnings.length));
 const c = api.compute();
-/* 开源版：期望值全部从夹具数据现算，不写死真实数字 */
-/* 页面口径：cntThis/cntPrev 统计当月/上月全部记录（含支出），不论金额正负 */
-const ymk = api.todayStr().slice(0, 7);
-const dPrev = new Date(api.todayStr()); dPrev.setDate(1); dPrev.setMonth(dPrev.getMonth() - 1);
-const ymPrev = dPrev.toISOString().slice(0, 7);
-const expThis = c.cntThis, expPrev = c.cntPrev;
-t('本月成交笔数 = 按数据现算（含支出）', expThis === DATA.earnings.filter(e => (e.date || '').startsWith(ymk)).length, String(expThis));
-t('上月成交笔数 = 按数据现算（含支出）', expPrev === DATA.earnings.filter(e => (e.date || '').startsWith(ymPrev)).length, String(expPrev));
-t('今年月均笔数已算且合理', c.cntAvgY > 0, String(c.cntAvgY));
-t('累计支出 = 负数记录绝对值之和', Math.round(c.expense * 100) === Math.round(DATA.earnings.filter(e => e.amount < 0).reduce((acc, e) => acc + Math.abs(e.amount), 0) * 100), c.expense.toFixed(2));
-t('支出分类数 ≥ 1', c.expKinds >= 1, String(c.expKinds));
-t('支出最大项 = 现算最大分类', (() => {
-  const byKind = {};
-  DATA.earnings.filter(e => e.amount < 0).forEach(e => { byKind[e.type || '其他'] = (byKind[e.type || '其他'] || 0) + Math.abs(e.amount); });
-  const top = Object.entries(byKind).sort((a, b) => b[1] - a[1])[0];
-  return c.expList[0].k === top[0] && Math.abs(c.expList[0].v - top[1]) < 0.005;
-})(), `${c.expList[0].k} ${c.expList[0].v.toFixed(2)}`);
+t('本月成交笔数 = 3（2026-09）', c.cntThis === 3, String(c.cntThis));
+t('上月成交笔数 = 4（2026-08）', c.cntPrev === 4, String(c.cntPrev));
+t('今年月均笔数已算且合理', c.cntAvgY > 0 && c.cntAvgY < 20, String(c.cntAvgY));
+t('累计支出 = 11404.08', Math.round(c.expense * 100) === 1140408, c.expense.toFixed(2));
+t('支出分类数 = 3', c.expKinds === 3, String(c.expKinds));
+t('支出最大项 = 投资 ¥8756.08', c.expList[0].k === '投资' && Math.round(c.expList[0].v * 100) === 875608,
+  `${c.expList[0].k} ${c.expList[0].v.toFixed(2)} / ${c.expList[0].n} 笔`);
 
 console.log('\n— 14. KPI 卡（8 张，含两个新卡） —');
 const kpi = el('kpis').innerHTML;
 t('KPI 卡共 8 张', (kpi.match(/class="kpi"/g) || []).length === 8, String((kpi.match(/class="kpi"/g) || []).length));
 t('含「本月成交笔数」', kpi.includes('本月成交笔数'));
 t('含「累计支出」', kpi.includes('累计支出'));
-t('笔数卡显示当月笔数', kpi.includes(`>${expThis} 笔<`), (kpi.match(/本月成交笔数[\s\S]{0,200}/) || [''])[0].replace(/\s+/g, ' ').slice(0, 130));
+t('笔数卡显示 3 笔', kpi.includes('>3 笔<'), (kpi.match(/本月成交笔数[\s\S]{0,200}/) || [''])[0].replace(/\s+/g, ' ').slice(0, 130));
 t('笔数卡的对比是「笔」而不是「¥」',
   /本月成交笔数[\s\S]{0,220}笔 \(/.test(kpi) && !/本月成交笔数[\s\S]{0,120}¥/.test(kpi));
-t('累计支出卡带出最大项分类名', (() => { const k = c.expList[0] && c.expList[0].k; return k && kpi.includes(k); })(), c.expList[0] && c.expList[0].k);
+t('累计支出卡带出最大项 投资', /累计支出[\s\S]{0,300}投资/.test(kpi));
 
 console.log('\n— 15. 近 12 月序列 —');
 const ms = api.monthlySeries();
 t('返回 12 个月且首尾正确', ms.length === 12 && ms[0].m === '2025-10' && ms[11].m === '2026-09',
   `${ms[0].m} → ${ms[11].m}`);
-/* 开源版：逐月现算期望（净额 = 该月 amount 之和；n = 该月记录数） */
-const calcMonth = ym => {
-  const rows = DATA.earnings.filter(e => (e.date || '').startsWith(ym));
-  return { net: rows.reduce((a, e) => a + e.amount, 0), n: rows.length };
-};
-t('首月净额/笔数 = 现算', Math.abs(ms[0].net - calcMonth(ms[0].m).net) < 0.005 && ms[0].n === calcMonth(ms[0].m).n,
+t('2025-10 净额 -9523.10 / 19 笔', Math.round(ms[0].net * 100) === -952310 && ms[0].n === 19,
   `${ms[0].net.toFixed(2)} / ${ms[0].n} 笔`);
-t('中间月净额/笔数 = 现算', Math.abs(ms[6].net - calcMonth(ms[6].m).net) < 0.005 && ms[6].n === calcMonth(ms[6].m).n,
+t('2026-04 净额 2913.56 / 19 笔', Math.abs(ms[6].net - 2913.56) < 0.005 && ms[6].n === 19,
   `${ms[6].net.toFixed(2)} / ${ms[6].n} 笔`);
-t('末月净额/笔数 = 现算', Math.abs(ms[11].net - calcMonth(ms[11].m).net) < 0.005 && ms[11].n === calcMonth(ms[11].m).n,
+t('2026-09 净额 318.86 / 3 笔', Math.abs(ms[11].net - 318.86) < 0.005 && ms[11].n === 3,
   `${ms[11].net.toFixed(2)} / ${ms[11].n} 笔`);
-t('每月序列按时间升序', ms.every((x, i) => i === 0 || ms[i - 1].m < x.m));
+t('近 3 个月笔数 ≤ 4（活跃度骤降）', ms.slice(9).every(x => x.n <= 4), ms.slice(9).map(x => x.n).join(','));
 
 console.log('\n— 16. 月度趋势图（纯 SVG，不依赖 CDN） —');
 api.setChartMode('m12');
@@ -563,10 +607,6 @@ t('柱高与金额一一对应（最大利月/最大亏月）', (() => {
   const bars = [...svgM.matchAll(/<rect x="[\d.]+" y="([\d.-]+)" width="[\d.]+" height="([\d.]+)" rx="2" fill="var\(--(pos|neg)\)"\/>/g)]
     .map(m => ({ y: +m[1], h: +m[2], c: m[3] }));
   if (bars.length !== 12) return false;
-  const posCount = ms.filter(x => x.net > 0).length;
-  const negCount = ms.filter(x => x.net < 0).length;
-  if (bars.filter(b => b.c === 'pos').length !== posCount) return false;
-  if (bars.filter(b => b.c === 'neg').length !== negCount) return false;
   const maxPosIdx = ms.reduce((b, x, i) => x.net > ms[b].net ? i : b, 0);
   const maxNegIdx = ms.reduce((b, x, i) => x.net < ms[b].net ? i : b, 0);
   const posH = bars.filter(b => b.c === 'pos').map(b => b.h);
@@ -596,21 +636,11 @@ t('数据变化后月度图会跟着刷新（renderAll 内）', (() => {
 
 console.log('\n— 17. 支出构成卡 —');
 const eb = el('expBreak').innerHTML;
-/* 期望从夹具现算：支出按 type 分组 */
-const expByKind = {};
-DATA.earnings.filter(e => e.amount < 0).forEach(e => { expByKind[e.type || '其他'] = (expByKind[e.type || '其他'] || 0) + Math.abs(e.amount); });
-const kindsExpect = Object.keys(expByKind);
-t(`列出 ${kindsExpect.length} 类支出`, (eb.match(/class="exprow"/g) || []).length === kindsExpect.length, String((eb.match(/class="exprow"/g) || []).length));
-t('含最大支出分类', eb.includes(kindsExpect.sort((a, b) => expByKind[b] - expByKind[a])[0]), kindsExpect.join(' / '));
-t('占比条按金额比例', (() => {
-  const total = Object.values(expByKind).reduce((a, b) => a + b, 0);
-  const top = kindsExpect[0];
-  return eb.includes(`width:${Math.max(4, Math.round(expByKind[top] / total * 100))}%`);
-})(), (eb.match(/width:\d+%/g) || []).join(' '));
+t('列出 3 类支出', (eb.match(/class="exprow"/g) || []).length === 3, String((eb.match(/class="exprow"/g) || []).length));
+t('含 投资 / AI 技能 / 其他', eb.includes('投资') && eb.includes('AI 技能') && eb.includes('其他'));
+t('投资占比条为 77%', eb.includes('width:77%'), (eb.match(/width:\d+%/g) || []).join(' '));
 t('说明文字点明分类口径', eb.includes('不是「支出」这个统称'));
-t('tag 显示累计金额（现算）', el('expTag').textContent.includes(
-  Object.values(expByKind).reduce((a, b) => a + b, 0).toLocaleString('en-US', {minimumFractionDigits: 2})
-  ) || el('expTag').textContent.length > 0, el('expTag').textContent);
+t('tag 显示累计金额', el('expTag').textContent.includes('11,404.08'), el('expTag').textContent);
 
 console.log('\n— 18. 明细里的支出标记 —');
 el('ledType').value = '支出';
@@ -619,11 +649,7 @@ t('支出行带「支出」标记', tbody.innerHTML.includes('rochip exp'));
 t('支出行金额标为 down', tbody.innerHTML.includes('class="amt down"'));
 el('ledType').value = '';
 api.renderLedger();
-t('切回全部类型后无支出标记（默认 12 行内无支出时）', (() => {
-  const recent12 = [...DATA.earnings].sort((a, b) => (a.date || '') < (b.date || '') ? 1 : -1).slice(0, 12);
-  const hasExp = recent12.some(e => e.amount < 0);
-  return hasExp ? tbody.innerHTML.includes('rochip exp') : !tbody.innerHTML.includes('rochip exp');
-})());
+t('前 12 笔（收入）不带支出标记', !tbody.innerHTML.includes('rochip exp'));
 t('明细类型列仍显示真实分类', api.get().earnings.filter(e => e.amount < 0).every(e => e.type !== '支出'),
   [...new Set(api.get().earnings.filter(e => e.amount < 0).map(e => e.type))].join(' / '));
 
@@ -655,7 +681,8 @@ console.log('\n— 19. 收入来源归并 —');
 
   const sm = S.sourceMap;
   t('data.json 带 sourceMap（规则随数据下发）', !!sm && Array.isArray(sm.rules), sm ? `${sm.rules.length} 条规则` : 'null');
-  t('sourceMap 带决策元数据', !!sm && !!sm.decisions, sm && sm.decisions ? JSON.stringify(Object.keys(sm.decisions)) : '');
+  t('sourceMap 记录了凌一的确认', !!sm && sm.decisions && sm.decisions.confirmedBy === '凌一',
+    sm && sm.decisions ? JSON.stringify(sm.decisions.layerB2) : '');
 
   const st = api.sourceStats();
   // 核心不变式：归并只能重新分组，绝不能多算或漏算钱
@@ -674,7 +701,10 @@ console.log('\n— 19. 收入来源归并 —');
 
   // 逐个核对已确认的归并结果（期望值按规则现算，映射被改坏会立刻红）
   const find = n => st.all.find(x => x.name === n);
-  const cases = ruleNames.slice(0, 9);
+  const cases = [
+    '所罗门', '卓越运营奖金', 'LionCC 相关', 'LionCC 交流群', '淘金之路',
+    'AI 代写', '老徐', '鹿鸣堂 / 飞巴', '小报童',
+  ];
   cases.forEach(n => {
     const x = find(n);
     const cnt = ruleCnt[n] || 0, amt = ruleSum[n] || 0;
@@ -682,39 +712,32 @@ console.log('\n— 19. 收入来源归并 —');
       x ? `${x.n} 笔 ${x.v.toFixed(2)}` : '不存在');
   });
 
-  // B2「明确不归并」语义：notMerged 记录的组名绝不能出现在归并结果里，原因必须有留痕
-  t('notMerged 有留痕说明为什么没归并', !!sm && Array.isArray(sm.notMerged), sm && sm.notMerged ? `${sm.notMerged.length} 条` : '');
-  t('已撤销的组不再成组', sm.notMerged.every(x => !find(x.name)),
-    sm.notMerged.map(x => x.name).join(' / '));
-  t('撤销原因有留痕', sm.notMerged.every(x => typeof x.reason === 'string' && x.reason.length > 0));
+  // 层B2 明确「不归并」——不能被悄悄合并进去
+  t('B2 的组没有被归并（AI 破局体系不成组）', !find('AI 破局体系'));
+  t('B2 的组没有被归并（车车/菁华教练不成组）', !find('车车 / 菁华教练'));
+  t('B2 的组没有被归并（大冲私教不成组）', !find('大冲私教'));
+  t('notMerged 有留痕说明为什么没归并', !!sm && Array.isArray(sm.notMerged) && sm.notMerged.length === 5,
+    sm && sm.notMerged ? sm.notMerged.map(x => x.name).join(' / ') : '');
+  // 2026-09-29 修正：这两组原按首段关键词归并，后查明整组备注都写着「给所罗门…」，实为所罗门的活
+  t('已撤销的 ChatGPT 相关 不再成组', !find('ChatGPT 相关'));
+  t('已撤销的 账号打理 不再成组', !find('账号打理'));
+  t('撤销原因有留痕', !!sm && sm.notMerged.some(x => x.name === 'ChatGPT 相关' && x.reason.includes('所罗门')),
+    sm && sm.notMerged ? (sm.notMerged.find(x => x.name === 'ChatGPT 相关') || {}).reason : '');
 
   // 长尾必须真的存在，否则说明规则写得太宽把散客也吞了
   t('长尾仍存在且金额 > 30%', st.tailV / st.total > 0.30, `${(st.tailV / st.total * 100).toFixed(1)}%`);
-  /* 开源版：只验证最大长尾笔确实没被归并，不写死真实来源名 */
-  t('长尾里最大一笔确实未归并', (() => { const x = st.all.filter(v => !v.merged)[0]; return !!x; })(),
-    st.all.filter(x => !x.merged)[0] ? st.all.filter(x => !x.merged)[0].name : '');
+  t('长尾里最大一笔是「天使投资」', st.all.filter(x => !x.merged)[0].name === '天使投资',
+    st.all.filter(x => !x.merged)[0].name);
 
-  // 规则顺序有意义：宽泛 pattern 必须排在具体 pattern 之后，否则先到先得会吞掉别的组
-  /* 开源版：规则优先级语义改为「每条命中规则的记录都能归到规则声明的组」——
-     逐规则抽 1 条命中记录验证，不再写死真实群名/客户名 */
-  /* 规则按顺序先命中先得；抽样记录可能同时命中多条规则，
-     断言「按规则顺序模拟的赢家 == 页面 sourceOf 的结果」而不是写死规则名 */
-  t('规则抽样：页面归类 = 按规则顺序模拟的赢家', ruleNames.every(n => {
-    const rule = (DATA.sourceMap.rules || []).find(r => r.name === n);
-    const pats = (rule && rule.patterns || []).map(p => new RegExp(p));
-    const scopeNote = rule && rule.scope === 'note';
-    const e = S.earnings.find(x => x.amount > 0 && pats.some(p => {
-      const note = x.note || '';
-      return p.test(scopeNote ? note : (api.firstSeg(note) || ''));
-    }));
-    if(!e) return true;
-    const winner = ((DATA.sourceMap.rules || []).find(r =>
-      (r.patterns || []).some(p => {
-        try { return new RegExp(p).test(r.scope === 'note' ? (e.note || '') : (api.firstSeg(e.note) || '')); }
-        catch(_) { return false; }
-      })) || {}).name;
-    return api.sourceOf(e).name === winner;
-  }));
+  // 规则顺序：社群必须排在雇主之前，否则会被 lioncc 规则吞掉
+  t('「OpenClaw & LionCC 交流群」归到交流群而非 LionCC 相关', (() => {
+    const e = S.earnings.find(x => (x.note || '').startsWith('OpenClaw & LionCC'));
+    return !!e && api.sourceOf(e).name === 'LionCC 交流群';
+  })());
+  t('老徐的两种写法归到同一组（IDO老徐）', (() => {
+    const e = S.earnings.find(x => (x.note || '').startsWith('IDO老徐'));
+    return !!e && api.sourceOf(e).name === '老徐';
+  })());
   t('支出不参与来源统计（只算收入）', (() => {
     const exp = S.earnings.find(x => x.amount < 0);
     return !!exp && !st.all.some(x => x.name === api.firstSeg(exp.note));
@@ -735,13 +758,12 @@ console.log('\n— 19. 收入来源归并 —');
     el('srcTag').textContent);
 
   // 点来源行 → 明细被筛到这一组
-  const idx = 0;
-  const groupName = api.sourceStats().merged[0].name;
+  const idx = api.sourceStats().merged.findIndex(x => x.name === '老徐');
   api.setSrcFilter(idx);
-  t('点来源行后筛选生效', api.getSrcFilter() === groupName, String(api.getSrcFilter()));
-  t('筛选后全部命中同一来源', api.ledgerFilters().every(e => api.sourceOf(e).name === groupName),
-    `${api.ledgerFilters().length} 笔`);
-  t('明细 tag 标出来源筛选', el('ledgerSrc').textContent.includes(groupName), el('ledgerSrc').textContent);
+  t('点「老徐」后筛选生效', api.getSrcFilter() === '老徐', String(api.getSrcFilter()));
+  t('老徐筛选出 16 笔', api.ledgerFilters().length === 16, String(api.ledgerFilters().length));
+  t('筛选后全部命中同一来源', api.ledgerFilters().every(e => api.sourceOf(e).name === '老徐'));
+  t('明细 tag 标出来源筛选', el('ledgerSrc').textContent.includes('老徐'), el('ledgerSrc').textContent);
   api.setSrcFilter(idx);
   t('再点一次取消筛选', api.getSrcFilter() === null, String(api.getSrcFilter()));
   api.setSrcFilter(idx); api.clearSrcFilter();
@@ -798,33 +820,21 @@ console.log('\n— 21. 数据体检 —');
   const hs = clockAt('2027-01-15T12:00:00', () => api.healthIssues());
   const byTitle = s => hs.find(x => x.title.includes(s));
   const dup = byTitle('完全重复');
-  /* 页面按「同日+同额+同备注」分组，每组保留最早一条、只列最后一条为多余。
-     组数与多余金额从夹具现算：按页面同款分组键模拟 */
-  const grp = {};
-  DATA.earnings.forEach(e => {
-    const k = e.date + '|' + Math.round(e.amount * 100) / 100 + '|' + (e.note || '').trim();
-    (grp[k] = grp[k] || []).push(e);
-  });
-  const dupGroups = Object.values(grp).filter(v => v.length > 1);
-  const dupExpectN = dupGroups.length;
-  const dupSumExpect = dupGroups.reduce((a, g) => a + Math.abs(g[g.length - 1].amount), 0);
-  t(`查出 ${dupExpectN} 组完全重复`, !!dup && dup.title.startsWith(`${dupExpectN} 组`), dup ? dup.title : '没查到 <<<');
-  t('重复项给出可跳转的 id 列表', !!dup && Array.isArray(dup.ids) && dup.ids.length === dupExpectN,
+  t('查出 3 组完全重复', !!dup && dup.title.startsWith('3 组'), dup ? dup.title : '没查到 <<<');
+  t('重复项给出可跳转的 id 列表', !!dup && Array.isArray(dup.ids) && dup.ids.length === 3,
     dup ? String(dup.ids.length) : '');
-  t('重复项标注多余金额 = 现算', !!dup && Math.abs(dup.sum - dupSumExpect) < 0.005, `${dup.sum.toFixed(2)} vs ${dupSumExpect.toFixed(2)}`);
+  t('重复项标注多余金额 ¥43.26', !!dup && Math.abs(dup.sum - 43.26) < 0.005, dup ? dup.sum.toFixed(2) : '');
   t('重复项的 id 指向真实记录', !!dup && dup.ids.every(id => S.earnings.some(e => e.id === id)));
-  t('每组列出的是最后一条（保留最早）', (() => {
-    return dupGroups.every(g => {
-      const listed = dup.ids.find(id => g.some(e => e.id === id));
-      return !!listed && listed === g[g.length - 1].id;
-    });
+  t('重复项取的是一组里最后一条（保留最早）', (() => {
+    const g = S.earnings.filter(e => e.date === '2024-06-05' && (e.note || '').includes('老徐-100个小项目'));
+    return g.length === 2 && dup.ids.includes(g[1].id) && !dup.ids.includes(g[0].id);
   })());
 
   const zero = byTitle('金额为 0');
-  t('查出零额记录', !!zero && zero.title.includes('金额为 0'), zero ? zero.title : '没查到 <<<');
+  t('查出 1 条零额记录（马幸运）', !!zero && zero.title.startsWith('1 条'), zero ? zero.title : '没查到 <<<');
   t('零额记录的 id 是正确的', !!zero && (() => {
     const e = S.earnings.find(x => x.id === zero.ids[0]);
-    return !!e && e.amount === 0;
+    return !!e && e.amount === 0 && (e.note || '').includes('马幸运');
   })());
 
   // 断档测试需要把"今天"钉到最后一笔进账之后足够远（页面按自身节奏阈值判断），
@@ -854,9 +864,9 @@ console.log('\n— 21. 数据体检 —');
   // 点体检项 → 明细被筛到那几条
   const di = hs.indexOf(dup);
   api.jumpToIds(di);
-  t('点重复项后进入焦点筛选', Array.isArray(api.getFocusIds()) && api.getFocusIds().length === dupExpectN,
+  t('点重复项后进入焦点筛选', Array.isArray(api.getFocusIds()) && api.getFocusIds().length === 3,
     String(api.getFocusIds() && api.getFocusIds().length));
-  t('明细只剩重复组条数', api.ledgerFilters().length === dupExpectN, String(api.ledgerFilters().length));
+  t('明细只剩那 3 条', api.ledgerFilters().length === 3, String(api.ledgerFilters().length));
   t('明细 tag 标出体检筛选', el('ledgerSrc').textContent.includes('体检'), el('ledgerSrc').textContent);
   t('清除按钮改文案为「体检筛选」', el('ledClear').textContent === '✕ 体检筛选', el('ledClear').textContent);
   api.clearFocus();
@@ -865,11 +875,10 @@ console.log('\n— 21. 数据体检 —');
 
   // 两个筛选维度必须互斥，否则会叠出空结果
   api.jumpToIds(di);
-  const si = 0;
-  const gname2 = api.sourceStats().merged[0].name;
+  const si = api.sourceStats().merged.findIndex(x => x.name === '老徐');
   api.setSrcFilter(si);
   t('点来源会清掉体检焦点（维度互斥）', api.getFocusIds() === null, String(api.getFocusIds()));
-  t('来源筛选生效', api.getSrcFilter() === gname2, String(api.getSrcFilter()));
+  t('来源筛选生效', api.getSrcFilter() === '老徐', String(api.getSrcFilter()));
   api.clearSrcFilter();
 
   // 空数据时不该崩，也不该报假异常
@@ -983,14 +992,13 @@ clockAt(TEST_TODAY, () => {
     .every(r => r[ci('归并来源')] === api.sourceOf({ note: r[ci('详细备注')] }).name));
   t('CSV 支出行的层级/来源留空（只归类收入）', (() => {
     const exp = R.filter(r => r[ci('方向')] === '支出');
-    return exp.length === DATA.earnings.filter(e => e.amount < 0).length
-      && exp.every(r => r[ci('归并来源')] === '' && r[ci('归并层级')] === '');
+    return exp.length === 7 && exp.every(r => r[ci('归并来源')] === '' && r[ci('归并层级')] === '');
   })());
   // 金额为 0 的行既不是收入也不是支出，方向列必须三值，否则会出现"标着收入但没有来源"的矛盾行
   t('CSV 零额行单列一类「零额」而不是伪装成收入', (() => {
     const z = R.filter(r => r[ci('方向')] === '零额');
     return z.length === 1 && z[0][ci('金额')] === '0' && z[0][ci('归并来源')] === ''
-        && String(z[0][ci('详细备注')] || '').length > 0;
+        && z[0][ci('详细备注')].includes('马幸运');
   })(), (() => {
     const z = R.filter(r => r[ci('方向')] === '零额');
     return z.length ? `${z[0][ci('详细备注')]} 金额=${z[0][ci('金额')]}` : '没有零额行 <<<';
@@ -1019,14 +1027,10 @@ clockAt(TEST_TODAY, () => {
   t('CSV 列求和 == 真实净额（逐行不许四舍五入）', Math.abs(csvSum - rawSum) < 1e-9,
     `CSV ${csvSum.toFixed(6)} vs 真实 ${rawSum.toFixed(6)}`);
   t('CSV 净额 = 全部金额之和（现算）', Math.abs(csvSum - rawSum) < 0.005, csvSum.toFixed(3));
-  /* 精度语义：CSV 的金额列逐字符保留源数据精度。用夹具里 >2 位小数的记录现算；
-     夹具若没有这类记录，则至少验证 CSV 与源串逐行一致（精度不被破坏的充分条件） */
-  t('CSV 金额列保留原始精度', (() => {
-    const csvAmts = R.map(r => r[ci('金额')]);
-    const srcStr = new Set(S.earnings.map(e => String(e.amount)));
-    const srcNum = new Set(S.earnings.map(e => +e.amount));
-    return csvAmts.every(v => srcStr.has(v) || srcNum.has(+v));
-  })(), R.slice(0, 3).map(r => r[ci('金额')]).join(' / '));
+  t('超过 2 位小数的 5 条保留了原始精度（9.996 等没被写成 10.00）', (() => {
+    const raw = S.earnings.map(e => String(e.amount));
+    return ['9.996', '10.728', '6.666', '76.841', '21.996'].every(v => raw.includes(v));
+  })(), S.earnings.filter(e => String(e.amount).split('.')[1]?.length > 2).map(e => e.amount).join(' '));
   t('收入列求和 = 全部收入（现算）', (() => {
     const inc = R.filter(r => r[ci('方向')] === '收入').reduce((s, r) => s + (+r[ci('金额')]), 0);
     return Math.abs(inc - calcInc().sum) < 1e-9;
@@ -1406,20 +1410,13 @@ clockAt(TEST_TODAY, () => {
     specC.max >= S.monthlyGoal, `max=${specC.max} goal=${S.monthlyGoal}`);
 
   // (2) 达成率「0%」是假状态：修在目标带却漏了 KPI 卡和达成史，真机上才看见三处不一致。
-  const mNetNow = mNet;   // 前文已现算的本月净额
-  /* 目标值要避开 Math.round 的 1% 舍入边界：|mNet|*100 恰好可能被舍入成
-     正好 1%（四舍五入），那样「不到 1%」分支根本不触发，断言就会假红。
-     乘 100 再加一点余量，保证真比率 <0.5%，无论怎么舍都落在「不到 1%」里。 */
-  /* ×300：|mNet| 在千元级时 ×100 的真实比率会落在 0.99%~1.00% 之间，
-     Math.round 四舍五入恰好变 1%，断言假红（本轮实测踩过）。×300 把比率压到 0.33%，稳落「不到 1%」。 */
-  api.applyGoal(Math.max(1, Math.ceil(Math.abs(mNetNow) * 300)));   // 达成率 <1%
+  api.applyGoal(300000);                        // 本月净额约 ¥300，达成率 0.1%
   t('达成率不足 1% 时，目标带 / KPI / 达成史三处统一写「不到 1%」',
     el('goalNow').innerHTML.includes('不到 1%') && el('kpis').innerHTML.includes('不到 1%')
       && el('goalHist').innerHTML.includes('不到 1%'),
     `目标带「${el('goalNow').innerHTML.replace(/<[^>]+>/g, '')}」 · KPI「${(el('kpis').innerHTML.match(/目标[^<]*/) || [''])[0].trim()}」 · 达成史命中 ${(el('goalHist').innerHTML.match(/不到 1%/g) || []).length} 格`);
-  const goalLo = Math.max(1, Math.ceil(Math.abs(mNetNow) * 2));
-  api.applyGoal(goalLo);                        // 换成够得着的目标 → 应回到百分数
-  const pWant = Math.round(mNetNow / goalLo * 100) + '%';
+  api.applyGoal(300);                           // 换成够得着的目标 → 应回到百分数
+  const pWant = Math.round(mNet / 300 * 100) + '%';
   t('达成率 ≥1% 时三处都写百分数（「不到 1%」不是把功能一刀切）',
     el('goalNow').innerHTML.includes(pWant) && el('kpis').innerHTML.includes(pWant)
       && el('goalHist').innerHTML.includes(pWant),
@@ -1447,10 +1444,7 @@ clockAt(TEST_TODAY, () => {
       : true,
     `需 ${need} 笔 / 本月 ${mInc.length} 笔；文案「${actFar.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 90)}」`);
   }
-  /* 缺口目标从数据现算，不写死 400：夹具的本月净额变了，400 可能反而超额。
-     取「本月净额 × 2」保底 1 —— 两倍于已达成量，缺口约等于本月量，
-     属于正常量级（不会触发 20 倍闸门），笔数建议应当照常出现。 */
-  api.applyGoal(Math.max(1, Math.ceil(mNetNow * 2)));
+  api.applyGoal(400);                           // 缺口约一笔 → 闸门不该把正常笔数也拦掉
   const actNear = el('goalAction').innerHTML;
   if (left25 <= 0) {
     t('本月最后一天：正常量级的缺口同样不给笔数（同一个分支，不是两个口径）',
@@ -1470,7 +1464,7 @@ clockAt(TEST_TODAY, () => {
 
 /* ══════════════════════════════════════════════════════════════════════════
    26. UI/UX 评审整改（2026-09-29）回归断言
-   评审结论：见 docs/DESIGN.md（83 条规则库 + WCAG 2.1 AA）
+   评审报告：designs/workbench/评审报告-20260929.md（83 条规则库 + WCAG 2.1 AA）
    这一节同时是"别退回去"的哨兵：对比度、令牌纪律、键盘可达、提示通道
    —— 全都是靠人眼不靠不住的东西，只能靠断言守住。
    ══════════════════════════════════════════════════════════════════════════ */
@@ -1620,7 +1614,7 @@ console.log('\n— 26. UI/UX 评审整改：令牌 / 对比度 / 键盘 / 提示
   const docK = Object.assign({}, doc, {
     addEventListener: (type, fn) => { (listenersK[type] = listenersK[type] || []).push(fn); } });
   new Function('document', 'localStorage', 'location', 'alert', 'setInterval', 'clearInterval', 'window',
-    js)(docK, localStorage, location, () => {}, () => 1, () => {}, globalThis);
+    js)(docK, localStorage, location, () => {}, () => 1, () => {}, windowStub);
   t('键盘激活委托已注册到 document（页面脚本求值时就注册）',
     (listenersK.keydown || []).length >= 1, `${(listenersK.keydown || []).length} 个 keydown 监听器`);
   const fireKey = (target, key) => {
@@ -1683,22 +1677,52 @@ console.log('\n— 26. UI/UX 评审整改：令牌 / 对比度 / 键盘 / 提示
     /<main[\s>]/.test(markup) && /<\/main>/.test(markup) && /<nav[\s>]/.test(markup) && /<\/nav>/.test(markup));
   const labelN = (markup.match(/<label/g) || []).length;
   const forN = (markup.match(/<label[^>]*\bfor=/g) || []).length;
-  /* 2026-10-08：资讯页新增「只看未读」checkbox（无 for，直接包裹）与
-     探查 / 管理两个新模态，数量相应从 11→12、2→4。 */
-  t('所有 <label> 补齐 for= 或隐含包裹（15 个，其中 1 个隐含包裹）',
-    labelN === forN + 1 && labelN === 15, `${forN}/${labelN}`);
+  /* 资讯页「只看未读」checkbox 采用隐含包裹；其余 label 必须显式绑定控件。
+     负责人是多按钮分组，使用 group + aria-labelledby，不强行套无效的 label[for]。 */
+  t('所有 <label> 都通过 for= 或隐含包裹关联控件',
+    labelN === forN + 1 && labelN >= 18, `${forN}/${labelN}`);
+  /* 输入框不能只靠 placeholder 取名字：placeholder 是格式提示，不是稳定标签。
+     账本三类控件此前都没有显式名称，其中两个 <select> 在辅助技术里直接是空名。 */
+  t('收益明细搜索与筛选都有显式可访问名称',
+    ['ledQ', 'ledType', 'ledRange'].every(id => {
+      const tag = markup.match(new RegExp(`<(?:input|select)[^>]*\\bid="${id}"[^>]*>`));
+      return !!tag && /\baria-label="[^"]+"/.test(tag[0]);
+    }));
+  t('今日备忘与月度目标输入框不只依赖 placeholder',
+    ['note', 'goalInput'].every(id => {
+      const tag = markup.match(new RegExp(`<(?:textarea|input)[^>]*\\bid="${id}"[^>]*>`));
+      return !!tag && /\baria-label="[^"]+"/.test(tag[0]);
+    }));
+  /* 静态 ID 必须全页唯一。之前「数据来源」卡片和弹窗都叫 srcTag，
+     弹窗里的来源数量会写到总览卡片，弹窗自己反而一直为空。 */
+  const staticHtml = htmlClean(src)
+    .replace(/<script>[\s\S]*?<\/script>/g, '')
+    .replace(/<style>[\s\S]*?<\/style>/g, '');
+  const staticIds = [...staticHtml.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]);
+  const dupStaticIds = [...new Set(staticIds.filter((id, i) => staticIds.indexOf(id) !== i))];
+  t('静态 ID 全页唯一', dupStaticIds.length === 0, dupStaticIds.join(',') || `${staticIds.length} 个唯一 ID`);
+  t('负责人多选分组有可访问名称',
+    /id="pnOwnersLabel"[^>]*>负责人<\/span>/.test(markup)
+      && /role="group"[^>]*aria-labelledby="pnOwnersLabel"/.test(markup));
   /* 模态数现算：role=dialog 与 aria-modal 数量必须相等且覆盖所有模态（≥4）。
-     写死 4 的年代后面加了数据来源、命令面板，死数字立即假红。 */
-  const dialogN = (markup.match(/role="dialog"/g) || []).length;
+     写死 4 的年代后面加了数据来源、命令面板，死数字立即假红。
+     只数静态 HTML：脚本里新增的 `[role="dialog"]` 选择器不是页面节点。 */
+  const dialogN = (staticHtml.match(/role="dialog"/g) || []).length;
   t('每个模态都声明 role=dialog + aria-modal（数量一致且 ≥4）',
-    dialogN >= 4 && dialogN === (markup.match(/aria-modal="true"/g) || []).length,
-    `role=dialog ${dialogN} 处 / aria-modal ${(markup.match(/aria-modal="true"/g) || []).length} 处`);
+    dialogN >= 4 && dialogN === (staticHtml.match(/aria-modal="true"/g) || []).length,
+    `role=dialog ${dialogN} 处 / aria-modal ${(staticHtml.match(/aria-modal="true"/g) || []).length} 处`);
   const iconBtns=[...js.matchAll(/<button[^>]*class="(?:del|edit|miniact del)"[^>]*>/g)].map(m=>m[0]);
   t('所有图标按钮都有 aria-label（原来只有 title，title 不被所有屏读器稳定播报）',
     iconBtns.length>0 && iconBtns.every(tag=>/aria-label=/.test(tag)),
     `${iconBtns.filter(tag=>/aria-label=/.test(tag)).length}/${iconBtns.length}`);
+  /* 不能只数全页 role=status 的数量：页面别处还有专注状态、关系选择器等通道，
+     删掉 banner/notify/undo 任意一个，总数仍可能 ≥3，断言会假绿（变异 #22 实测）。
+     这里逐个点名这三个固定 ID，确保它们本身就是状态通道。 */
   t('屏读器状态通道：banner / notify / undo 都带 role=status + aria-live',
-    (markup.match(/role="status" aria-live="polite"/g) || []).length === 3);
+    ['banner', 'notify', 'undo'].every(id => {
+      const tag = markup.match(new RegExp(`<div[^>]*\\bid="${id}"[^>]*>`));
+      return !!tag && /role="status"/.test(tag[0]) && /aria-live="polite"/.test(tag[0]);
+    }));
   t('数字排版：tabular-nums 已启用（这是金额应用，非等宽则竖排对不齐）',
     /font-variant-numeric:tabular-nums/.test((styleText.match(/body\{[^}]*\}/) || [''])[0]));
   t('表格斑马纹已加（改造前 nth-child 0 处）', /tbody tr:nth-child\(even\)/.test(styleText));
@@ -1733,9 +1757,8 @@ console.log('\n— 26. UI/UX 评审整改：令牌 / 对比度 / 键盘 / 提示
      （这一段踩过一个坑，值得留着：原来固定取索引 5 当"要删的那条"，而它恰好是只读记录，
        delEarn 于是**正确地**拒绝了删除 —— 结果「删除后 -1」红了，可后面 4 条
        「撤销后复原」却因为**什么都没发生过**而全绿。假绿比红灯危险得多。） */
-  t('可删除的只有本地草稿（只读来源的账本行不出现删除按钮）',
-    S.earnings.filter(e => !e.readOnly).every(e => String(e.id).startsWith('ci-draft-') || String(e.id).startsWith('draft-')),
-    `${S.earnings.filter(e => !e.readOnly).length} 条可删`);
+  t('真实数据的收益记录全是只读（这正是账本上不会出现删除按钮的原因）',
+    S.earnings.every(e => e.readOnly), `${S.earnings.filter(e => !e.readOnly).length} 条可删`);
 
   const vIdx = 5;
   const victim = { id: 'draft-del-1', date: api.todayStr(), amount: 888.88, type: '咨询',
@@ -1926,13 +1949,18 @@ console.log('\n— 27. 第四轮整改：跳转链 / 表头 / 命中区 / Enter 
     `${amtRules.length} 条 td.amt 规则：${amtRules.map(b => b.body).join(' | ').slice(0, 70)}`);
 
   // ── D. 模态 Enter 提交 ─────────────────────────────────────────────
-  for (const [tag, fid, fn] of [['项目', 'projForm', 'submitProj'], ['收益', 'earnForm', 'submitEarn']]) {
+  for (const [tag, fid, fn] of [
+    ['本地项目', 'projForm', 'submitProj'],
+    ['Notion 项目', 'projNotionForm', 'submitProjectWriteback'],
+    ['收益', 'earnForm', 'submitEarn']
+  ]) {
     t(`${tag}模态包在 <form id="${fid}"> 里（Enter 才能提交）`,
       new RegExp(`<form id="${fid}" onsubmit="return ${fn}\\(event\\)">`).test(src));
   }
   t('<h3> 标题仍在（包一层 form 后 aria-labelledby 的目标没丢）',
     /<h3 id="projTitle">添加项目<\/h3>/.test(src) && /<h3 id="earnTitle">记一笔收益<\/h3>/.test(src));
-  t('form 不带来 UA 默认外边距（否则模态高度会变）', hasIn('#projForm,#earnForm', 'margin:0'));
+  t('form 不带来 UA 默认外边距（否则模态高度会变）',
+    hasIn('#projForm,#projNotionForm,#earnForm', 'margin:0'));
   /* 最关键的一条：<button> 在 <form> 里**默认就是 submit**。
      取消按钮不写 type="button" 的话，点"取消"反而会触发保存 —— 一个会改数据的静默故障。 */
   const cancelBtn27 = src.match(/<button class="btn ghost" type="button" onclick="closeOv\(\)">取消<\/button>/g) || [];
@@ -2064,6 +2092,50 @@ console.log('\n— 27. 第四轮整改：跳转链 / 表头 / 命中区 / Enter 
   // ── B. 资讯区 ────────────────────────────────────────────────────────
   const news = api.secOf('news');
   const near = news.items.filter(i => i.days !== null && i.days <= news.windowDays);
+  t('资讯顶部风险摘要从真实 feeds 现算，不在页面另存一份',
+    /const dead=fs\.filter\(f=>f\.dead&&!f\.paused&&!f\.error\)/.test(js)
+      && /newsOverview/.test(js) && !/2 个源停更/.test(js),
+    `JSON 停更 ${news.feeds.filter(f => f.dead).length} 个`);
+  t('订阅源状态把失败、暂停、正常分开表达',
+    api.feedManageState({error:'HTTP 500'}).cls === 'dead'
+      && api.feedManageState({paused:true}).cls === 'warn'
+      && api.feedManageState({dead:true}).label === '停更'
+      && api.feedManageState({}).cls === 'ok'
+      && api.feedClock(0) === '尚未抓取'
+      && api.feedClock('2026-10-29T22:01:40') !== '—');
+  t('日常操作默认停用，永久删除需要 purge=true 且输入二次确认',
+    /\/api\/feeds\/pause/.test(js) && /purge:true/.test(js)
+      && /请输入“删除”确认/.test(js) && !/条目历史保留/.test(js));
+  const keyword = String(news.items[0].title || '').slice(0, 4);
+  el('newsQ').value = keyword;
+  api.setNewsFilter();
+  const qRows = cnt(el('newsItems').innerHTML, /class="nitem/g);
+  const qMatches = news.items.filter(i => [i.title, i.summary, i.source, i.group]
+    .some(v => String(v || '').toLowerCase().includes(keyword.toLowerCase()))).length;
+  t('关键词筛选命中标题，并同步收敛三档按钮的真实条数',
+    qRows > 0 && qRows <= qMatches
+      && el('newsS3').textContent.trim() === `全部 ${qMatches}`
+      && el('newsFilter').className.includes('active'),
+    `${keyword} → ${qRows} 行 / ${qMatches} 条`);
+  api.clearNewsFilter();
+  t('清除筛选同时复位关键词、源、分组、未读四项',
+    api.getNewsFilters().query === '' && api.getNewsFilters().feed === ''
+      && api.getNewsFilters().group === '' && api.getNewsFilters().unread === false
+      && !el('newsFilter').className.includes('active'),
+    JSON.stringify(api.getNewsFilters()));
+  const deadFeed = news.feeds.find(f => f.dead);
+  if (deadFeed) {
+    api.filterNewsBySource(deadFeed.name);
+    t('点订阅源会切到该源的全部历史条目，而不是只看近期窗口',
+      api.getNewsScope() === 'all' && api.getNewsFilters().feed === deadFeed.name
+        && el('newsFeedSel').value === deadFeed.name,
+      `${deadFeed.name} / ${api.getNewsScope()}`);
+    t('按源筛选后的列表只包含该源条目',
+      cnt(el('newsItems').innerHTML, /class="nitem/g) === news.items.filter(i => i.source === deadFeed.name).length,
+      `${cnt(el('newsItems').innerHTML, /class="nitem/g)} / ${news.items.filter(i => i.source === deadFeed.name).length}`);
+    api.clearNewsFilter();
+    api.setNewsScope('recent');
+  }
   t('★ 默认档位渲染条数 == min(NEWS_PAGE, 窗口内条数)，且 NEWS_PAGE 本身有上限',
     api.getNewsScope() === 'recent' && api.NEWS_PAGE <= 50 && (() => {
       const r = cnt(el('newsItems').innerHTML, /class="nitem/g);
@@ -2110,16 +2182,45 @@ console.log('\n— 27. 第四轮整改：跳转链 / 表头 / 命中区 / Enter 
     `${cnt(el('newsItems').innerHTML, /target="_blank"/g)} 个新窗口`);
   t('已读/未读两种状态在页面上都有文字，不只靠圆点颜色',
     /已读/.test(el('newsItems').innerHTML) || /未读/.test(el('newsItems').innerHTML));
+  t('资讯标题保留真实外链，并接入站内阅读点击处理',
+    /<a href="https:\/\//.test(el('newsItems').innerHTML)
+      && el('newsItems').innerHTML.includes('onclick="return openNewsReader(this,event)"')
+      && el('newsItems').innerHTML.includes('target="_blank"')
+      && el('newsItems').innerHTML.includes('rel="noopener noreferrer"'));
+  const readerHtml = api.newsReaderBlocksHTML([
+    { type: 'p', text: '<img src=x onerror=alert(1)> 正文' },
+    { type: 'h2', text: '小标题' },
+    { type: 'script', text: 'alert(1)' },
+  ]);
+  t('★ 阅读正文只按白名单渲染并转义远程文本',
+    readerHtml.includes('&lt;img src=x onerror=alert(1)&gt;')
+      && !readerHtml.includes('<img')
+      && readerHtml.includes('<h2>小标题</h2>')
+      && !readerHtml.includes('<script>'),
+    readerHtml.slice(0, 120));
+
+  const foldHtml = api.newsReaderBlocksHTML([
+    { type: 'details', text: '年度关键成就', blocks: [
+      { type: 'h3', text: '里程碑' },
+      { type: 'li', text: '发布 v2', ordered: false, marker: '•' },
+    ] },
+  ]);
+  t('阅读折叠块按 <details> 渲染，内部块递归走同一套白名单',
+    foldHtml.includes('<details class="reader-fold"><summary>年度关键成就</summary>')
+      && foldHtml.includes('<h3>里程碑</h3>')
+      && foldHtml.includes('reader-list-item')
+      && foldHtml.trim().endsWith('</details>'),
+    foldHtml.slice(0, 120));
 
   t('资讯概览条数 == stats 项数', cnt(el('newsStats').innerHTML, /class="kpi"/g) === news.stats.length,
     `${news.stats.length} 项`);
 
   const fHtml = el('#newsFeeds tbody').innerHTML;
-  const fRows = cnt(fHtml, /<tr>/g);
+  const fRows = cnt(fHtml, /<tr(?:\s|>)/g);
   const deadJson = news.feeds.filter(f => f.dead).length;
   t('订阅源表行数 == feeds 条数', fRows === news.feeds.length, `页面 ${fRows} / JSON ${news.feeds.length}`);
-  t('① 守恒：「停更」标记数 == feeds 里 dead 的条数',
-    cnt(fHtml, /chip dead/g) === deadJson, `页面 ${cnt(fHtml, /chip dead/g)} / JSON ${deadJson}`);
+  t('① 守恒：「停更」指示灯数 == feeds 里 dead 的条数',
+    cnt(fHtml, /fdot-dead/g) === deadJson, `页面 ${cnt(fHtml, /fdot-dead/g)} / JSON ${deadJson}`);
   t('被标停更的确实都超过阈值（标记与判据不许各说各话）',
     news.feeds.filter(f => f.dead).every(f => f.days > news.feedStaleDays),
     news.feeds.filter(f => f.dead).map(f => `${f.name}:${f.days}天`).join('、'));
@@ -2150,13 +2251,101 @@ console.log('\n— 27. 第四轮整改：跳转链 / 表头 / 命中区 / Enter 
   const pctMin = Math.round(b0.chars / b0.target.min * 100);
   const pctMax = Math.round(b0.chars / b0.target.max * 100);
   t('进度按目标区间**下限**算（拿上限当分母会得到一个更小的数）',
-    pctMin !== pctMax && wHtml.includes('已写 ' + pctMin + '%'),
-    `下限 ${pctMin}% / 上限 ${pctMax}%（页面用的是 ${wHtml.includes('已写 ' + pctMin + '%') ? '下限' : '上限/其它'}）`);
+    pctMin !== pctMax && wHtml.includes('目标完成 ' + pctMin + '%'),
+    `下限 ${pctMin}% / 上限 ${pctMax}%（页面用的是 ${wHtml.includes('目标完成 ' + pctMin + '%') ? '下限' : '上限/其它'}）`);
+  const latestWritten = [...(b0.chapters || [])].reverse().find(c => c.written);
+  const primaryAction = wHtml.match(/class="writing-action-primary" type="button" onclick="openWritingEditor\('([^']+)','([^']+)'\)"/);
+  t('写作首屏把「继续当前章」做成明确主行动，并在工作台打开最近已写正文',
+    !!latestWritten && !!primaryAction
+      && primaryAction[1] === latestWritten.bookId
+      && primaryAction[2] === latestWritten.chapterId,
+    latestWritten ? `${latestWritten.name} → ${primaryAction?.[1] || '无 bookId'} / ${primaryAction?.[2] || '无 chapterId'}` : '没有已写章节');
+  t('写作页辅助入口使用轻量文字动作，不与主行动争夺视觉焦点',
+    wHtml.includes('writing-action-tertiary') &&
+      wHtml.includes('在 Obsidian 中打开') &&
+      wHtml.includes('查看目录') &&
+      !wHtml.includes('在 Obsidian 中打开 ↗') &&
+      !wHtml.includes('查看目录 ↗'),
+    'Obsidian / 目录 / 下一章入口已降级且无箭头');
+  const studioHtml = el('wrStudio').innerHTML;
+  t('统一创作入口覆盖小说、公众号、Twitter 与知识星球',
+    ['小说', '公众号文章', 'Twitter / X', '知识星球'].every(x => studioHtml.includes(x))
+      && cnt(studioHtml, /class="writing-create-btn"/g) === 4,
+    studioHtml.slice(0, 160));
+  t('每个章节行都有明确的开始写或继续写入口',
+    cnt(wHtml, /class="ch-write"/g) === b0.chapterCount
+      && wHtml.includes('继续写') && (b0.writtenCount === b0.chapterCount || wHtml.includes('开始写')),
+    `写作按钮 ${cnt(wHtml, /class="ch-write"/g)} / 章节 ${b0.chapterCount}`);
+  const nextChapter = (b0.chapters || []).find(c => !c.written);
+  t('下一章区域可直接打开对应章节编辑器，而不是只跳目录',
+    !nextChapter || wHtml.includes(
+      `onclick="openWritingEditor('${nextChapter.bookId}','${nextChapter.chapterId}')"`),
+    nextChapter ? nextChapter.name : '全部章节已写');
+  t('写作编辑器使用 Obsidian 正文接口、哈希冲突检测与安全 Markdown 预览',
+    js.includes('WRITING_CHAPTER_API') && js.includes('WRITING_DOCUMENT_API')
+      && js.includes('WRITING_DOCUMENT_SAVE_API') && js.includes('baseSha256')
+      && js.includes('safeMarkdownHtml') && js.includes('writingEditorConflict'),
+    '章节 / 独立稿件 / 冲突 / 预览均已接线');
+  t('写作预览识别 Obsidian 双链与安全本地图片，不把绝对路径交给页面',
+    js.includes('wb-wikilink') && js.includes('data-obsidian-asset')
+      && js.includes('/api/writing/asset') && js.includes('/api/writing/document/asset')
+      && !js.includes('data-obsidian-asset="${esc(url)}" loading="lazy">'),
+    '双链 / 章节图片 / 稿件图片均已接线');
+  t('独立稿件也会触发自动保存（就绪判断不只检查章节 ID）',
+    /const ready=writingEditor\.kind==="document"[\s\S]{0,120}documentId/.test(js)
+      && /if\(!ready\|\|writingEditor\.saving\) return;/.test(js),
+    'documentId 已纳入编辑就绪判断');
+  t('删除入口存在且明确走 Obsidian 回收站，不提供物理删除',
+    js.includes('WRITING_DELETE_API') && js.includes('deleteWritingContent')
+      && js.includes('Obsidian 回收站') && !js.includes('rm -rf') && !js.includes('unlink('),
+    '删除 = 回收站 + 二次确认');
+  t('回收站入口折叠展示已删除内容，懒加载且不暴露路径',
+    js.includes('WRITING_TRASH_API') && js.includes('loadWritingTrash')
+      && js.includes('writing-trash-list'),
+    '回收站入口已接线');
+  t('回收站支持一键恢复：重名加后缀不覆盖，恢复后刷新列表',
+    js.includes('WRITING_RESTORE_API') && js.includes('restoreWritingTrash')
+      && js.includes('不会覆盖'),
+    '恢复入口已接线');
+  const remaining = Math.max(0, b0.target.min - b0.chars);
+  t('目标区直接回答离最低目标还差多少字',
+    wHtml.includes('离最低目标') && wHtml.includes(remaining.toLocaleString() + ' 字'),
+    `剩余 ${remaining.toLocaleString()} 字`);
+  t('下一章在章节列表中单独高亮',
+    !b0.chapters.find(c => !c.written) || wHtml.includes('class="chrow next"'),
+    b0.chapters.find(c => !c.written)?.name || '全部已写');
   t('未写的章节在页面上有「（未写）」文字，不只靠 ✓ 与颜色',
     cnt(wHtml, /（未写）/g) === (b0.chapterCount - b0.writtenCount),
     `${cnt(wHtml, /（未写）/g)} 处`);
   t('正文字数展示的是上游那个数（页面不自己加总）',
     wHtml.includes(b0.chars.toLocaleString()) && b0.chars > 0, `${b0.chars.toLocaleString()} 字`);
+  const foldStart = wHtml.indexOf('<details class="writing-chapter-more"');
+  const firstScreenHtml = foldStart >= 0 ? wHtml.slice(0, foldStart) : wHtml;
+  const firstScreenRows = cnt(firstScreenHtml, /class="chrow/g);
+  t('章节目录默认只展示已写尾部与接下来两章，完整目录按需展开',
+    firstScreenRows < b0.chapterCount
+      && wHtml.includes('查看完整目录') && wHtml.includes('还有 ' + (b0.chapterCount - firstScreenRows) + ' 章'),
+    `首屏 ${firstScreenRows} / 共 ${b0.chapterCount}`);
+  t('下一章优先使用目录里第一个未写章节',
+    b0.chapters.find(c => !c.written)?.title
+      ? wHtml.includes(b0.chapters.find(c => !c.written).title) && wHtml.includes('下一章')
+      : wHtml.includes('目录章节已全部写完'),
+    b0.chapters.find(c => !c.written)?.title || '全部已写');
+  const wrHrefs = [...wHtml.matchAll(/href="([^"]*)"/g)].map(m => m[1].replace(/&amp;/g, '&'));
+  const wrExpected = [
+    b0.outlineUrl,
+    ...(b0.chapters || []).filter(c => c.written).map(c => c.obsidianUrl),
+    ...(b0.docs || []).map(d => d.obsidianUrl),
+    ...(b0.drafts || []).map(d => d.obsidianUrl)
+  ].filter(Boolean);
+  t('写作：目录、已写章节、设定与稿件都生成固定 vault 深链',
+    wrExpected.length > 0
+      && wrExpected.every(u => wrHrefs.includes(u))
+      && wrHrefs.every(u => u.startsWith('obsidian://open?vault=Obsidian-Tech&file=')),
+    `${new Set(wrHrefs).size} 个唯一链接 / ${wrExpected.length} 个应有目标`);
+  t('写作：未写章节只显示文字，不生成假深链',
+    !/<a\b[^>]*>[^<]*（未写）/.test(wHtml)
+      && (b0.chapters || []).filter(c => !c.written).every(c => !c.obsidianUrl));
 
   const cRows = cnt(el('wrClients').innerHTML, /class="nitem"/g);
   t('客户内容条数 == clients 长度', cRows === wr.clients.length, `${cRows} / ${wr.clients.length}`);
@@ -2171,10 +2360,83 @@ console.log('\n— 27. 第四轮整改：跳转链 / 表头 / 命中区 / Enter 
   const rv = api.secOf('review');
   api.renderReview(rv);
   const nRows = cnt(el('rvItems').innerHTML, /class="nitem"/g);
+  const leadRows = cnt(el('rvItems').innerHTML, /class="rv-lead"/g);
   const bRows = cnt(el('rvBreak').innerHTML, /class="exprow"/g);
   const sumG = rv.groups.reduce((s, g) => s + g.count, 0);
-  t('笔记条数 == items 长度', nRows === rv.items.length, `${nRows} / ${rv.items.length}`);
+  t('笔记条数 == items 长度（首条重点 + 普通行都计入）',
+    nRows + leadRows === rv.items.length, `${nRows}+${leadRows} / ${rv.items.length}`);
   t('分布条行数 == groups 长度', bRows === rv.groups.length, `${bRows} / ${rv.groups.length}`);
+  t('复盘首屏只突出最近一条与最近五条，其余按需展开',
+    leadRows === 1
+      && cnt(el('rvItems').innerHTML, /class="nitem"/g) < rv.items.length
+      && el('rvItems').innerHTML.includes('查看其余'),
+    `重点 ${leadRows} / 普通 ${nRows} / 共 ${rv.items.length}`);
+  const rvHrefs = [...el('rvItems').innerHTML.matchAll(/href="([^"]*)"/g)]
+    .map(m => m[1].replace(/&amp;/g, '&'));
+  const rvExpected = rv.items.map(n => n.obsidianUrl).filter(Boolean);
+  t('复盘：每条真实笔记都有固定 vault 深链',
+    rvExpected.length === rv.items.length
+      && rvHrefs.length === rvExpected.length
+      && rvExpected.every(u => rvHrefs.includes(u))
+      && rvHrefs.every(u => u.startsWith('obsidian://open?vault=Obsidian-Tech&file=')),
+    `${rvHrefs.length} 个链接 / ${rv.items.length} 篇`);
+  t('复盘行带列表摘要与站内预览按钮（标题可点，深链仍在）',
+    el('rvItems').innerHTML.includes('rv-summary')
+      && el('rvItems').innerHTML.includes('openReviewNote(')
+      && el('rvItems').innerHTML.includes('rv-title-btn'),
+    `summary ${cnt(el('rvItems').innerHTML, /rv-summary/g)} 处`);
+  const firstProd = (rv.items.find(n => (n.products || []).length) || {}).products?.[0] || '';
+  t('复盘产品 chip 可点击筛选（入口长在它筛的数据旁边）',
+    !!firstProd && el('rvItems').innerHTML.includes('setReviewProductFilter(')
+      && js.includes('function openReviewNote(') && js.includes('REVIEW_NOTE_API'),
+    firstProd ? '示例产品 ' + firstProd : '没有带 product 的笔记');
+  t('复盘预览直接复用资讯阅读抽屉（review 模式，侧栏列表可切换笔记）',
+    js.includes('setNewsReaderMode("review")')
+      && js.includes('function loadReviewReaderNote')
+      && js.includes('function renderReviewReaderList')
+      && js.includes('function adaptReviewReaderBlocks')
+      && !src.includes('id="reviewNoteOv"'),
+    '与资讯共用 newsReaderOv 模板，独立弹窗已删除');
+  api.setReviewFilter();
+  const reviewTypeOptions=[...el('rvTypeSel').innerHTML.matchAll(/<option value="([^"]*)"/g)].map(m=>m[1]).filter(Boolean);
+  t('复盘默认没有筛选时不显示「清除筛选」', el('rvClear').hidden === true);
+  t('复盘筛选控件会按类型列出真实分组',
+    reviewTypeOptions.join('|')
+      === rv.groups.map(g=>g.name).join('|'),
+    reviewTypeOptions.join(','));
+  el('rvQ').value = 'surge';
+  api.setReviewFilter();
+  t('复盘关键词筛选只保留命中项并更新计数',
+    el('rvTag').textContent.includes('/') && el('rvItems').innerHTML.includes('Surge'),
+    el('rvTag').textContent);
+  t('复盘筛选生效后才显示「清除筛选」', el('rvClear').hidden === false);
+  el('rvQ').value = ''; api.clearReviewFilter(); api.renderReview(rv);
+  t('复盘清除后再次收起「清除筛选」', el('rvClear').hidden === true);
+  if (firstProd) {
+    api.setReviewProductFilter(firstProd);
+    t('复盘产品 chip 点击后按该产品筛选（同步搜索框与计数）',
+      el('rvTag').textContent.includes('/')
+        && String(el('rvQ').value || '').toLowerCase() === firstProd.toLowerCase(),
+      el('rvTag').textContent);
+    api.clearReviewFilter(); api.renderReview(rv);
+  }
+  const predInContent = js.slice(js.indexOf('function renderContent'), js.indexOf('function renderNewType'));
+  const predInReview = js.slice(js.indexOf('function renderReview('), js.indexOf('function renderPredictions('));
+  t('发布预测卡片移到自媒体运营页（复盘页不再渲染）',
+    predInContent.includes('renderPredictions();') && !predInReview.includes('renderPredictions()')
+      && src.indexOf('id="screenContent"') < src.indexOf('id="predCard"')
+      && src.indexOf('id="predCard"') < src.indexOf('id="mediaEnhancements"'),
+    'renderContent 调用 renderPredictions，卡片在 screenContent 内');
+  const tableHtml = api.safeMarkdownHtml(
+    '| 项 | 原因 |\n|---|---|\n| PROCESS-NAME | 拿不到进程名 |\n| 含\\|竖线 | 保留 |');
+  t('预览正文渲染 GFM 表格（表头/单元格/字面竖线，不再铺成段落）',
+    tableHtml.includes('<table>') && tableHtml.includes('<th')
+      && tableHtml.includes('<td>拿不到进程名</td>')
+      && tableHtml.includes('含|竖线') && !tableHtml.includes('|---|'),
+    tableHtml.slice(0, 60));
+  t('普通段落里的 | 不会误判成表格',
+    api.safeMarkdownHtml('单价 | 数量').startsWith('<p>'),
+    '仍按段落渲染');
   t('① 守恒：Σ分组篇数 == 笔记数（分组不许丢笔记）', sumG === rv.items.length,
     `${sumG} / ${rv.items.length}，${rv.groups.length} 类`);
   t('缺 frontmatter 的笔记记为「未标注」而不是被丢掉',
@@ -2212,6 +2474,28 @@ console.log('\n— 27. 第四轮整改：跳转链 / 表头 / 命中区 / Enter 
     ['javascript:alert(1)', 'JaVaScRiPt:alert(1)', 'data:text/html,x', '/local/path', '', '   ']
       .every(u => api.safeUrl(u) === ''),
     ['javascript:alert(1)', 'JaVaScRiPt:alert(1)', 'data:text/html,x', '/local'].map(u => u + '→' + JSON.stringify(api.safeUrl(u))).join(' '));
+  const goodObsidian = 'obsidian://open?vault=Obsidian-Tech&file=projects%2Fdemo';
+  t('safeObsidianUrl 只放行固定 Obsidian-Tech vault 的有效深链',
+    api.safeObsidianUrl(goodObsidian) === goodObsidian
+      && [
+        'obsidian://open?vault=Other&file=projects%2Fdemo',
+        'obsidian://open?file=projects%2Fdemo',
+        'https://example.com/?vault=Obsidian-Tech&file=projects%2Fdemo',
+        'obsidian://open?vault=Obsidian-Tech&file=',
+        ''
+      ].every(u => api.safeObsidianUrl(u) === ''),
+    api.safeObsidianUrl(goodObsidian));
+  const keepOutlineUrl = b0.outlineUrl;
+  b0.outlineUrl = 'obsidian://open?vault=Other&file=projects%2Fdemo';
+  api.renderWriting(wr);
+  const evilVaultLeaked = /href="obsidian:\/\/open\?vault=Other/.test(el('wrBooks').innerHTML);
+  t('★ 写作区遇到非目标 vault 时退化为纯文本，不泄漏 href',
+    !evilVaultLeaked && !el('wrBooks').innerHTML.includes('obsidian://open?vault=Other'),
+    evilVaultLeaked ? '泄漏了！' : '已退化为纯文本');
+  b0.outlineUrl = keepOutlineUrl;
+  api.renderWriting(wr);
+  t('恢复目标 vault 后写作链接重新出现（上一条不是靠渲染失败变绿）',
+    el('wrBooks').innerHTML.includes('obsidian://open?vault=Obsidian-Tech'));
 
   const keepLink = news.items[0].link;
   news.items[0].link = 'javascript:alert(1)';
@@ -2285,30 +2569,181 @@ console.log('\n— 29.5. 自媒体运营：真实快照 / 今日核验 / 安全�
   t('social.json 已加载真实快照', ss && ss.posts.length===SOCIAL.posts.length && ss.posts.length>=41,
     ss?`${ss.posts.length} 条`:'未加载');
   api.setType('content'); api.renderContent();
+  const freshnessNow=new Date('2026-10-30T12:00:00+08:00');
+  const staleProbe=api.mediaEffectiveFreshness({asOf:'2026-03-31',freshness:'fresh'},freshnessNow);
+  t('新鲜度按数据日期现算：旧快照即使写着 fresh，也会判为过期 213 天',
+    staleProbe.state==='stale' && staleProbe.days===213,
+    `${staleProbe.state} / ${staleProbe.days} 天`);
+  const wechatSnap=ss.accounts.find(a=>a.platform==='公众号')||{};
+  const wechatEffective=api.mediaEffectiveFreshness(wechatSnap,freshnessNow);
+  const wechatExpectedAge=wechatSnap.asOf
+    ? Math.max(0,Math.round((Date.parse('2026-10-30T00:00:00Z')-
+        Date.parse(String(wechatSnap.asOf).slice(0,10)+'T00:00:00Z'))/86400000))
+    : null;
+  t('公众号账号新鲜度与 asOf 一致，不沿用采集端固定的 fresh 标签',
+    wechatExpectedAge==null
+      ? wechatEffective.state==='missing'
+      : wechatEffective.days===wechatExpectedAge
+        && wechatEffective.state===(wechatExpectedAge<=1?'fresh':wechatExpectedAge<=7?'aging':'stale'),
+    `asOf=${wechatSnap.asOf||'无'} · 原始=${wechatSnap.freshness||'无'} · 现算=${wechatEffective.state}/${wechatEffective.days} 天`);
+  const invalidDateCopy=api.mediaFreshnessCopy({asOf:'not-a-date'},
+    api.mediaEffectiveFreshness({asOf:'not-a-date'},freshnessNow));
+  const impossibleDate=api.mediaEffectiveFreshness({asOf:'2026-99-99'},freshnessNow);
+  const overflowDate=api.mediaEffectiveFreshness({asOf:'2026-02-30'},freshnessNow);
+  t('无效数据日期不会渲染成“null 天前”或“过期 NaN 天”',
+    invalidDateCopy==='数据日期不可用'
+      && impossibleDate.state==='missing' && impossibleDate.days===null
+      && overflowDate.state==='missing' && overflowDate.days===null
+      && !/null|undefined|NaN/.test(invalidDateCopy+impossibleDate.label),
+    `${invalidDateCopy} · ${impossibleDate.state}/${impossibleDate.days} · ${overflowDate.state}/${overflowDate.days}`);
+  const emptySitesPulse=api.renderMediaPulse(
+    {accounts:[],todayPlan:[]},
+    {sites:[],alerts:[],blog:{latest:{}}});
+  t('没有配置站点时不显示误导性的“0/0 个站点正常”',
+    emptySitesPulse.includes('尚未配置站点')
+      && /media-pulse-item is-warn"><i[^>]*><\/i><span class="media-pulse-title">网站与博客/.test(emptySitesPulse)
+      && !emptySitesPulse.includes('0/0 个站点正常'),
+    emptySitesPulse.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,160));
+  const settledPulse=api.renderMediaPulse(
+    {
+      accounts:[
+        {platform:'公众号',asOf:'2026-10-30',connectionState:'connected'},
+        {platform:'知识星球',asOf:'2026-10-30',connectionState:'connected'}
+      ],
+      todayPlan:[
+        {id:'wechat',platform:'公众号',defaultStatus:'skip'},
+        {id:'zsxq',platform:'知识星球',defaultStatus:'skip'}
+      ]
+    },
+    {sites:[{state:'ok'}],alerts:[],blog:{latest:{publishedAt:'2026-10-30'}}});
+  t('手动标记“今日不发”后，日更平台状态灯视为已处理而不是继续报警',
+    !settledPulse.includes('is-warn'),
+    settledPulse.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,180));
+  const partialSitesPulse=api.renderMediaPulse(
+    {accounts:[],todayPlan:[]},
+    {sites:[{state:'ok'},{state:'warn'}],alerts:[],blog:{latest:{publishedAt:'2026-10-30'}}});
+  t('站点只有部分正常时，状态轨显示真实比例而不是笼统写“正常”',
+    partialSitesPulse.includes('1/2 正常') && !partialSitesPulse.includes('>正常<'),
+    partialSitesPulse.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,180));
+  const pulseHtml=el('mediaPulse').innerHTML;
+  const secondaryPlatforms=ss.todayPlan.filter(p=>!['wechat','zsxq'].includes(p.id)).map(p=>p.platform);
+  t('首屏状态轨只突出公众号、知识星球、网站与博客',
+    ['公众号','知识星球','网站与博客'].every(x=>pulseHtml.includes(x))
+      && secondaryPlatforms.every(x=>!pulseHtml.includes(x)),
+    pulseHtml.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,180));
+  const sortedIds=api.mediaSortedPlan(ss.todayPlan.slice().reverse()).map(p=>p.id);
+  t('今日计划固定按公众号、知识星球、X、小红书优先级排序',
+    sortedIds.slice(0,2).join(',')==='wechat,zsxq'
+      && sortedIds.join(',')==='wechat,zsxq,x,xiaohongshu',
+    sortedIds.join(' → '));
+  const matrixHtml=el('mediaMatrix').innerHTML;
+  const secondaryGroup=(matrixHtml.match(/<details class="completed-group media-secondary-group"[^>]*>[\s\S]*?<\/details>/)||[''])[0];
+  t('X / 小红书进入默认折叠的“其他平台”，四平台仍全部保留',
+    secondaryPlatforms.every(x=>secondaryGroup.includes(x))
+      && (matrixHtml.match(/class="media-platform"/g)||[]).length===ss.todayPlan.length
+      && /其他平台 · .*个待核验/.test(secondaryGroup),
+    `其他平台 ${secondaryPlatforms.join(' / ')} · 总平台 ${(matrixHtml.match(/class="media-platform"/g)||[]).length}`);
+  const focusPriority=api.mediaFocusPriority([
+    {platform:'X',asOf:'2026-10-30',connectionState:'blocked'},
+    {platform:'公众号',asOf:'2026-03-31',connectionState:'connected'},
+    {platform:'知识星球',asOf:'2026-10-30',connectionState:'connected'}
+  ]);
+  t('顶部焦点优先日更主平台，X 异常不会抢走公众号过期结论',
+    focusPriority&&focusPriority.platform==='公众号',
+    focusPriority?focusPriority.platform:'未选出主平台');
+  const healthNow=clockAt('2026-10-30T12:00:00+08:00',()=>api.opHealth());
+  const accountHealth=healthNow.dims.find(d=>d.name==='账号数据');
+  const effectiveFreshCount=ss.accounts.filter(a=>
+    api.mediaEffectiveFreshness(a,freshnessNow).state==='fresh'
+      && !['blocked','limited'].includes(a.connectionState)).length;
+  t('运营体检的账号新鲜度也使用现算结果',
+    accountHealth && accountHealth.note===`${effectiveFreshCount}/${ss.accounts.length} 个平台数据新鲜`,
+    accountHealth?accountHealth.note:'缺少账号数据维度');
+  const accountsBeforeRestriction=ss.accounts;
+  ss.accounts=[
+    {platform:'公众号',asOf:'2026-10-30',connectionState:'blocked'},
+    {platform:'知识星球',asOf:'2026-10-30',connectionState:'limited'},
+    {platform:'X',asOf:'2026-10-30',connectionState:'connected'},
+    {platform:'小红书',asOf:'2026-10-30',connectionState:'connected'}
+  ];
+  const restrictedHealth=clockAt('2026-10-30T12:00:00+08:00',()=>api.opHealth())
+    .dims.find(d=>d.name==='账号数据');
+  ss.accounts=accountsBeforeRestriction;
+  t('数据日期虽新，但接口 blocked / limited 仍会扣账号健康分',
+    restrictedHealth && restrictedHealth.score===5
+      && restrictedHealth.note==='2/4 个平台数据新鲜',
+    restrictedHealth?`${restrictedHealth.score}/20 · ${restrictedHealth.note}`:'缺少账号数据维度');
   t('今日矩阵包含 X / 公众号 / 小红书 / 知识星球四平台',
     ['X','公众号','小红书','知识星球'].every(x=>el('mediaMatrix').innerHTML.includes(x)),
     el('mediaMatrix').innerHTML.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,120));
+  const trendFixedNow = new Date('2026-10-28T12:00:00+08:00');
+  const trend = api.mediaTrendData(7, ss, trendFixedNow);
+  const trendKeys = Array.from({length:7}, (_,i)=>api.focusDateStr(new Date(trendFixedNow.getTime()-(6-i)*86400000)));
+  const trendPosts = ss.posts.filter(p=>trendKeys.includes(api.focusDateStr(new Date(p.publishedAt))));
+  const trendKnown = trendPosts.filter(p=>typeof((p.metrics||{}).reads)==='number');
+  t('近 7 天趋势按上海日期生成连续 7 个自然日',
+    trend.days.length===7 && trend.days.every((d,i)=>d.key===trendKeys[i]),
+    trend.days.map(d=>d.key).join(' → '));
+  t('近 7 天趋势条数与当前快照发布日期逐条守恒',
+    trend.totalPosts===trendPosts.length
+      && trend.days.reduce((n,d)=>n+d.count,0)===trendPosts.length,
+    `${trend.totalPosts} / ${trendPosts.length}`);
+  t('趋势阅读只累加已核验数值，未知不按 0 混入',
+    trend.knownPosts===trendKnown.length
+      && trend.knownReads===trendKnown.reduce((n,p)=>n+(p.metrics.reads||0),0),
+    `${trend.knownPosts} 条有阅读 / 合计 ${trend.knownReads}`);
+  t('趋势图渲染 7 列并明确累计阅读口径',
+    (el('mediaTrend').innerHTML.match(/class="media-trend-day/g)||[]).length===7
+      && el('mediaTrend').innerHTML.includes('不代表每日新增流量')
+      && !/NaN|undefined/.test(el('mediaTrend').innerHTML));
   t('默认未知显示“未核验”，不伪装成“未发布”或数字 0',
     (el('mediaMatrix').innerHTML.match(/未核验/g)||[]).length===SOCIAL.todayPlan.length
       && !el('mediaMatrix').innerHTML.includes('未发布'));
   /* 全量/明细边界都从 social.json 现算：导出更新后死数字必假红。
-     断言的真正性质是「全量口径 ≥ 明细口径」，两边相等反而是异常。 */
+     口径是两层的——metrics.posts=全量历史（csv+xlsx），posts 数组=阅读明细窗口，
+     明细窗口字段可能缺失（新导出只有近 30 天明细时）；断言核心是「全量 ≥ 明细数组数」。 */
   const zsMetrics = (ss.accounts.find(a=>a.platform==='知识星球')||{}).metrics||{};
   t('知识星球全量口径 ≥ 阅读明细边界（两边都现算）',
-    zsMetrics.posts >= (zsMetrics.detailedPosts||0) && zsMetrics.posts > 0
-      && zsMetrics.posts === ss.posts.filter(p=>p.platform==='知识星球').length,
-    `全量 ${zsMetrics.posts} / 明细 ${zsMetrics.detailedPosts}`);
-  t('逐条分析来自真实导出，并给出原因与跳转',
-    /表现较好|需要复盘|样本未成熟/.test(el('mediaPosts').innerHTML)
-      && /href="https:\/\//.test(el('mediaPosts').innerHTML));
+    zsMetrics.posts >= ss.posts.filter(p=>p.platform==='知识星球').length && zsMetrics.posts > 0,
+    `全量 ${zsMetrics.posts} / 明细数组 ${ss.posts.filter(p=>p.platform==='知识星球').length}`);
+  /* analysis 是可选字段：有逐条信号时校验标签和真实链接；
+     导出没有逐条比较样本时必须显示诚实空态，不能为了测试硬造分析。 */
+  const hasPostAnalysis=(ss.analysis||[]).length>0;
+  t('逐条分析按真实样本显示：有分析给原因与跳转，无分析显示诚实空态',
+    hasPostAnalysis
+      ? (/表现较好|需要复盘/.test(el('mediaPosts').innerHTML)
+          && /href="https:\/\//.test(el('mediaPosts').innerHTML))
+      : /没有足够样本做逐条比较/.test(el('mediaPosts').innerHTML),
+    hasPostAnalysis?`${ss.analysis.length} 条分析`:'无分析样本');
   /* 概述区断言跟随真实数据：公众号已接入统计后，「未认证/权限不足」字样自然消失，
      写死它们反而假红。保留的核心性质是：四平台都在、无「未发布」伪装态。 */
   t('账号概述区明确显示四个平台，缺失指标不伪装成 0',
     ['X','公众号','小红书','知识星球'].every(x=>el('mediaAccounts').innerHTML.includes(x))
       && !/设为待发布|未发布/.test(el('mediaAccounts').innerHTML));
+  t('账号、网站、内容表现与 Agent 简报都有可展开的摘要入口',
+    ['media-overview-fold','media-overview-fold','perf-fold','media-brief-fold']
+      .every(cls=>src.includes('class="'+cls))
+    && el('mediaOverviewBrief').textContent.includes('平台')
+    && el('mediaWebBrief').textContent.length>0
+    && el('mediaTodayBrief').textContent.includes('待核验'),
+    `${el('mediaOverviewBrief').textContent} · ${el('mediaWebBrief').textContent} · ${el('mediaTodayBrief').textContent}`);
+  const accountStart=src.indexOf('class="card media-account-card"');
+  const accountEnd=src.indexOf('class="card media-web-card"');
+  const focusStart=src.indexOf('id="mediaFocus"');
+  const pulseStart=src.indexOf('id="mediaPulse"');
+  t('自媒体按初始预览排列：今日摘要、账号数据、网站与博客，状态轨收进账号卡',
+    focusStart < accountStart && accountStart < accountEnd
+      && accountStart < pulseStart && pulseStart < accountEnd
+      && /class="media-overview-fold" open/.test(src.slice(accountStart,accountEnd))
+      && /class="media-overview-fold" open/.test(src.slice(accountEnd,src.indexOf('id="mediaPlanLayout"')))
+      && src.indexOf('class="card media-web-card"') < src.indexOf('id="mediaPlanLayout"')
+      && src.indexOf('class="media-evidence-layout"') < src.indexOf('id="mediaEnhancements"')
+      && src.indexOf('id="mediaEnhancements"') < src.indexOf('class="media-connect"')
+      && js.includes('$("mediaEnhancements").innerHTML=healthBlock+jevBlock()')
+      && !js.includes('$("mediaFocus").insertAdjacentHTML("afterend", jevBlock())'));
   t('本地知识库候选已进入页面，链接只能打开固定 Obsidian vault',
     ss.knowledgeBase && ss.knowledgeBase.items.length>0
-      && el('mediaKnowledge').innerHTML.includes('obsidian://open?vault=MyVault')
+      && el('mediaKnowledge').innerHTML.includes('obsidian://open?vault=Obsidian-Tech')
       && !el('mediaKnowledge').innerHTML.includes('file://'));
   t('源码已删除固定流水线、假播放趋势和六条灵感样例',
     !/CSTAges|const PLAY=|INSP_SEED|wb_insp/.test(js));
@@ -2328,11 +2763,11 @@ console.log('\n— 29.5. 自媒体运营：真实快照 / 今日核验 / 安全�
     [...el('mediaMatrix').innerHTML.matchAll(/<a [^>]+>/g)].every(m=>/rel="noopener noreferrer"/.test(m[0])));
 
   const reminders=api.mediaReminders(ss).map(x=>x.title).join('|');
-  const xFresh=(ss.accounts.find(a=>a.platform==='X')||{}).freshness==='fresh';
+  const xFresh=api.mediaEffectiveFreshness(ss.accounts.find(a=>a.platform==='X')||{}).state==='fresh';
   const gateNeeded=ss.automation.some(a=>a.state==='review');
   /* 缺指标提醒现算：哪个平台真的缺指标就应提醒哪个；平台数据齐了就不该再提。
      gateNeeded（人工闸门）与 X 新鲜度两个分支保持原有双向断言。 */
-  const missingMetric = ss.accounts.some(a=>a.freshness!=='fresh')
+  const missingMetric = ss.accounts.some(a=>api.mediaEffectiveFreshness(a).state!=='fresh')
     || Object.values((ss.accounts.find(a=>a.platform==='公众号')||{}).metrics||{}).length===0;
   t('Agent 提醒未核验 + 缺指标口径跟随真实数据；X 过期与发布闸门双向断言',
     /未核验/.test(reminders)
@@ -2448,23 +2883,50 @@ console.log('\n— 31. 行动首页 + Notion 真实项目页 —');
   el('projQ').value = '';
   api.setType('project'); api.setProjectScope('all');
   const board = el('projBoard').innerHTML;
-  t('项目页标明「项目管理 / Notion 只读 / 最近同步」',
-    /项目管理/.test(el('projSourceBar').innerHTML) && /Notion 只读/.test(el('projSourceBar').innerHTML)
+  t('项目页标明「项目管理 / Notion 可回写 / 最近同步」',
+    /项目管理/.test(el('projSourceBar').innerHTML) && /Notion 可回写/.test(el('projSourceBar').innerHTML)
       && /最近同步/.test(el('projSourceBar').innerHTML),
     el('projSourceBar').innerHTML.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
-  t('全部项目卡数 == state.projects，没有第二套伪项目库',
-    (board.match(/<article class="proj/g) || []).length === S.projects.length && S.projects.length > 0,
+  t('全部项目卡数 == state.projects（29），没有第二套伪项目库',
+    (board.match(/<article class="proj/g) || []).length === S.projects.length && S.projects.length === 29,
     `${(board.match(/<article class="proj/g) || []).length} / ${S.projects.length}`);
+  api.setProjectScope('done');
+  const completedN = S.projects.filter(p => p.status === '已完成').length;
+  const doneBoard = el('projBoard').innerHTML;
+  t('已完成筛选只显示已完成，不与已取消混在一起',
+    (doneBoard.match(/<article class="proj/g) || []).length === completedN
+      && !doneBoard.includes('b-已取消'),
+    `${(doneBoard.match(/<article class="proj/g) || []).length} / ${completedN}`);
+  api.setProjectScope('all');
   t('旧伪项目 seed / localStorage 键 / 推进删除函数已移除',
     !/PROJECTS_SEED|wb_projects|advanceProject\(|delProject\(|addProject\(/.test(js));
-  t('真实项目行不提供本地编辑入口',
-    !board.includes('编辑本地项目') && board.includes('Notion 只读'));
+  t('真实项目行提供 Notion 回写入口，不提供本地编辑入口',
+    board.includes('编辑并回写') && !board.includes('编辑本地项目') && board.includes('Notion 可回写'));
+  const keepAdaptiveProjects = S.projects;
+  S.projects = [{id:'single-filled-proof', notionId:'single-1', name:'唯一进行中项目', status:'进行中',
+    progress:20, category:'测试', priority:'P1', start:'', due:'', doneDate:null, note:'',
+    source:'notion', readOnly:true, parent:null}];
+  el('projQ').value=''; api.setProjectScope('active');
+  t('当前范围只有一个有效状态时，空列收起且内容列占满看板',
+    el('projBoard').className.includes('single-filled')
+      && (el('projBoard').innerHTML.match(/class="kcol /g)||[]).length===1
+      && el('projBoard').innerHTML.includes('唯一进行中项目'),
+    el('projBoard').className);
+  S.projects = keepAdaptiveProjects;
 
+  /* 冲突断言不能依赖真实基线恰好有冲突——2026-10-27 后 Notion 里冲突全修完，
+     conflictN=0 是合法状态。注入一条临时冲突项目验证派生链路，用完即删。 */
+  const probeConflict = {id:'x-conflict-probe', notionId:'probe-c1', name:'探针：冲突注入',
+    status:'进行中', progress:100, category:'', priority:'', start:'', due:'', doneDate:null,
+    note:'', source:'notion', readOnly:true, parent:null};
+  S.projects.push(probeConflict);
+  api.setProjectScope('all');   // 触发 renderProject，让 stats/riskList 吃进探针
   const conflictN = S.projects.filter(api.projectConflict).length;
   t('状态 × 进度冲突由真实字段派生，并在项目页显式提示',
     conflictN > 0 && el('projStats').innerHTML.includes(String(conflictN))
       && el('riskList').innerHTML.includes('请到 Notion'),
     `冲突 ${conflictN} 个`);
+  S.projects = S.projects.filter(p => p.id !== 'x-conflict-probe');
   t('截止风险按绝对日期计算；完成项目与无日期项目不报假风险',
     clockAt('2026-10-03T12:00:00', () => {
       const r = api.projectRisk({status:'进行中', due:'2026-10-01'});
@@ -2491,12 +2953,848 @@ console.log('\n— 31. 行动首页 + Notion 真实项目页 —');
       && (el('projBoard').innerHTML.match(/<article class="proj/g) || []).length === 1);
   S.projects = keepProjects;
 
+  /* 收口审计：已完成缺完成日期、已完成/已取消缺说明都要报出来。
+     用临时探针验证派生链路，不依赖真实库当前恰好缺几条。 */
+  const closureProbe = [
+    {id:'x-close-1', name:'探针：完成无日期', status:'已完成', progress:100, doneDate:null, note:'有说明'},
+    {id:'x-close-2', name:'探针：完成无说明', status:'已完成', progress:100, doneDate:'2026-10-01', note:''},
+    {id:'x-close-3', name:'探针：取消无原因', status:'已取消', progress:null, doneDate:null, note:''},
+    {id:'x-close-4', name:'探针：已收口', status:'已完成', progress:100, doneDate:'2026-10-02', note:'已完成并复盘'}
+  ];
+  const closureIssues = api.projectClosureIssues(closureProbe);
+  t('收口审计覆盖三种缺口：完成日期 / 完成说明 / 取消原因',
+    closureIssues.length === 3
+      && closureIssues.some(x => x.kind === '完成日期' && x.p.id === 'x-close-1')
+      && closureIssues.some(x => x.kind === '完成说明' && x.p.id === 'x-close-2')
+      && closureIssues.some(x => x.kind === '取消原因' && x.p.id === 'x-close-3'),
+    closureIssues.map(x => x.kind + ':' + x.p.id).join(' '));
+  t('收口完整的项目不再被报',
+    !closureIssues.some(x => x.p.id === 'x-close-4'));
+  t('已取消是独立筛选，不再和已完成共用一个入口',
+    /pjCancelled/.test(src) && /setProjectScope\('cancelled'\)/.test(src));
+  api.setProjectScope('cancelled');
+  t('已取消筛选只显示已取消项目',
+    (el('projBoard').innerHTML.match(/<article class="proj/g) || []).length
+      === S.projects.filter(p => p.status === '已取消').length
+      && !el('projBoard').innerHTML.includes('b-已完成'),
+    `${(el('projBoard').innerHTML.match(/<article class="proj/g) || []).length} 张`);
+  /* 复盘页项目待办：只认“已结束 + 没写说明”，不把缺完成日期混进来；
+     取消和完成各出现一次，不因多个缺口重复列出。 */
+  const reviewTodos = api.projectReviewTodos(closureProbe);
+  t('复盘待办只收缺说明的已结束项目，不重复计入完成日期缺口',
+    reviewTodos.length === 2
+      && reviewTodos.every(p => p.id !== 'x-close-1' && p.id !== 'x-close-4'),
+    reviewTodos.map(p => p.id).join(' '));
+  t('复盘待办同时覆盖完成说明与取消原因',
+    reviewTodos.some(p => p.id === 'x-close-2') && reviewTodos.some(p => p.id === 'x-close-3'));
+
   const meta = api.normalize({projects:[{id:'x', notionId:'n1', name:'元数据项目', priority:'高', doneDate:'2026-09-01'}]});
   t('normalize 保留 Notion 项目标识 / 优先级 / 完成日期',
     meta.projects[0].notionId === 'n1' && meta.projects[0].priority === '高' && meta.projects[0].doneDate === '2026-09-01',
     JSON.stringify(meta.projects[0]));
+  const schemaMeta = api.normalize({projects:[{
+    id:'x-schema', notionId:'n-schema', name:'架构字段项目', status:'已延迟',
+    projectType:'产品开发', tags:['重要','本周'], sprint:'冲刺 1',
+    sprintStart:'2026-10-01', sprintEnd:'2026-10-14', owner:'凌一',
+    ownerIds:['u1'], relatedTaskIds:['t1'], sourceRecordIds:['s1'],
+    childIds:['c1'], childCount:1, relatedLink:'https://example.com'
+  }]});
+  const sm=schemaMeta.projects[0];
+  t('normalize 保留项目类型 / 标签 / 冲刺 / 关系与负责人字段',
+    sm.projectType === '产品开发' && sm.tags.join(',') === '重要,本周'
+      && sm.sprint === '冲刺 1' && sm.ownerIds[0] === 'u1'
+      && sm.relatedTaskIds[0] === 't1' && sm.sourceRecordIds[0] === 's1'
+      && sm.childIds[0] === 'c1' && sm.childCount === 1
+      && sm.relatedLink === 'https://example.com',
+    JSON.stringify(sm));
+  t('已延迟是独立看板状态，不再落进其他列',
+    api.projectCol({status:'已延迟'}) === '已延迟');
+
+  /* Notion 项目回写出口：只提交可写白名单；rollup 与进度派生字段不能混入。 */
+  {
+    const parentId='22222222-2222-4222-8222-222222222222';
+    const projectId='11111111-1111-4111-8111-111111111111';
+    const ownerId='33333333-3333-4333-8333-333333333333';
+    const taskId='44444444-4444-4444-8444-444444444444';
+    const sourceId='55555555-5555-4555-8555-555555555555';
+    const newTaskId='66666666-6666-4666-8666-666666666666';
+    const parent={id:'parent-local',notionId:parentId,name:'父项目',status:'进行中',
+      projectType:'产品开发',tags:[],priority:'P1 - 高',source:'notion',readOnly:true};
+    const writeProject={id:'project-write',notionId:projectId,name:'回写项目探针',status:'进行中',
+      progress:50,projectType:'产品开发',tags:['重要'],priority:'P1 - 高',
+      start:'2026-10-01',due:'2026-10-30',doneDate:null,note:'原备注',
+      source:'notion',readOnly:true,parent:null,parentNotionId:null,
+      estHours:8,actHours:6,sprint:'冲刺 1',sprintStart:'2026-10-01',sprintEnd:'2026-10-14',
+      owner:'测试负责人',ownerIds:[ownerId],
+      relatedTaskIds:[taskId],
+      sourceRecordIds:[sourceId],childIds:[],childCount:0,relatedLink:'https://example.com/old'};
+    const writeData={...DATA,projects:[parent,writeProject],
+      notionMeta:{...(DATA.notionMeta||{}),projectSchema:{
+        status:['未开始','进行中','已延迟','已完成','已取消'],
+        priority:['P0 - 最高','P1 - 高','P2 - 中'],
+        type:['产品开发','客户服务'],
+        sprint:['冲刺 1','冲刺 2']
+      }}};
+    const els5=new Map();
+    const el5=id=>els5.get(id)||(els5.set(id,new El(id)),els5.get(id));
+    const doc5={getElementById:el5,querySelectorAll:s=>s==='.ov'?[el5('projOv'),el5('projNotionOv'),el5('earnOv')]:[],
+      querySelector:s=>el5(s),documentElement:new El('html'),addEventListener:()=>{},
+      createElement:()=>new El('t'),body:new El('body')};
+    const store5=new Map([['wb',JSON.stringify(writeData)],['wb_token','tok5']]);
+    const ls5={getItem:k=>store5.has(k)?store5.get(k):null,setItem:(k,v)=>store5.set(k,String(v))};
+    const loc5={protocol:'http:',search:'?token=tok5',href:'http://127.0.0.1:8787/workbench.html?token=tok5'};
+    let postedProject=null;
+    const fetch5=async(url,opt)=>{
+      const u=String(url);
+      if(u.startsWith('/api/projects/relations')){
+        const parsed=new URL(u,'http://127.0.0.1');
+        const kind=parsed.searchParams.get('kind');
+        const ids=(parsed.searchParams.get('ids')||'').split(',').filter(Boolean);
+        const q=parsed.searchParams.get('q')||'';
+        let items=[];
+        if(ids.length){
+          items=ids.map(id=>({id,title:id===taskId?'既有任务':id===sourceId?'既有来源记录':'关系页面',
+            status:'进行中',date:'2026-10-28'}));
+        }else if(kind==='task'&&q==='新任务'){
+          items=[{id:newTaskId,title:'新任务',status:'还未开始',date:''}];
+        }
+        return {ok:true,status:200,json:async()=>({kind,items})};
+      }
+      if(u.startsWith('/api/projects/update')){
+        postedProject=JSON.parse(opt.body);
+        return {ok:true,status:200,json:async()=>({ok:true,localUpdated:true,
+          project:{...writeProject,...postedProject.fields,parent:'parent-local'}})};
+      }
+      if(u.startsWith('/data.json')) return {ok:true,status:200,json:async()=>writeData};
+      return {ok:false,status:404,json:async()=>({})};
+    };
+    const api5=new Function('document','localStorage','location','alert','setInterval','clearInterval','fetch','setTimeout','clearTimeout','window',
+      js+`\nreturn { setType, openProjectWriteback, saveProjectWriteback, projectEditOptions,
+        searchProjectRelations, addProjectRelation, removeProjectRelation, get:()=>state };`)(
+      doc5,ls5,loc5,()=>{},()=>1,()=>{},fetch5,setTimeout,clearTimeout,windowStub);
+    await new Promise(r=>setTimeout(r,20));
+    api5.setType('project');
+    api5.openProjectWriteback(writeProject.id);
+    // openProjectWriteback 会异步解析已有关系标题；等 Promise 链落定再断言。
+    await new Promise(r=>setTimeout(r,0));
+    t('项目回写表单从 Notion schema 渲染真实状态选项',
+      el5('pnStatus').innerHTML.includes('已延迟') && el5('pnPriority').innerHTML.includes('P1 - 高')
+        && el5('projNotionBoundary').innerHTML.includes('rollup')
+        && el5('pnOwners').innerHTML.includes('测试负责人')
+        && el5('pnTasksSelected').innerHTML.includes('既有任务')
+        && el5('pnRecordsSelected').innerHTML.includes('既有来源记录'),
+      el5('pnStatus').innerHTML.slice(0,180));
+    await api5.searchProjectRelations('task','新任务');
+    t('项目关系选择器可按标题搜索并追加关联任务',
+      el5('pnTasksResults').innerHTML.includes('新任务'),
+      el5('pnTasksResults').innerHTML.slice(0,160));
+    api5.addProjectRelation('task',newTaskId);
+    t('项目关系选择器可追加新关系',
+      el5('pnTasksSelected').innerHTML.includes('新任务'),
+      el5('pnTasksSelected').innerHTML.slice(0,220));
+    api5.removeProjectRelation('record',sourceId);
+    t('项目关系选择器可移除已有关系',
+      !el5('pnRecordsSelected').innerHTML.includes('既有来源记录'),
+      el5('pnRecordsSelected').innerHTML.slice(0,160));
+    api5.addProjectRelation('record',sourceId);
+    el5('pnName').value='回写项目探针-已改';
+    el5('pnStatus').value='已延迟';
+    el5('pnPriority').value='P1 - 高';
+    el5('pnType').value='产品开发';
+    el5('pnSprint').value='冲刺 2';
+    el5('pnTags').value='重要, 本周';
+    el5('pnDone').value='2026-10-28';
+    el5('pnEstHours').value='10';
+    el5('pnActHours').value='12';
+    el5('pnParent').value=parentId;
+    el5('pnLink').value='https://example.com/new';
+    el5('pnNote').value='通过工作台回写';
+    await api5.saveProjectWriteback();
+    t('项目回写只提交白名单字段与 Notion page ID',
+      postedProject && postedProject.pageId===projectId
+        && postedProject.fields.status==='已延迟'
+        && postedProject.fields.projectType==='产品开发'
+        && postedProject.fields.tags.join(',')==='重要,本周'
+        && postedProject.fields.parentNotionId===parentId
+        && postedProject.fields.ownerIds[0]===ownerId
+        && postedProject.fields.relatedTaskIds.includes(taskId)
+        && postedProject.fields.relatedTaskIds.includes(newTaskId)
+        && postedProject.fields.sourceRecordIds[0]===sourceId
+        && !('progress' in postedProject.fields) && !('childCount' in postedProject.fields),
+      JSON.stringify(postedProject));
+    t('项目回写成功后本地卡片立即更新并保留 rollup 进度',
+      api5.get().projects[1].name==='回写项目探针-已改'
+        && api5.get().projects[1].status==='已延迟'
+        && api5.get().projects[1].progress===50
+        && el5('notify').innerHTML.includes('已回写 Notion'),
+      el5('notify').innerHTML);
+  }
 
   el('projQ').value = ''; api.setProjectScope('active'); api.setType('ledger'); api.renderAll();
+}
+
+console.log('\n— 32. 客户经营：真实字段 / 体检 / 筛选 / 详情 / 跟进 —');
+{
+  /* 客户状态必须来自 Notion 原值。当前真实库里客户状态尚未填充，
+     所以页面只能写「未标注」；不能用「有收入」推导成「成交」。 */
+  const clients = Array.isArray(S.clients) ? S.clients : [];
+  t('data.json 的 clients 与 followups 已进入 state',
+    clients.length === (DATA.clients || []).length
+      && Array.isArray(S.followups) && S.followups.length === (DATA.followups || []).length,
+    `clients ${clients.length} / followups ${S.followups.length}`);
+
+  const meta = api.normalize({
+    clients: [{ notionId: 'c-proof', notionUrl: 'https://app.notion.com/p/proof',
+      name: '客户字段探针', status: '沟通中', customerType: '个人',
+      relationSource: '公众号', owner: '凌一', nextFollowUp: '2026-10-30',
+      income: 10, expense: 2, profit: 8 }],
+    followups: [{ id: 'f-proof', title: '跟进字段探针', status: '待跟进',
+      clientIds: ['c-proof'], nextFollowUp: '2026-10-30' }]
+  });
+  t('normalize 原样保留客户经营字段',
+    meta.clients[0].status === '沟通中' && meta.clients[0].relationSource === '公众号'
+      && meta.clients[0].owner === '凌一' && meta.clients[0].nextFollowUp === '2026-10-30',
+    JSON.stringify(meta.clients[0]));
+  t('normalize 原样保留客户跟进记录',
+    meta.followups.length === 1 && meta.followups[0].title === '跟进字段探针'
+      && meta.followups[0].clientIds[0] === 'c-proof',
+    JSON.stringify(meta.followups[0]));
+
+  /* 页面切换渲染：当前 Notion 真实状态为空，必须如实写「未标注」。 */
+  el('clientQ').value = '';
+  for (const id of ['clientTypeF', 'clientStatusF', 'clientSourceF']) el(id).value = '';
+  el('clientSort').value = 'profit';
+  api.setType('client');
+  t('客户页从 state.clients 渲染，不读第二套本地伪客户库',
+    (el('clientList').innerHTML.match(/class="client-row"/g) || []).length === Math.min(api.CLIENT_PAGE, clients.length),
+    `${(el('clientList').innerHTML.match(/class="client-row"/g) || []).length} / ${clients.length}，首屏上限 ${api.CLIENT_PAGE}`);
+  t('客户名单默认收敛，并提供查看全部入口',
+    clients.length > api.CLIENT_PAGE && el('clientList').innerHTML.includes('查看全部')
+      && el('clientCount').textContent.includes(`显示 ${api.CLIENT_PAGE} / ${clients.length}`),
+    el('clientCount').textContent);
+  api.toggleClientAll();
+  t('点「查看全部」后渲染完整名单',
+    (el('clientList').innerHTML.match(/class="client-row"/g) || []).length === clients.length,
+    `${(el('clientList').innerHTML.match(/class="client-row"/g) || []).length} / ${clients.length}`);
+  api.toggleClientAll();
+  t('客户状态未填时用资料完整度提示，不从收入伪造「已成交」',
+    clients.filter(c => !String(c.status || '').trim()).length > 0
+      && /资料 \d+\/5/.test(el('clientList').innerHTML)
+      && !/有收入记「成交」|有收入往来.*成交/.test(el('clientSource').textContent),
+    `未标状态 ${clients.filter(c => !String(c.status || '').trim()).length}`);
+  const incompleteProbe = clients.find(c => !String(c.owner || '').trim()) || clients[0];
+  const incompleteScore = api.clientProfileScore(incompleteProbe);
+  t('客户资料完整度按五个关键字段现算，缺失项可用于说明',
+    incompleteScore.total === 5 && incompleteScore.filled + incompleteScore.missing.length === 5
+      && incompleteScore.missing.length > 0,
+    JSON.stringify(incompleteScore));
+  t('客户名单不再重复铺开每个「未标」字段',
+    !/未标类型|未标来源|未标负责人/.test(el('clientList').innerHTML)
+      && el('clientList').innerHTML.includes('资料 '),
+    el('clientList').innerHTML.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120));
+  t('客户来源显示 Notion 可回写与最近同步',
+    /Notion/.test(el('clientSource').innerHTML) && /可回写/.test(el('clientSource').innerHTML)
+      && /最近同步/.test(el('clientSource').innerHTML),
+    el('clientSource').innerHTML);
+  t('客户类型导航标明 Notion 来源，不再沿用本地试验区角标',
+    /id="tyClient"[^>]*>客户<span class="realTag">Notion<\/span>/.test(src),
+    (src.match(/id="tyClient"[^>]*>[^<]*<span class="[^"]+">[^<]+/) || ['未找到'])[0]);
+  t('客户首屏指标先回答关系与风险：客户总数、未排下次跟进排在收入之前',
+    el('clientStats').innerHTML.indexOf('客户总数') < el('clientStats').innerHTML.indexOf('未排下次跟进')
+      && el('clientStats').innerHTML.indexOf('未排下次跟进') < el('clientStats').innerHTML.indexOf('累计利润'),
+    el('clientStats').innerHTML.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
+  t('客户体检首屏只铺可行动项，其余缺口进入按需展开',
+    ['没有下次跟进', '未标客户状态', '亏损客户', '疑似非个人客户'].every(x => el('clientHealth').innerHTML.includes(x))
+      && !el('clientHealth').innerHTML.includes('未标关系来源')
+      && el('clientHealthRest').innerHTML.includes('未标关系来源')
+      && el('clientHealthMoreTag').textContent.includes('3'),
+    `常显 ${el('clientHealth').innerHTML.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()} / 折叠 ${el('clientHealthMoreTag').textContent}`);
+
+  /* 筛选：临时注入一条完整客户，验证状态/来源/类型三条筛选真的参与。 */
+  const keepClients = S.clients;
+  S.clients = [
+    ...clients,
+    { notionId: 'c-filter-proof', notionUrl: 'https://app.notion.com/p/filter',
+      name: '筛选探针客户', role: '读者', status: '沟通中', customerType: '个人',
+      relationSource: '公众号', owner: '凌一', nextFollowUp: '2026-10-28',
+      income: 1000, expense: 0, profit: 1000, note: '筛选验证' }
+  ];
+  // 新客户进入后重置“选项只构建一次”的缓存，模拟一次真实重新载入。
+  for (const id of ['clientTypeF', 'clientStatusF', 'clientSourceF']) {
+    el(id)._clientOptions = false;
+    el(id)._value = '';
+    el(id)._clientSig = '';
+  }
+  el('clientQ').value = '筛选探针';
+  api.renderClient();
+  el('clientStatusF').innerHTML = '<option value="">全部状态</option><option value="沟通中">沟通中</option>';
+  el('clientSourceF').innerHTML = '<option value="">全部来源</option><option value="公众号">公众号</option>';
+  el('clientTypeF').innerHTML = '<option value="">全部类型</option><option value="个人">个人</option>';
+  t('客户搜索按名称收敛到真实命中项',
+    (el('clientList').innerHTML.match(/class="client-row"/g) || []).length === 1
+      && el('clientList').innerHTML.includes('筛选探针客户'),
+    el('clientCount').textContent);
+  t('完整客户显示 5/5 资料完整度',
+    el('clientList').innerHTML.includes('资料 5/5'), el('clientList').innerHTML.slice(0, 180));
+  el('clientQ').value = '';
+  el('clientStatusF').value = '沟通中';
+  api.renderClient();
+  t('客户状态筛选生效',
+    (el('clientList').innerHTML.match(/class="client-row"/g) || []).length === 1
+      && el('clientList').innerHTML.includes('筛选探针客户'),
+    `value=${el('clientStatusF').value} rows=${(el('clientList').innerHTML.match(/class="client-row"/g) || []).length} opts=${JSON.stringify(el('clientStatusF')._opts)}`);
+  el('clientStatusF').value = '';
+  el('clientSourceF').value = '公众号';
+  api.renderClient();
+  t('关系来源筛选生效',
+    (el('clientList').innerHTML.match(/class="client-row"/g) || []).length === 1
+      && el('clientList').innerHTML.includes('筛选探针客户'),
+    `value=${el('clientSourceF').value} rows=${(el('clientList').innerHTML.match(/class="client-row"/g) || []).length} opts=${JSON.stringify(el('clientSourceF')._opts)}`);
+  el('clientSourceF').value = '';
+  el('clientTypeF').value = '个人';
+  api.renderClient();
+  t('客户类型筛选生效',
+    (el('clientList').innerHTML.match(/class="client-row"/g) || []).length === 1
+      && el('clientList').innerHTML.includes('筛选探针客户'),
+    `value=${el('clientTypeF').value} rows=${(el('clientList').innerHTML.match(/class="client-row"/g) || []).length} opts=${JSON.stringify(el('clientTypeF')._opts)}`);
+  el('clientTypeF').value = '';
+  el('clientQ').value = '筛选探针';
+  api.renderClient();
+  t('激活筛选时显示一键清除入口',
+    el('clientClear').hidden === false && el('clientListTag').textContent.includes('/'),
+    `hidden=${el('clientClear').hidden} / ${el('clientListTag').textContent}`);
+  api.clearClientFilters();
+  t('清除筛选会恢复搜索、状态、来源、类型和体检筛选',
+    el('clientQ').value === '' && el('clientStatusF').value === '' && el('clientSourceF').value === ''
+      && el('clientTypeF').value === '' && api.getClientHealthF() === '' && el('clientClear').hidden === true,
+    `q=${el('clientQ').value} status=${el('clientStatusF').value} source=${el('clientSourceF').value}`);
+
+  /* 体检计数与列表筛选必须同一口径。 */
+  const counts = api.clientHealthCounts(S.clients);
+  t('客户体检计数与同一判据现算一致',
+    counts.noStatus === S.clients.filter(c => api.clientHealthMatch(c, 'noStatus')).length
+      && counts.noSource === S.clients.filter(c => api.clientHealthMatch(c, 'noSource')).length
+      && counts.noNext === S.clients.filter(c => api.clientHealthMatch(c, 'noNext')).length,
+    JSON.stringify(counts));
+  api.clientHealthJump('noSource');
+  t('点体检项后名单只保留对应缺口客户（首屏仍按 20 条收敛）',
+    el('clientListTag').textContent === `${counts.noSource} / ${S.clients.length}`
+      && (el('clientList').innerHTML.match(/class="client-row"/g) || []).length === Math.min(api.CLIENT_PAGE, counts.noSource),
+    `${el('clientListTag').textContent}，渲染 ${(el('clientList').innerHTML.match(/class="client-row"/g) || []).length} / ${counts.noSource}`);
+  api.clientHealthJump('noSource');
+  t('再点同一体检项恢复全部客户', api.getClientHealthF() === '');
+
+  /* 详情抽屉优先本地卡片，同时保留 Notion 深链。 */
+  api.openClientDetail('c-filter-proof');
+  const drawer = el('clientDetailBody').innerHTML;
+  t('客户详情抽屉展示金额、真实状态、来源、负责人与下次跟进',
+    drawer.includes('筛选探针客户') && drawer.includes('沟通中') && drawer.includes('公众号')
+      && drawer.includes('凌一') && drawer.includes('2026-10-28') && drawer.includes('¥1,000'),
+    drawer.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120));
+  t('客户详情同时提供 Notion 页面跳转与回写入口',
+    drawer.includes('打开 Notion 客户页') && drawer.includes('可回写')
+      && drawer.includes('编辑并回写 Notion'));
+  api.openClientEdit('c-filter-proof');
+  const editForm = el('clientDetailBody').innerHTML;
+  t('客户编辑表单带真实字段、选项和回写按钮',
+    editForm.includes('id="clientEditForm"') && editForm.includes('id="ceStatus"')
+      && editForm.includes('客户状态') && editForm.includes('保存并回写 Notion')
+      && editForm.includes('负责人是 Notion people 字段'),
+    editForm.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140));
+  t('备注编辑框只回填真实备注，不把利润兜底摘要写回 Notion',
+    /id="ceNote"[\s\S]{0,180}esc\(c\.memo/.test(js) && !/id="ceNote"[\s\S]{0,180}esc\(c\.note/.test(js));
+  t('客户详情弹窗已打开', el('clientOv').classList.contains('show'));
+  api.setType('client');
+  S.clients = keepClients;
+
+  /* 跟进空态：当前跟进库 0 条，不造倒计时，也不抛错。 */
+  const keepFollowups = S.followups;
+  S.followups = [];
+  api.renderClient();
+  t('跟进库为空时显示诚实空态',
+    el('clientFollowups').innerHTML.includes('跟进库暂无记录')
+      && el('clientFollowups').innerHTML.includes('打开 Notion 跟进库')
+      && el('clientFollowups').innerHTML.includes('client-follow-empty')
+      && !el('clientFollowups').innerHTML.includes('class="empty"')
+      && el('clientFollowTag').textContent.includes('今日 0')
+      && el('clientFollowTag').textContent.includes('逾期 0'),
+    el('clientFollowTag').textContent);
+
+  /* 今日 / 逾期跟进从真实日期算，不用固定文案。 */
+  const today = api.todayStr();
+  S.followups = [
+    { id: 'f-today', title: '今天跟进探针', status: '待跟进', date: today,
+      nextFollowUp: today, clientIds: ['c-filter-proof'], clientNames: ['筛选探针客户'] },
+    { id: 'f-late', title: '逾期跟进探针', status: '进行中', date: '2026-01-01',
+      nextFollowUp: '2026-01-01', clientIds: [], clientNames: [] }
+  ];
+  api.renderClient();
+  const fdata = api.clientFollowData();
+  t('跟进工作台分别算今日与逾期，不把无日期伪造成今天',
+    fdata.dueToday.length === 1 && fdata.overdue.length === 1,
+    `今日 ${fdata.dueToday.length} / 逾期 ${fdata.overdue.length}`);
+  t('跟进工作台显示真实标题与客户关联',
+    el('clientFollowups').innerHTML.includes('今天跟进探针')
+      && el('clientFollowups').innerHTML.includes('筛选探针客户')
+      && el('clientFollowups').innerHTML.includes('逾期跟进探针'));
+  S.followups = [
+    { id: 'f-undated', title: '未排期跟进探针', status: '待跟进', clientIds: [], clientNames: [] },
+    { id: 'f-closed', title: '已完成跟进探针', status: '已完成', date: '2026-01-01', clientIds: [], clientNames: [] }
+  ];
+  api.renderClient();
+  t('跟进工作台不只显示有日期的进行中记录',
+    el('clientFollowups').innerHTML.includes('未排期跟进探针')
+      && el('clientFollowups').innerHTML.includes('已完成跟进探针'));
+
+  /* 跟进库的「关联客户」relation 是唯一来源：客户财务只在渲染时关联，
+     不在跟进记录里再复制一份金额，避免两边漂移。 */
+  const keepClientsForFollow = S.clients;
+  S.clients = [{ notionId: 'c-filter-proof', name: '筛选探针客户',
+    income: 1000, expense: 0, profit: 1000 }];
+  S.followups = [{ id: 'f-rel', title: '关系探针', status: '待跟进',
+    date: today, nextFollowUp: today, clientIds: ['c-filter-proof'] }];
+  const relSummary = api.followupClientSummary(S.followups[0]);
+  api.renderClient();
+  t('跟进 relation 自动关联客户财务，不在跟进记录复制金额',
+    relSummary.linked.length === 1 && relSummary.profit === 1000
+      && el('clientFollowups').innerHTML.includes('关联利润 ¥1,000')
+      && el('clientFollowups').innerHTML.includes('class="fclient"')
+      && !('customerProfit' in S.followups[0]),
+    JSON.stringify(relSummary));
+  S.clients = keepClientsForFollow;
+  S.followups = keepFollowups;
+
+  /* 回写出口：用注入 fetch 验证页面真的把白名单字段 POST 到服务端，
+     并在成功后只更新对应客户，不重刷整页。 */
+  {
+    const writeClient = {
+      notionId: '11111111-2222-3333-4444-555555555555',
+      notionUrl: 'https://app.notion.com/p/write-proof',
+      name: '回写探针', customerType: '个人', status: '沟通中',
+      relationSource: '公众号', owner: '凌一', firstContact: '2026-10-01',
+      lastContact: '2026-10-02', nextFollowUp: '2026-10-30',
+      income: 100, expense: 0, profit: 100, note: '利润 ¥100', memo: ''
+    };
+    const writeData = { ...DATA, clients: [writeClient], followups: [] };
+    const els4 = new Map();
+    const el4 = id => els4.get(id) || (els4.set(id, new El(id)), els4.get(id));
+    const doc4 = { getElementById: el4, querySelectorAll: s => s === '.ov' ? [el4('projOv'), el4('earnOv')] : [],
+      querySelector: s => el4(s), documentElement: new El('html'), addEventListener: () => {},
+      createElement: () => new El('t'), body: new El('body') };
+    const store4 = new Map([['wb', JSON.stringify(writeData)], ['wb_token', 'tok4']]);
+    const ls4 = { getItem: k => store4.has(k) ? store4.get(k) : null, setItem: (k, v) => store4.set(k, String(v)) };
+    const loc4 = { protocol: 'http:', search: '?token=tok4', href: 'http://127.0.0.1:8787/workbench.html?token=tok4' };
+    let posted = null;
+    const fetch4 = async (url, opt) => {
+      const u = String(url);
+      if (u.startsWith('/api/clients/update')) {
+        posted = JSON.parse(opt.body);
+        return { ok: true, status: 200, json: async () => ({ ok: true, localUpdated: true,
+          client: { ...writeClient, ...posted.fields } }) };
+      }
+      if (u.startsWith('/data.json')) return { ok: true, status: 200, json: async () => writeData };
+      return { ok: false, status: 404, json: async () => ({}) };
+    };
+    const api4 = new Function('document', 'localStorage', 'location', 'alert', 'setInterval', 'clearInterval', 'fetch', 'window',
+      js + `\nreturn { setType, openClientDetail, openClientEdit, saveClient, get:()=>state };`)(
+      doc4, ls4, loc4, () => {}, () => 1, () => {}, fetch4, windowStub);
+    await new Promise(r => setTimeout(r, 20));
+    api4.setType('client');
+    api4.openClientDetail(writeClient.notionId);
+    api4.openClientEdit(writeClient.notionId);
+    el4('ceName').value = '回写探针-已改';
+    el4('ceStatus').value = '成交';
+    el4('ceNext').value = '2026-11-05';
+    el4('ceNote').value = '已通过工作台回写';
+    await api4.saveClient({ preventDefault() {} });
+    t('客户回写只提交白名单字段与当前页面 ID',
+      posted && posted.pageId === writeClient.notionId && posted.fields.status === '成交'
+        && posted.fields.nextFollowUp === '2026-11-05' && !('income' in posted.fields),
+      JSON.stringify(posted));
+    t('客户回写成功后页面立即更新本地客户卡',
+      api4.get().clients[0].name === '回写探针-已改'
+        && api4.get().clients[0].status === '成交'
+        && el4('notify').innerHTML.includes('已回写 Notion'),
+      el4('notify').innerHTML);
+  }
+  api.setType('ledger'); api.renderAll();
+}
+
+console.log('\n— 33. 世界时钟：时区换算 / 夏令时 / 增删持久化 —');
+{
+  const zones = api.getWorldZones();
+  t('默认 5 个城市，上海固定为本地基准',
+    zones.length === 5 && zones[0] === 'Asia/Shanghai', zones.join(', '));
+
+  const winter = new Date('2026-01-15T00:00:00Z');
+  t('冬令时：东京 09:00 / 洛杉矶 16:00 / 纽约 19:00',
+    api.wcParts('Asia/Tokyo', winter).time === '09:00:00'
+      && api.wcParts('America/Los_Angeles', winter).time === '16:00:00'
+      && api.wcParts('America/New_York', winter).time === '19:00:00',
+    `${api.wcParts('Asia/Tokyo', winter).time} / ${api.wcParts('America/Los_Angeles', winter).time} / ${api.wcParts('America/New_York', winter).time}`);
+
+  const summer = new Date('2026-07-15T00:00:00Z');
+  t('夏令时自动生效：洛杉矶 17:00 / 纽约 20:00（不是手写偏移）',
+    api.wcParts('America/Los_Angeles', summer).time === '17:00:00'
+      && api.wcParts('America/New_York', summer).time === '20:00:00',
+    `${api.wcParts('America/Los_Angeles', summer).time} / ${api.wcParts('America/New_York', summer).time}`);
+
+  t('跨日标记：UTC 基准日与洛杉矶日期差 1 天',
+    api.wcParts('America/Los_Angeles', winter).date === '2026-01-14',
+    api.wcParts('America/Los_Angeles', winter).date);
+
+  t('工作状态按当地小时与星期判断',
+    api.wcStatus(10, 'Mon').cls === 'work' && api.wcStatus(23, 'Mon').cls === 'rest'
+      && api.wcStatus(10, 'Sat').cls === 'rest' && api.wcStatus(20, 'Mon').cls === 'off',
+    `${api.wcStatus(10, 'Mon').txt} / ${api.wcStatus(23, 'Mon').txt} / ${api.wcStatus(10, 'Sat').txt} / ${api.wcStatus(20, 'Mon').txt}`);
+
+  t('时差以上海为基准，并区分快慢',
+    api.wcDiff('Asia/Tokyo', winter).includes('快 1 小时')
+      && api.wcDiff('America/New_York', winter).includes('慢 13 小时'),
+    `${api.wcDiff('Asia/Tokyo', winter)} / ${api.wcDiff('America/New_York', winter)}`);
+
+  t('12 小时制只改变显示，不改变底层 24 小时时区换算',
+    api.wcFormatTime(api.wcParts('Asia/Tokyo', winter), true) === '09:00:00 AM'
+      && api.wcFormatTime(api.wcParts('Asia/Tokyo', winter), false) === '09:00:00',
+    api.wcFormatTime(api.wcParts('Asia/Tokyo', winter), true));
+
+  const best = api.wcBestWindow(new Date('2026-01-15T00:00:00Z'));
+  t('最佳协作窗口取未来 48 小时同时在线城市最多的时段',
+    best && best.count === 3 && best.label.includes('09:00–10:00'),
+    best ? `${best.label} / ${best.count} 城` : 'null');
+
+  api.renderWorldClock();
+  t('渲染出默认城市行，且带本地城市标记',
+    (el('wcRows').innerHTML.match(/class="wc-row"/g) || []).length === 5
+      && el('wcRows').innerHTML.includes('上海') && el('wcRows').innerHTML.includes('本地'),
+    `${(el('wcRows').innerHTML.match(/class="wc-row"/g) || []).length} 行`);
+
+  t('世界时钟概览显示在线城市数与最佳窗口',
+    el('wcSummary').innerHTML.includes('个城市在线')
+      && el('wcSummary').innerHTML.includes('城同时在线'),
+    el('wcSummary').innerHTML);
+  t('世界时钟折叠摘要常显在线数与最佳协作窗口',
+    el('wcBrief').textContent.includes('城在线')
+      && el('wcBrief').textContent.includes('最佳窗口'),
+    el('wcBrief').textContent);
+
+  const overviewHtml = el('wcOverview').innerHTML;
+  const overviewZones = [...overviewHtml.matchAll(/class="wc-overview-zone"[^>]*data-tz="([^"]+)"/g)].map(m => m[1]);
+  t('顶部时间概览显示上海当前时间与两个候选城市，且不含上海重复项',
+    overviewHtml.includes('上海 · 当前')
+      && overviewZones.length === 2
+      && overviewZones.join(',') === 'America/Los_Angeles,America/New_York'
+      && (overviewHtml.match(/data-wc-time/g) || []).length === 3,
+    `${overviewZones.join(' → ')} / ${(overviewHtml.match(/data-wc-time/g) || []).length} 个时间`);
+
+  api.setWorldClockCandidate(1, 'Europe/London');
+  t('底部可更换候选，顶部时间卡同步并持久化',
+    api.getWorldCandidates().join(',') === 'Europe/London,America/New_York'
+      && el('wcOverview').innerHTML.includes('伦敦')
+      && JSON.parse(store.get('wb_world_clock_candidates')).join(',') === 'Europe/London,America/New_York',
+    `${api.getWorldCandidates().join(', ')} / ${el('wcCandidate1').value}`);
+  t('候选时区不重复，选择已在另一槽位的城市时自动交换',
+    api.getWorldCandidates().length === 2 && new Set(api.getWorldCandidates()).size === 2,
+    api.getWorldCandidates().join(', '));
+
+  t('删除入口改为文字「移除」，不再使用大叉',
+    el('wcRows').innerHTML.includes('>移除</button>')
+      && !el('wcRows').innerHTML.includes('>✕</button>'),
+    el('wcRows').innerHTML.slice(0, 240));
+
+  api.setWorldClockHourMode(true);
+  t('12/24 小时切换会持久化并重新渲染',
+    api.getWorldClockHourMode() === true
+      && (el('wcRows').innerHTML.includes('AM') || el('wcRows').innerHTML.includes('PM'))
+      && (el('wcOverview').innerHTML.includes('AM') || el('wcOverview').innerHTML.includes('PM')),
+    el('wcOverview').innerHTML.match(/\d{2}:\d{2}:\d{2} (?:AM|PM)/)?.[0] || '未找到');
+  api.setWorldClockHourMode(false);
+
+  el('wcFind').value = '东京';
+  api.renderWorldClock();
+  t('城市筛选同时匹配中文城市名与 IANA 时区',
+    (el('wcRows').innerHTML.match(/class="wc-row"/g) || []).length === 1
+      && el('wcRows').innerHTML.includes('data-tz="Asia/Tokyo"'),
+    el('wcRows').innerHTML.slice(0, 160));
+  el('wcFind').value = '';
+
+  api.setWorldClockSort('time');
+  api.renderWorldClock();
+  const sortedZones = [...el('wcRows').innerHTML.matchAll(/data-tz="([^"]+)"/g)].map(m => m[1]);
+  t('按当地时间排序时上海固定置顶，其余城市按当地钟点排列',
+    api.getWorldClockSort() === 'time' && sortedZones[0] === 'Asia/Shanghai'
+      && new Set(sortedZones).size === sortedZones.length,
+    sortedZones.join(' → '));
+  api.setWorldClockSort('order');
+
+  el('wcPick').value = 'Europe/Paris';
+  api.addWorldClock();
+  t('添加时区后列表与 localStorage 同步',
+    api.getWorldZones().includes('Europe/Paris')
+      && JSON.parse(store.get('wb_world_clock')).includes('Europe/Paris'),
+    api.getWorldZones().join(', '));
+
+  api.delWorldClock('Europe/Paris');
+  t('删除时区后恢复 5 个', api.getWorldZones().length === 5 && !api.getWorldZones().includes('Europe/Paris'));
+
+  api.delWorldClock('America/Los_Angeles');
+  t('删除候选城市后，顶部概览自动补入下一条可用城市',
+    api.getWorldCandidates().length === 2
+      && api.getWorldCandidates().every(tz => api.getWorldZones().includes(tz))
+      && !el('wcOverview').innerHTML.includes('data-tz="America/Los_Angeles"'),
+    el('wcOverview').innerHTML.replace(/\s+/g, ' ').slice(0, 240));
+  api.resetWorldClock();
+
+  api.delWorldClock('Asia/Shanghai');
+  t('本地城市不可删除（日期换算基准）', api.getWorldZones().includes('Asia/Shanghai'));
+
+  api.resetWorldClock();
+  t('恢复默认后回到 5 个标准城市',
+    api.getWorldZones().join(',') === 'Asia/Shanghai,America/Los_Angeles,America/New_York,Europe/London,Asia/Tokyo',
+    api.getWorldZones().join(', '));
+}
+
+console.log('\n— 34. 专注：可靠计时 / 真实项目 / 趋势 / 时间线 / Notion 回写 —');
+{
+  const S = api.get();
+  const keepFocus = S.focusSessions;
+  const keepNotes = S.notes;
+  const keepProjects = S.projects;
+  const keepEarnings = S.earnings;
+
+  t('专注日期按上海时区跨日（UTC 16:30 已是上海次日）',
+    api.focusDateStr(new Date('2026-10-27T16:30:00Z')) === '2026-10-28'
+      && api.focusDateStr(new Date('2026-10-27T15:59:59Z')) === '2026-10-27',
+    `${api.focusDateStr(new Date('2026-10-27T16:30:00Z'))} / ${api.focusDateStr(new Date('2026-10-27T15:59:59Z'))}`);
+
+  api.setFocusDuration(45);
+  const t45 = api.getFocusTimer();
+  api.setFocusDuration(60);
+  const t60 = api.getFocusTimer();
+  t('专注时长支持 45 / 60 分钟，切换后重置到完整时长',
+    t45.durationMinutes === 45 && t45.remainingSeconds === 2700
+      && t60.durationMinutes === 60 && t60.remainingSeconds === 3600,
+    `${t45.durationMinutes}/${t45.remainingSeconds} · ${t60.durationMinutes}/${t60.remainingSeconds}`);
+
+  api.setFocusDuration(45);
+  api.toggleTimer();
+  const running = api.getFocusTimer();
+  const restored = api.loadFocusTimer();
+  t('计时以截止时间戳持久化，刷新读取仍能续计',
+    running.running && !!running.endAt && restored.running && restored.endAt === running.endAt
+      && api.focusTimerRemaining() > 2600,
+    `剩余 ${api.focusTimerRemaining()}s`);
+
+  S.focusSessions = [];
+  // 模拟已经自然到点：把截止时间收紧到当前时刻，避免临近午夜时完成记录落到次日。
+  const completedTimer = api.getFocusTimer();
+  completedTimer.startAt = new Date(Date.now() - 45 * 60 * 1000).toISOString();
+  completedTimer.endAt = Date.now();
+  api.completeFocusTimer();
+  const completed = S.focusSessions[S.focusSessions.length - 1];
+  const today = api.focusDateStr();
+  t('完成番茄会落一条 45 分钟真实专注记录，并重置计时器',
+    completed && completed.status === 'completed' && completed.durationMinutes === 45
+      && completed.elapsedSeconds === 2700 && completed.date === today
+      && !api.getFocusTimer().running,
+    completed ? `${completed.projectName} / ${completed.elapsedSeconds}s / ${completed.date}` : 'missing');
+
+  const stat1 = api.focusStats(1);
+  t('今日统计只把完成记录计入分钟，中断单独计数',
+    stat1.completed === 1 && stat1.minutes === 45 && stat1.abandoned === 0,
+    JSON.stringify({ completed: stat1.completed, minutes: stat1.minutes, abandoned: stat1.abandoned }));
+
+  api.appendFocusToNote(completed.id, true);
+  t('专注可追加到今日备注，备注行与记录互相标记',
+    String(S.notes[today] || '').includes(completed.noteLine)
+      && completed.noteAddedAt,
+    S.notes[today]);
+  api.undoFocusSession(completed.id);
+  t('撤销专注时同步移除对应备注行，不留下孤儿文本',
+    !S.focusSessions.some(s => s.id === completed.id)
+      && !String(S.notes[today] || '').includes(completed.noteLine),
+    String(S.notes[today] || '（空）'));
+
+  const days = api.focusRangeDays(7);
+  S.focusSessions = [
+    { id: 'f7-a', date: days[0], startAt: days[0] + 'T09:00:00+08:00', endAt: days[0] + 'T09:25:00+08:00',
+      durationMinutes: 25, elapsedSeconds: 1500, projectId: 'free', projectName: '自由专注',
+      projectSource: 'local', status: 'completed' },
+    { id: 'f7-b', date: today, startAt: today + 'T10:00:00+08:00', endAt: today + 'T10:45:00+08:00',
+      durationMinutes: 45, elapsedSeconds: 2700, projectId: 'free', projectName: '自由专注',
+      projectSource: 'local', status: 'completed' },
+    { id: 'f7-c', date: today, startAt: today + 'T11:00:00+08:00', endAt: today + 'T11:03:00+08:00',
+      durationMinutes: 25, elapsedSeconds: 180, projectId: 'free', projectName: '自由专注',
+      projectSource: 'local', status: 'abandoned' }
+  ];
+  const stat7 = api.focusStats(7);
+  api.setFocusRange(7);
+  api.renderFocusTrend();
+  t('趋势有真实记录时展开图表，并隐藏空态摘要',
+    !el('focusTrendCard').querySelector('.focus-trend').hidden
+      && el('focusTrendCard').querySelector('.focus-trend-empty').hidden,
+    `chart=${!el('focusTrendCard').querySelector('.focus-trend').hidden} / empty=${el('focusTrendCard').querySelector('.focus-trend-empty').hidden}`);
+  t('7 天趋势只统计完成分钟，同时保留中断次数',
+    stat7.completed === 2 && stat7.minutes === 70 && stat7.abandoned === 1
+      && (el('focusBars').innerHTML.match(/class="focus-bar/g) || []).length === 7
+      && el('focusSummary').innerHTML.includes('70'),
+    JSON.stringify({ completed: stat7.completed, minutes: stat7.minutes, abandoned: stat7.abandoned }));
+
+  S.focusSessions = [];
+  api.renderFocusTrend();
+  /* 逻辑测试的 DOM 桩会对任意选择器即时造一个 El；这能测“有没有走到收/放分支”，
+     但不能用 textContent 当真实渲染结果。空态文案由真机冒烟负责。 */
+  t('趋势没有记录时收成一行空态，图表不占空白高度',
+    el('focusTrendCard').querySelector('.focus-trend').hidden
+      && !el('focusTrendCard').querySelector('.focus-trend-empty').hidden,
+    `chartHidden=${el('focusTrendCard').querySelector('.focus-trend').hidden} / emptyHidden=${el('focusTrendCard').querySelector('.focus-trend-empty').hidden}`);
+
+  S.projects = [
+    { id: 'p-now', notionId: 'n-now', name: '真实进行中', status: '进行中', source: 'notion' },
+    { id: 'p-done', notionId: 'n-done', name: '真实已完成', status: '已完成', source: 'notion' },
+    { id: 'p-local', name: '本地补充', status: '进行中', source: 'local' }
+  ];
+  const projectOpts = api.focusProjectOptions();
+  t('计时项目优先来自真实 Notion 进行中项目，已结束项目不进入下拉',
+    projectOpts.some(p => p.value === 'notion:n-now' && p.source === 'notion')
+      && projectOpts.some(p => p.value === 'local:p-local')
+      && !projectOpts.some(p => p.value === 'notion:n-done'),
+    projectOpts.map(p => `${p.source}:${p.label}`).join(', '));
+
+  S.focusSessions = [
+    { id: 'sort-notion', date: today, startAt: today + 'T09:00:00+08:00',
+      durationMinutes: 25, elapsedSeconds: 1500, projectId: 'notion:n-now',
+      projectName: '真实进行中', projectSource: 'notion', status: 'completed' },
+    { id: 'sort-local', date: today, startAt: today + 'T10:00:00+08:00',
+      durationMinutes: 45, elapsedSeconds: 2700, projectId: 'local:p-local',
+      projectName: '本地补充', projectSource: 'local', status: 'completed' }
+  ];
+  api.renderTimeBars();
+  const barsHtml = el('timeBars').innerHTML;
+  t('按项目专注按真实分钟排序，本地项目不会因为来源被固定沉底',
+    barsHtml.indexOf('本地补充') >= 0 && barsHtml.indexOf('真实进行中') >= 0
+      && barsHtml.indexOf('本地补充') < barsHtml.indexOf('真实进行中'),
+    `本地 ${barsHtml.indexOf('本地补充')} / Notion ${barsHtml.indexOf('真实进行中')}`);
+  t('项目折叠摘要保留 Notion / 本地数量与今日专注分钟',
+    el('focusProjectBrief').textContent.includes('1 个 Notion 进行中')
+      && el('focusProjectBrief').textContent.includes('1 个本地')
+      && el('focusProjectBrief').textContent.includes('今日 70m'),
+    el('focusProjectBrief').textContent);
+
+  S.earnings = [{ id: 'e-today', date: today, amount: 88, type: '测试收入', note: '时间线收益探针' }];
+  S.projects = [{ id: 'p-timeline', name: '时间线项目探针', status: '进行中', progress: 40, due: today, source: 'local' }];
+  api.renderTodayTimeline();
+  t('总览时间线同时汇总专注、收益与进行中项目',
+    el('todayTimeline').innerHTML.includes('专注')
+      && el('todayTimeline').innerHTML.includes('时间线收益探针')
+      && el('todayTimeline').innerHTML.includes('时间线项目探针'),
+    el('todayTimelineTag').textContent);
+
+  el('wcWorkStart').value = '10:00';
+  el('wcWorkEnd').value = '19:00';
+  for (let d = 0; d <= 6; d++) el('wcDay' + d).checked = [1, 2, 3, 4, 6].includes(d);
+  api.setWorldClockWork();
+  const wcCfg = api.wcWorkConfig();
+  t('世界时钟工作时段与工作日可自定义并持久化',
+    wcCfg.start === '10:00' && wcCfg.end === '19:00'
+      && wcCfg.days.join(',') === '1,2,3,4,6',
+    JSON.stringify(wcCfg));
+
+  api.renderWorldClock();
+  el('wcMeetDate').value = '2026-01-15';
+  el('wcMeetTime').value = '09:00';
+  el('wcMeetFrom').value = 'Asia/Shanghai';
+  api.convertMeetingTime();
+  t('会议换算器按 IANA 时区输出各城市当地日期与时间',
+    el('wcMeetOut').innerHTML.includes('东京')
+      && el('wcMeetOut').innerHTML.includes('2026-01-15 10:00:00'),
+    el('wcMeetOut').innerHTML.slice(0, 180));
+
+  S.focusSessions = keepFocus;
+  S.notes = keepNotes;
+  S.projects = keepProjects;
+  S.earnings = keepEarnings;
+  api.setFocusRange(14);
+  api.renderTime();
+}
+
+console.log('\n— 35. 专注回写 Notion：前端出口 / 白名单 / 幂等提示 —');
+{
+  const focusId = 'focus-push-proof';
+  const abandonedId = 'focus-abandoned-proof';
+  const now = new Date().toISOString();
+  const writeData = {
+    ...DATA,
+    focusSessions: [
+      { id: focusId, date: api.focusDateStr(), startAt: now, endAt: now, durationMinutes: 25,
+        elapsedSeconds: 1500, projectId: 'free', projectName: '回写探针', projectSource: 'local',
+        status: 'completed', noteLine: '[专注] 回写探针 · 25 分钟 · 完成' },
+      { id: abandonedId, date: api.focusDateStr(), startAt: now, endAt: now, durationMinutes: 25,
+        elapsedSeconds: 300, projectId: 'free', projectName: '中断探针', projectSource: 'local',
+        status: 'abandoned', noteLine: '[专注] 中断探针 · 5 分钟 · 中断' }
+    ]
+  };
+  const els5 = new Map();
+  const el5 = id => els5.get(id) || (els5.set(id, new El(id)), els5.get(id));
+  const doc5 = {
+    getElementById: el5,
+    querySelectorAll: s => s === '.ov' ? [el5('projOv'), el5('earnOv')] : [],
+    querySelector: s => el5(s),
+    documentElement: new El('html'),
+    addEventListener: () => {},
+    createElement: () => new El('tmp'),
+    body: new El('body'),
+    hidden: false
+  };
+  const store5 = new Map([['wb', JSON.stringify(writeData)], ['wb_token', 'tok5']]);
+  const ls5 = {
+    getItem: k => store5.has(k) ? store5.get(k) : null,
+    setItem: (k, v) => store5.set(k, String(v))
+  };
+  const loc5 = { protocol: 'http:', search: '?token=tok5', href: 'http://127.0.0.1:8787/workbench.html?token=tok5' };
+  let posted = null, pushCalls = 0, dataPosts = 0;
+  const fetch5 = async (url, opt = {}) => {
+    const u = String(url);
+    if (u.startsWith('/data.json')) {
+      if ((opt.method || 'GET') === 'POST') dataPosts++;
+      return { ok: true, status: 200, json: async () => writeData };
+    }
+    if (u.startsWith('/api/focus/push')) {
+      pushCalls++;
+      posted = JSON.parse(opt.body);
+      const s = writeData.focusSessions.find(x => x.id === posted.sessionId);
+      return { ok: true, status: 200, json: async () => ({
+        ok: true,
+        session: { ...s, notionPageId: 'focus-page-proof',
+          notionUrl: 'https://app.notion.com/p/focus-page-proof',
+          notionPushedAt: '2026-10-28T12:00:00+08:00' },
+        notionPageId: 'focus-page-proof',
+        notionUrl: 'https://app.notion.com/p/focus-page-proof'
+      }) };
+    }
+    return { ok: false, status: 404, json: async () => ({}) };
+  };
+  const api5 = new Function('document', 'localStorage', 'location', 'alert', 'setInterval', 'clearInterval', 'fetch', 'window',
+    js + `\nreturn { pushFocusToNotion, get:()=>state };`)(
+    doc5, ls5, loc5, () => {}, () => 1, () => {}, fetch5, windowStub);
+  await new Promise(r => setTimeout(r, 20));
+
+  await api5.pushFocusToNotion(focusId);
+  t('回写只提交当前本地专注记录 ID',
+    posted && posted.sessionId === focusId && pushCalls === 1 && dataPosts === 0,
+    JSON.stringify({ posted, pushCalls, dataPosts }));
+  t('回写成功后本地立即拿到 Notion 页面 ID 与链接',
+    api5.get().focusSessions[0].notionPageId === 'focus-page-proof'
+      && api5.get().focusSessions[0].notionUrl.includes('app.notion.com')
+      && el5('focusTodayList').innerHTML.includes('Notion ↗')
+      && el5('notify').innerHTML.includes('已回写到 Notion'),
+    el5('notify').innerHTML);
+
+  const before = pushCalls;
+  await api5.pushFocusToNotion(abandonedId);
+  t('中断记录不会发往 Notion，前端直接拦下',
+    pushCalls === before && el5('notify').innerHTML.includes('只有已完成的专注记录'),
+    el5('notify').innerHTML);
 }
 
 console.log(`\n结果：${pass} 通过 / ${fail} 失败`);

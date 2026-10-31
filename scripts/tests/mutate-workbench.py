@@ -14,10 +14,9 @@
 只做前两步的断言等于注释。第 46 条就是反例：我最初写的"预设值两两不相同"是**永远绿**的
 （去重保证了它），改坏取整规则照样绿 —— 必须把"该有的参照一个都不能少"并进同一条才可证伪。
 """
-from pathlib import Path
 import subprocess, os, re, sys
 
-ROOT = str(Path(__file__).resolve().parent.parent.parent)
+ROOT = "/Users/jascen/Development/daily-workbench"
 SRC = f"{ROOT}/workbench.html"
 NODE = "/opt/homebrew/bin/node"
 TMP = "/tmp/wb-mut.html"
@@ -62,7 +61,8 @@ MUT = [
   ' onclick="setSrcFilter(${i})" style="cursor:pointer" tabindex="0" role="button"',
   ' onclick="setSrcFilter(${i})" style="cursor:pointer"', "3 处整块可点的 div 进了 Tab 序"),
  ("label 关联：去掉一个 for=", "exact",
-  '<label for="pName">名称</label>', '<label>名称</label>', "所有 <label> 补齐 for="),
+  '<label for="pName">名称</label>', '<label>名称</label>',
+  "所有 <label> 都通过 for= 或隐含包裹关联控件"),
  ("动效偏好 A26：把媒体名写错一位（整个块失效）", "exact",
   "@media(prefers-reduced-motion:reduce){", "@media(prefers-reduced-motion1:reduce){",
   "prefers-reduced-motion 媒体查询结构完整"),
@@ -80,7 +80,8 @@ MUT = [
   "  <main id=\"main\" tabindex=\"-1\">", "", "<main> / <nav> 已补上"),
  ("ARIA：删掉屏读器状态通道", "exact",
   '<div class="undo" id="undo" role="status" aria-live="polite"></div>',
-  '<div class="undo" id="undo"></div>', "屏读器状态通道"),
+  '<div class="undo" id="undo"></div>',
+  "屏读器状态通道：banner / notify / undo 都带 role=status + aria-live"),
  ("反向断言：给账本 <tr> 加上 tabindex（257 个 Tab 停靠点）", "exact",
   "const click= editable? ` class=\"clickable\" onclick=\"editEarn('${e.id}')\" title=\"点击编辑\"`",
   "const click= editable? ` class=\"clickable\" tabindex=\"0\" onclick=\"editEarn('${e.id}')\" title=\"点击编辑\"`",
@@ -145,7 +146,8 @@ MUT = [
   '<form id="earnForm" onsubmit="submitEarn(event)">',
   '收益模态包在 <form id="earnForm">'),
  ("模态：让 form 带回 UA 默认外边距", "exact",
-  "#projForm,#earnForm{margin:0}", "#projForm,#earnForm{margin:1em}",
+  "#projForm,#projNotionForm,#earnForm{margin:0}",
+  "#projForm,#projNotionForm,#earnForm{margin:1em}",
   "form 不带来 UA 默认外边距"),
  ("跳转链：去掉跳转目标的 tabindex=\"-1\"（回车后焦点接不住，等于没跳）", "exact",
   '<main id="main" tabindex="-1">', '<main id="main">',
@@ -275,6 +277,10 @@ MUT = [
   '"同步请求失败："+e.message+"\\n确认本地同步服务在 127.0.0.1:8787 上运行。");',
   '"同步请求失败："+e.message+"\\n确认本地同步服务在 127.0.0.1:8787 上运行。","info");',
   "同步出口「fetch 抛异常（服务没开）」"),
+ ("顶部时间概览把上海重复放进候选列（三个时间的参照错位）", "exact",
+  "const alternatives=wcCandidateZones();",
+  "const alternatives=WC_ZONES.slice(0,2);",
+  "顶部时间概览显示上海当前时间与两个候选城市"),
 ]
 
 orig = open(SRC, encoding="utf-8").read()
