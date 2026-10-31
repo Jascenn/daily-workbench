@@ -6,18 +6,18 @@
 # 并且点「同步一次」只会得到 HTTP 401 —— 2026-09-29 实际踩过这个坑。
 #
 # 用法：
-#     bash scripts/open-workbench.sh          # 只打印链接
-#     bash scripts/open-workbench.sh --open   # 打印并用默认浏览器打开
-#     bash scripts/open-workbench.sh --qrcode # 打印链接 + 终端二维码（手机同局域网可扫）
+#     bash scripts/tools/open-workbench.sh          # 只打印链接
+#     bash scripts/tools/open-workbench.sh --open   # 打印并用默认浏览器打开
+#     bash scripts/tools/open-workbench.sh --qrcode # 打印链接 + 终端二维码（手机同局域网可扫）
 
 set -u
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DIR="/Users/jascen/Development/daily-workbench"
 TOKEN_FILE="$HOME/.config/daily-workbench/sync-token"
 PORT=8787
 
 if [ ! -f "$TOKEN_FILE" ]; then
     echo "✗ 找不到同步令牌：$TOKEN_FILE"
-    echo "  服务首次启动时会自动生成；也可先跑 scripts/setup-syncserver.sh。"
+    echo "  服务首次启动时会自动生成；也可先跑 scripts/tools/setup-syncserver.sh。"
     exit 2
 fi
 TOKEN=$(cat "$TOKEN_FILE")
@@ -35,7 +35,7 @@ if curl -s -o /dev/null -m 3 "http://127.0.0.1:${PORT}/api/status"; then
     echo "✓ 本地服务在运行（127.0.0.1:${PORT}）"
 else
     echo "⚠ 本地服务没响应。先在 Terminal 跑一次："
-    echo "    bash \"$DIR/scripts/setup-syncserver.sh\""
+    echo "    bash \"$DIR/scripts/tools/setup-syncserver.sh\""
 fi
 
 # 顺带自检：带 token 应该 200，裸链接应该 401
@@ -64,7 +64,7 @@ case "${1:-}" in
         ;;
     ""|--help|-h)
         [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ] && {
-            echo "用法：bash scripts/open-workbench.sh [--open|--qrcode]"
+            echo "用法：bash scripts/tools/open-workbench.sh [--open|--qrcode]"
         }
         ;;
     *)

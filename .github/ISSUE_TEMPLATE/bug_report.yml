@@ -1,27 +1,17 @@
 name: Bug report
-description: Report incorrect data, synchronization, or interface behavior
+description: Report a private development-mirror issue
 title: "fix: "
 body:
   - type: markdown
     attributes:
       value: |
-        Do not include real earnings, client names, platform credentials, or
-        local absolute paths. Use the guest-mode fixtures when possible.
+        Do not include real earnings, customer names, platform credentials, or
+        local absolute paths. Use synthetic data whenever possible.
   - type: input
     id: version
     attributes:
       label: Version or commit
-      placeholder: "main / bb680bc"
-    validations:
-      required: true
-  - type: dropdown
-    id: mode
-    attributes:
-      label: Data mode
-      options:
-        - Guest fixtures
-        - Local synthetic data
-        - Real local data, redacted
+      placeholder: "main / e7af7a4"
     validations:
       required: true
   - type: textarea
@@ -56,7 +46,7 @@ body:
     attributes:
       label: Safety checks
       options:
-        - label: I removed real financial, customer, credential, and local path data.
+        - label: I removed real private data, credentials, and local paths.
           required: true
         - label: This is not a private vulnerability report.
           required: true

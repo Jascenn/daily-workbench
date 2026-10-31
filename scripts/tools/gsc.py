@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Google Search Console daily snapshot for the WorkBuddy workbench.
+"""Google Search Console daily snapshot for the Daily Workbench.
 
 Pure standard library: no pip packages needed. Service-account auth is done
 with a hand-rolled RS256 JWT (hashlib + pow), all HTTPS via urllib.

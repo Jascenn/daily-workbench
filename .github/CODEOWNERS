@@ -1,7 +1,7 @@
 # Default owner for all changes.
 * @Jascenn
 
-# External-sync and server code define the data boundary.
+# Data-pipeline and server code define the privacy boundary.
 /app.py @Jascenn
 /scripts/ @Jascenn
 

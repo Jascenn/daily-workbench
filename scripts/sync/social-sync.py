@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Build the read-only social snapshot consumed by the content screen.
+"""Build the read-only social snapshot consumed by the Daily Workbench content screen.
 
 This first version only imports evidence that already exists on this Mac:
 
-* a historical SuperX PDF snapshot for the configured X handle;
+* a historical SuperX PDF snapshot for @LingYi_Stu;
 * a 41-row ZSXQ content export;
 * the presence (not runtime health) of local draft-publishing skills.
 
@@ -36,24 +36,18 @@ from xml.etree import ElementTree as ET
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 OUT = ROOT / "social.json"
-
-# ===== 个人化配置：开源默认值是示例，实际使用时改这里或用环境变量覆盖 =====
-import os
-KNOWLEDGE_VAULT = Path(os.environ.get("WB_OBSIDIAN_VAULT", "~/Documents/Obsidian").expanduser())
-X_HANDLE = os.environ.get("WB_X_HANDLE", "@your_handle")
-WECHAT_ACCOUNT = os.environ.get("WB_WECHAT_ACCOUNT", "示例公众号")
-ZSXQ_GROUPS = [g.strip() for g in os.environ.get("WB_ZSXQ_GROUPS", "示例星球A,示例星球B").split(",") if g.strip()]
-# 可选的历史快照文件（无则自动降级为「历史快照不可用」状态，不报错）
-X_PDF = Path(os.environ.get("WB_X_PDF", "")) if os.environ.get("WB_X_PDF") else None
-ZSXQ_XLSX = Path(os.environ.get("WB_ZSXQ_XLSX", "")) if os.environ.get("WB_ZSXQ_XLSX") else None
-ZSXQ_CSV = Path(os.environ.get("WB_ZSXQ_CSV", "")) if os.environ.get("WB_ZSXQ_CSV") else None
-
+KNOWLEDGE_VAULT = Path("/Users/jascen/Documents/Obsidian-Tech")
 XREACH_SESSION = Path.home() / ".config" / "xfetch" / "session.json"
 OPENCLAW_ENV = Path.home() / ".openclaw" / ".env"
 WECHAT_PUSH = Path.home() / ".openclaw" / "workspace" / "articles" / "mp_push.py"
 XHS_PIPELINE = Path.home() / ".openclaw" / "workspace" / "skills" / "xiaohongshu-skills" / "scripts" / "fill_draft_defaults.py"
 MCPORTER_CONFIG = Path.home() / ".mcporter" / "mcporter.json"
+
+X_PDF = Path("/Users/jascen/Downloads/02_Resourc/20_参考资料/LingYi (@LingYi_Stu) X Analytics _ SuperX.pdf")
+ZSXQ_XLSX = Path("/Users/jascen/Downloads/02_Resourc/30_工作文档/凌一 _ 成长·写作·赚钱-内容数据-数据报表(20251202-20260101).xlsx")
+ZSXQ_CSV = Path("/Users/jascen/Downloads/02_Resourc/30_工作文档/zsxqarticle.csv")
 ZSXQ_TOKEN = Path.home() / ".config" / "daily-workbench" / "zsxq-token"
+ZSXQ_GROUPS = ["凌一的碎屑", "凌一 | 成长·写作·赚钱", "胡言乱语星球队", "认养一只龙虾openclaw", "星球测试"]
 MPDT_BIN = Path.home() / ".venvs" / "mpdt" / "bin" / "mpdt"
 MPDT_PROFILE = Path.home() / ".mpdt" / "chrome-profile"
 
@@ -156,14 +150,16 @@ def zsxq_live_snapshot() -> tuple[dict[str, object] | None, list[dict[str, objec
         "platform": "知识星球", "account": "、".join(ZSXQ_GROUPS),
         "profileUrl": "https://wx.zsxq.com/", "dashboardUrl": "https://wx.zsxq.com/",
         "asOf": str(newest)[:10] if newest else None,
-        "sourceKind": "知识星球 Web API（登录态只读）", "freshness": "fresh" if posts else "partial",
+        "sourceKind": "知识星球 Web API（登录态只读）",
+        **freshness_fields(str(newest)[:10] if newest else None),
+        "collectionState": "partial" if failed_groups else ("available" if posts else "partial"),
         "metrics": {"posts": len(posts), "groups": len(mine), "perGroup": per_group},
         "note": ("已聚合 %d 个星球的最近话题（%s）；只读拉取，不发帖不修改。" % (
             len(mine), " · ".join(f"{name} {count} 条" for name, count in per_group.items()))) +
                 (f" 本轮 {len(failed_groups)} 个星球被限流未拉到（{'、'.join(failed_groups)}），对应计数为 0 不是没更新。" if failed_groups else ""),
     }
     if not posts:
-        account["freshness"] = "partial"
+        account["collectionState"] = "partial"
         account["note"] = "登录态有效但没有拉到话题明细，统计字段保持为空。"
     return account, posts
 
@@ -253,6 +249,34 @@ def parse_date(value: object) -> dt.datetime | None:
             return email.utils.parsedate_to_datetime(text)
         except (TypeError, ValueError):
             return None
+
+
+def freshness_fields(
+    as_of: object,
+    *,
+    fresh_days: int = 1,
+    stale_after_days: int = 7,
+    now: dt.date | None = None,
+) -> dict[str, object]:
+    """按数据日期计算新鲜度，不信任采集端可能过时的固定标签。
+
+    ``asOf`` 表示这批数据实际覆盖到的最后日期。通道连通不代表数据新鲜，
+    页面需要同时呈现“已连接”和“数据过期”这两个事实。
+    """
+    when = parse_date(as_of)
+    if when is None:
+        return {"freshness": "missing", "freshnessAgeDays": None}
+    if when.tzinfo is not None:
+        when = when.astimezone(dt.timezone(dt.timedelta(hours=8)))
+    today = now or dt.datetime.now(dt.timezone(dt.timedelta(hours=8))).date()
+    age = max(0, (today - when.date()).days)
+    if age <= fresh_days:
+        state = "fresh"
+    elif age <= stale_after_days:
+        state = "aging"
+    else:
+        state = "stale"
+    return {"freshness": state, "freshnessAgeDays": age}
 
 
 def file_time(path: Path) -> str | None:
@@ -345,7 +369,7 @@ def wechat_api_snapshot() -> tuple[dict[str, object], list[dict[str, object]], l
     """
     dashboard = "https://mp.weixin.qq.com/"
     account: dict[str, object] = {
-        "platform": "公众号", "account": WECHAT_ACCOUNT, "profileUrl": "", "dashboardUrl": dashboard,
+        "platform": "公众号", "account": "凌一同学", "profileUrl": "", "dashboardUrl": dashboard,
         "asOf": None, "sourceKind": "公众号官方 API", "freshness": "missing", "connectionState": "missing",
         "metrics": {}, "note": "尚未读取到公众号官方统计。",
     }
@@ -476,7 +500,7 @@ def wechat_api_snapshot() -> tuple[dict[str, object], list[dict[str, object]], l
     account.update({
         "asOf": yesterday if core_connected else (latest_post_date or None),
         "sourceKind": "公众号官方 API · " + ("已发布内容与昨日统计" if published_available else "永久图文素材"),
-        "freshness": "fresh" if connected and not permission_errors else "partial",
+        **freshness_fields(yesterday if core_connected else latest_post_date),
         "connectionState": "limited" if limited else ("connected" if connected else "limited"),
         "accountType": account_type,
         "verified": verified,
@@ -618,9 +642,10 @@ def mpdt_snapshot() -> tuple[dict[str, object] | None, list[dict[str, object]], 
     completion = [p["metrics"]["completionRate"] for p in posts if isinstance(p["metrics"].get("completionRate"), (int, float))]
     newest = max((str(p.get("publishedAt") or "") for p in posts), default="")
     account: dict[str, object] = {
-        "platform": "公众号", "account": WECHAT_ACCOUNT, "profileUrl": "", "dashboardUrl": "https://mp.weixin.qq.com/",
+        "platform": "公众号", "account": "凌一同学", "profileUrl": "", "dashboardUrl": "https://mp.weixin.qq.com/",
         "asOf": newest[:10] if newest else None,
-        "sourceKind": "mpdt 登录态抓取（Chrome CDP）", "freshness": "fresh",
+        "sourceKind": "mpdt 登录态抓取（Chrome CDP）",
+        **freshness_fields(newest[:10] if newest else None),
         "metrics": {"samplePosts": len(posts), "avgReads": sum(reads) // len(reads) if reads else None,
                     "detailPosts": len(detail_rows),
                     "avgCompletion": (sum(completion) / len(completion)) if completion else None},
@@ -636,9 +661,9 @@ def xreach_live_snapshot() -> tuple[dict[str, object] | None, list[dict[str, obj
     """Read public X profile/timeline after the user has explicitly authenticated xreach."""
     if not xreach_ready():
         return None, [], []
-    profile = run_json(xreach_command("user", X_HANDLE))
+    profile = run_json(xreach_command("user", "@LingYi_Stu"))
     timeline = run_json(xreach_command(
-        "tweets", X_HANDLE, "-n", "30", "--all", "--max-pages", "5"
+        "tweets", "@LingYi_Stu", "-n", "30", "--all", "--max-pages", "5"
     ), timeout=90)
     if not isinstance(profile, dict) or not isinstance(timeline, dict):
         return None, [], []
@@ -667,7 +692,7 @@ def xreach_live_snapshot() -> tuple[dict[str, object] | None, list[dict[str, obj
             "platform": "X",
             "publishedAt": tweet.get("createdAt"),
             "title": text[:96] + ("…" if len(text) > 96 else ""),
-            "url": f"https://x.com/{X_HANDLE}/status/{ident}",
+            "url": f"https://x.com/LingYi_Stu/status/{ident}",
             "metrics": {
                 "reads": tweet.get("viewCount"),
                 "likes": tweet.get("likeCount"),
@@ -695,9 +720,9 @@ def xreach_live_snapshot() -> tuple[dict[str, object] | None, list[dict[str, obj
                               if isinstance(p["metrics"].get("reads"), (int, float)))
     newest = max((parse_date(p.get("publishedAt")) for p in posts if parse_date(p.get("publishedAt"))), default=None)
     account = {
-        "platform": "X", "account": X_HANDLE, "profileUrl": f"https://x.com/{X_HANDLE}",
-        "dashboardUrl": "https://analytics.x.com/", "asOf": newest.date().isoformat() if newest else dt.date.today().isoformat(),
-        "sourceKind": "公开账号与最近推文", "freshness": "fresh" if posts else "stale",
+        "platform": "X", "account": "@LingYi_Stu", "profileUrl": "https://x.com/LingYi_Stu",
+        "dashboardUrl": "https://analytics.x.com/", "asOf": newest.date().isoformat() if newest else None,
+        "sourceKind": "公开账号与最近推文", **freshness_fields(newest.date().isoformat() if newest else None),
         "metrics": {
             "posts": profile.get("tweetCount"), "following": profile.get("followingCount"),
             "followers": profile.get("followersCount"), "recentPublicViews": recent_public_views,
@@ -811,11 +836,11 @@ def xhs_live_snapshot() -> tuple[dict[str, object] | None, list[dict[str, object
 
     newest = max((xhs_note_time(feed.get("id")) for feed in feeds if isinstance(feed, dict) and xhs_note_time(feed.get("id"))), default=None)
     account = {
-        "platform": "小红书", "account": str(basic.get("nickname") or WECHAT_ACCOUNT),
+        "platform": "小红书", "account": str(basic.get("nickname") or "凌一同学"),
         "profileUrl": f"https://www.xiaohongshu.com/user/profile/{user_id}" if user_id else "https://www.xiaohongshu.com/",
         "dashboardUrl": "https://creator.xiaohongshu.com/",
-        "asOf": newest.date().isoformat() if newest else dt.date.today().isoformat(),
-        "sourceKind": "本人主页与公开笔记列表", "freshness": "fresh",
+        "asOf": newest.date().isoformat() if newest else None,
+        "sourceKind": "本人主页与公开笔记列表", **freshness_fields(newest.date().isoformat() if newest else None),
         "metrics": {
             "posts": len(posts), "following": counts.get("follows"), "followers": counts.get("fans"),
             "interactions": counts.get("interaction"), "samplePosts": len(posts),
@@ -856,12 +881,12 @@ def x_snapshot() -> dict[str, object]:
     counts = re.search(r"(\d+)\s+following\s+(\d+)\s+followers", text)
     return {
         "platform": "X",
-        "account": X_HANDLE,
-        "profileUrl": f"https://x.com/{X_HANDLE}",
+        "account": "@LingYi_Stu",
+        "profileUrl": "https://x.com/LingYi_Stu",
         "dashboardUrl": "https://analytics.x.com/",
         "asOf": "2025-09-16" if text else None,
         "sourceKind": "第三方历史快照",
-        "freshness": "stale" if text else "missing",
+        **freshness_fields("2025-09-16" if text else None),
         "metrics": {
             "posts": int(tweets.group(1)) if tweets else None,
             "following": int(counts.group(1)) if counts else None,
@@ -943,12 +968,12 @@ def zsxq_snapshot() -> tuple[dict[str, object], list[dict[str, object]], list[di
 
     summary = {
         "platform": "知识星球",
-        "account": "示例知识星球主",
+        "account": "凌一 · 成长·写作·赚钱",
         "profileUrl": "https://wx.zsxq.com/",
         "dashboardUrl": "https://wx.zsxq.com/",
         "asOf": history_newest.date().isoformat() if history_newest else None,
         "sourceKind": "历史全量 + 近 41 条明细导出",
-        "freshness": "stale" if posts else "missing",
+        **freshness_fields(history_newest.date().isoformat() if history_newest else None),
         "exportAgeDays": (dt.datetime.now(dt.timezone(dt.timedelta(hours=8))).date()
                           - history_newest.date()).days if history_newest else None,
         "metrics": {
@@ -1099,7 +1124,7 @@ def knowledge_snapshot() -> dict[str, object]:
         candidates.append({
             "title": heading,
             "relativePath": rel.as_posix(),
-            "obsidianUrl": "obsidian://open?vault=" + quote(os.environ.get("WB_OBSIDIAN_VAULT_NAME", "MyVault"))
+            "obsidianUrl": "obsidian://open?vault=" + quote(KNOWLEDGE_VAULT.name)
                            + "&file=" + quote(file_key, safe=""),
             "updatedAt": updated.isoformat(timespec="seconds"),
             "topics": matched[:3],
@@ -1183,14 +1208,14 @@ def build() -> dict[str, object]:
     analysis = [a for a in (x_analysis + xhs_analysis + wechat_analysis + zsxq_analysis) if a.get("postId") in post_ids]
     knowledge = knowledge_snapshot()
     accounts = [
-        x,
         # mpdt 有真实统计时用它替换官方 API 快照（未认证订阅号拿不到 datacube）。
         (mpdt if mpdt and (mpdt.get("metrics") or {}) else wechat),
+        zsxq_merged,
+        x,
         xhs_live or {
             "platform": "小红书", "account": "未配置账号数据", "profileUrl": "", "dashboardUrl": "https://creator.xiaohongshu.com/",
             "asOf": None, "sourceKind": "无指标源", "freshness": "missing", "metrics": {}, "note": "已有草稿管线，但尚未接入笔记表现和当天发布回执。",
         },
-        zsxq_merged,
     ]
     today = dt.date.today().isoformat()
     return {
@@ -1199,10 +1224,10 @@ def build() -> dict[str, object]:
         "dataPolicy": "未知不计为 0；历史快照不冒充实时数据；原创与转发分开分析。",
         "accounts": accounts,
         "todayPlan": [
-            {"id": "x", "platform": "X", "date": today, "defaultStatus": "unknown", "url": f"https://x.com/{X_HANDLE}", "actionUrl": "https://x.com/compose/post"},
             {"id": "wechat", "platform": "公众号", "date": today, "defaultStatus": "unknown", "url": "https://mp.weixin.qq.com/", "actionUrl": "https://mp.weixin.qq.com/"},
-            {"id": "xiaohongshu", "platform": "小红书", "date": today, "defaultStatus": "published" if any(str(p.get("publishedAt") or "")[:10] == today for p in xhs_posts) else "unknown", "url": xhs_live.get("profileUrl") if xhs_live else "https://creator.xiaohongshu.com/", "actionUrl": "https://creator.xiaohongshu.com/"},
             {"id": "zsxq", "platform": "知识星球", "date": today, "defaultStatus": "unknown", "url": "https://wx.zsxq.com/", "actionUrl": "https://wx.zsxq.com/"},
+            {"id": "x", "platform": "X", "date": today, "defaultStatus": "unknown", "url": "https://x.com/LingYi_Stu", "actionUrl": "https://x.com/compose/post"},
+            {"id": "xiaohongshu", "platform": "小红书", "date": today, "defaultStatus": "published" if any(str(p.get("publishedAt") or "")[:10] == today for p in xhs_posts) else "unknown", "url": xhs_live.get("profileUrl") if xhs_live else "https://creator.xiaohongshu.com/", "actionUrl": "https://creator.xiaohongshu.com/"},
         ],
         "posts": posts,
         "analysis": analysis,
@@ -1223,7 +1248,7 @@ def build() -> dict[str, object]:
             {"name": "知识星球 Web API", "kind": "login-state-readonly", "asOf": (zsxq_live or {}).get("asOf"), "modifiedAt": now_iso() if zsxq_live_posts else None, "records": len(zsxq_live_posts), "available": bool(zsxq_live_posts), "note": "zsxq_access_token Cookie 只读拉取；无 token 时用历史导出。"},
             {"name": "知识星球历史全量导出", "kind": "post-export", "asOf": zsxq.get("asOf"), "modifiedAt": file_time(ZSXQ_CSV), "records": int((zsxq.get("metrics") or {}).get("posts") or 0), "available": ZSXQ_CSV.exists()},
             {"name": "知识星球近 41 条明细导出", "kind": "post-export", "asOf": zsxq.get("asOf"), "modifiedAt": file_time(ZSXQ_XLSX), "records": len(zsxq_posts), "available": ZSXQ_XLSX.exists()},
-            {"name": "本地知识库", "kind": "local-knowledge", "asOf": dt.date.today().isoformat(), "modifiedAt": file_time(KNOWLEDGE_VAULT), "records": knowledge["matchedNotes"], "available": KNOWLEDGE_VAULT.is_dir()},
+            {"name": "Obsidian-Tech 本地知识库", "kind": "local-knowledge", "asOf": dt.date.today().isoformat(), "modifiedAt": file_time(KNOWLEDGE_VAULT), "records": knowledge["matchedNotes"], "available": KNOWLEDGE_VAULT.is_dir()},
         ],
     }
 

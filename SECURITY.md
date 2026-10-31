@@ -2,24 +2,23 @@
 
 ## Supported version
 
-Security fixes are applied to the latest `main`.
+This is a private development mirror. Security fixes are applied only to the
+latest `main`.
 
 ## Report a vulnerability privately
 
-Do not open a public issue for a vulnerability or attach credentials, real
-earnings, customer names, or local data snapshots. Use GitHub private
-vulnerability reporting from the repository Security tab. If that option is
-unavailable, contact the repository owner through a private GitHub channel.
+Do not open a public issue for a vulnerability or include credentials, real
+earnings, customer records, or local snapshots. Report privately to the
+repository owner through GitHub.
 
 ## In scope
 
-- exposure of Notion or other platform credentials;
+- leakage of real local data or platform credentials into Git;
 - a path that breaks the read-only boundary around external systems;
 - a bypass of the local synchronization token;
-- a bug that causes real data to be replaced by guest data, or the reverse;
-- an unreviewed write-back from the local workbench to Notion.
+- accidental publication of private development data.
 
 ## Safe reports
 
-Use fixture data or a fresh guest-mode profile. Redact real records and local
-absolute paths before sharing logs or screenshots.
+Use fixture data and redact all personal and financial fields. This repository
+must never contain production credentials or real data snapshots.

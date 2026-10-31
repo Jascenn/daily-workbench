@@ -1,4 +1,4 @@
-# Local runtime data and snapshots（含个人真实数据，绝不入库）
+# Local runtime data and snapshots
 *.json
 !package.json
 !package-lock.json
@@ -14,12 +14,15 @@ workbench-demo.html
 
 # Caches and runtime directories
 .tmp-runtime/
+.workbuddy/
+logs/
 __pycache__/
 *.py[cod]
-logs/
 
 # OS files
 .DS_Store
+
+mpdt-export.json
 
 # Auto-generated weekly reports (contain personal earnings data)
 reports/

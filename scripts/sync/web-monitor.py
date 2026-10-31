@@ -13,6 +13,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -22,7 +23,7 @@ from xml.etree import ElementTree as ET
 def _gsc_section() -> dict | None:
     """Google Search Console 每日快照（服务账号，只读）。
 
-    数据由 scripts/gsc.py 拉取并缓存（最多 20 小时刷新一次）；密钥配好之前
+    数据由 scripts/tools/gsc.py 拉取并缓存（最多 20 小时刷新一次）；密钥配好之前
     返回 notConfigured 提示，页面据此显示接入指引。永不抛异常。"""
     try:
         from gsc import gsc_snapshot
@@ -46,7 +47,7 @@ def _words_section() -> dict | None:
 def _ai_usage_section() -> dict | None:
     """AI 用量快照：本机 Codex 日志统计 + Jev 模型连通性探测。
 
-    数据由 scripts/ai-usage.py 拉取并缓存（Jev 6h / Codex 扫描 12h 一次）。
+    数据由 scripts/tools/ai_usage.py 拉取并缓存（Jev 6h / Codex 扫描 12h 一次）。
     永不抛异常。"""
     try:
         from ai_usage import snapshot
@@ -56,8 +57,13 @@ def _ai_usage_section() -> dict | None:
 
 
 ROOT = Path(__file__).resolve().parent.parent.parent
+TOOLS_DIR = ROOT / "scripts" / "tools"
+# launchd 直接执行 scripts/sync/web-monitor.py 时，sys.path 只有脚本目录；
+# GSC 与 AI 用量模块在 scripts/tools，显式加入后才能按模块名导入。
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
 OUT = ROOT / "web-presence.json"
-BLOG_REPO = Path(os.environ.get("WB_BLOG_REPO", "~/blog").expanduser())
+BLOG_REPO = Path("/Users/jascen/.zcode/workspace/default/lingyi-blog")
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X) WorkbenchMonitor/1.0"
 SITES = [
     ("tools", "工具网站", "https://lingyi.tools/"),
@@ -257,6 +263,14 @@ def build() -> dict[str, object]:
         sites.append(check)
 
     rss_check, rss_body = curl_get(RSS_URL, timeout=25)
+    # 本机直连 Cloudflare 的 SSL 握手会间歇超时，而 Surge 出口通常稳定。
+    # RSS 直连失败时立即用代理重抓一次，避免明明能取到最新内容却退回旧快照。
+    if rss_check["state"] == "down" and not rss_check.get("status"):
+        proxy_rss, proxy_body = curl_get(
+            RSS_URL, timeout=20, proxy="http://127.0.0.1:7890")
+        if proxy_rss["state"] in {"ok", "slow"} and proxy_body:
+            rss_check = proxy_rss
+            rss_body = proxy_body
     latest, item_count = parse_rss(rss_body)
     previous_blog = old.get("blog") if isinstance(old.get("blog"), dict) else {}
     previous_latest = previous_blog.get("latest") if isinstance(previous_blog.get("latest"), dict) else None
@@ -289,7 +303,10 @@ def build() -> dict[str, object]:
             alerts.append({"tone": "warn", "title": f"{site['name']}：需要检查", "detail": f"{status} · {site.get('error') or '响应偏慢'}"})
     if blog["newSinceLastCheck"] and latest:
         alerts.insert(0, {"tone": "ok", "title": "博客检测到新文章", "detail": str(latest.get("title") or "")})
-    if blog["state"] != "ok":
+    # RSS 成功解析但单次响应超过 5s 时，只标记为「偏慢」，不能把它写成
+    # 「更新检测不稳定」：已有文章列表说明检测本身是成功的，否则会制造
+    # 与真实快照矛盾的常驻告警。
+    if blog["state"] != "ok" and (not latest or blog.get("error")):
         alerts.append({"tone": "warn", "title": "博客更新检测不稳定", "detail": str(blog.get("error") or "RSS 暂时不可用")})
 
     search = _gsc_section()

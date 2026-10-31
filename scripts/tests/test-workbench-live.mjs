@@ -3,11 +3,8 @@
 //   B. 真机点一次「同步一次」按钮的完整链路（runSync → POST /api/sync → sync-now.sh → Notion）
 import fs from 'fs';
 
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const HTML = join(ROOT, 'workbench.html');
-const DATA_PATH = join(ROOT, 'data.json');
+const HTML = '/Users/jascen/Development/daily-workbench/workbench.html';
+const DATA_PATH = '/Users/jascen/Development/daily-workbench/data.json';
 const BASE = 'http://127.0.0.1:8787';
 const TOKEN = fs.readFileSync(process.env.HOME + '/.config/daily-workbench/sync-token', 'utf8').trim();
 
@@ -114,7 +111,7 @@ t('按钮初始可用', el('syncBtn').disabled === false && el('syncBtn').textCo
 /* 先等同步锁空闲，再发起同步。
    为什么必须等：/api/sync 用的是**非阻塞**锁（同一时刻只允许一次同步）。
    那个锁是**服务端**持有的 —— 上一次测试进程若被中途杀掉（或有人在浏览器里
-   正点着「同步一次」），服务端的同步子进程仍在跑、锁仍被占着，最长 SYNC_TIMEOUT(180s)。
+   正点着「同步一次」），服务端的同步子进程仍在跑、锁仍被占着，最长 SYNC_TIMEOUT(300s)。
    这时页面立刻拿到 409「已有一次同步正在进行」，而下面 4 条断言会把它读成
    "同步失败 / 耗时 0.0s / lastNotionSync 没刷新" —— 全是误报，
    却长得像产品缺陷。（2026-09-30 实测踩到：一个被 SIGTERM 掉的测试留下的同步
@@ -192,13 +189,13 @@ t('按钮已恢复可用且文案复位', el('syncBtn').disabled === false && el
    2026-09-30 实测同一条链路，顺利时 9.6s（含新加的 sections 重建约 0.3s），
    重试时 68.6s。把上限卡在 60s 会把"网络慢"报成"代码有问题"，
    而人学会忽略它之后，真正卡死（180s 超时）也看不见了。
-   所以上限贴 SYNC_TIMEOUT（180s）留一点余量：它要拦的是"挂住不返回"。 */
+   所以上限贴 SYNC_TIMEOUT（300s）：它要拦的是"挂住不返回"，而不是正常的外网慢。 */
 /* 只有同步真的跑通时才评它 —— 不写 `: true` 那种"真空通过"。
    （本项目抓过的第 5 类假绿就是这种：条件不成立就静默放行，看起来绿其实没测。
    这里改成"整条不发出"，并在上面用一条显式失败说明"这 3 条未执行"，不静默。） */
 if (syncOk) {
-  t(`耗时没有挂死（<150s；实测顺利约 9.6s，网络重试可到 68s+）`,
-    +secs >= 2 && +secs <= 150, secs + 's');
+  t(`耗时没有挂死（≤${300}s；与 SYNC_TIMEOUT 对齐，正常同步实测可到 160s+）`,
+    +secs >= 2 && +secs <= 300, secs + 's');
 }
 
 const after = JSON.parse(fs.readFileSync(DATA_PATH, 'utf8'));
@@ -238,7 +235,7 @@ console.log('\nD. 静态兜底白名单：令牌之外的文件不许被读到')
    也就是"锁了正门、侧门开着"。修法是 STATIC_ALLOW 白名单（只放 workbench.html）。
    下面每条都先确认**磁盘上真有这个文件** —— 否则 404 可能只是"文件不存在"，
    那是一条永远绿的假断言（本套件第 5 类假绿）。 */
-const DIR = ROOT;
+const DIR = '/Users/jascen/Development/daily-workbench';
 const probe = async (path, withToken) => {
   const r = await fetch(BASE + path + (withToken ? '?token=' + encodeURIComponent(TOKEN) : ''));
   return { code: r.status, len: (await r.arrayBuffer()).byteLength };
