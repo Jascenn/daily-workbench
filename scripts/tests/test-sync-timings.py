@@ -66,8 +66,23 @@ finally:
     app._rss_read = original_rss
     app.WEB_PRESENCE = original_web_presence
 
-check("解析出的耗时会合并到原有六步", len(steps) == 6 and all("elapsed" in s for s in steps),
-      json.dumps(steps, ensure_ascii=False))
+# 步骤数量与顺序不能在这里写死：脚本一加步骤，写死的断言就变成"过期绿灯"。
+# 直接从 sync-now.sh 反解步骤名（emit_step / run_optional 两类），再与页面拿到的一一对照。
+import re as _re
+_script = open(os.path.join(ROOT, "scripts", "sync-now.sh"), encoding="utf-8").read()
+_expected = []
+for _m in _re.finditer(r'(?:emit_step|run_optional)\s+"([^"]+)"', _script):
+    _name = _m.group(1)
+    # run_optional 函数体内也有 emit_step "$name"，那是变量不是真实步骤名
+    if not _name.startswith("$") and _name not in _expected:
+        _expected.append(_name)
+check("步骤名与顺序和 sync-now.sh 完全一致",
+      [s["name"] for s in steps] == _expected,
+      "页面=" + ",".join(s["name"] for s in steps) + " | 脚本=" + ",".join(_expected))
+check("有计时的步骤都合并了 elapsed，未计时的步骤不伪造耗时",
+      all("elapsed" in s for s in steps if s["name"] in timings)
+      and all("elapsed" not in s for s in steps if s["name"] not in timings),
+      json.dumps({s["name"]: s.get("elapsed") for s in steps}, ensure_ascii=False))
 check("合并不改变步骤成功状态与结果文案",
       all(s["ok"] for s in steps) and "收益 1 条 / 项目 1 条" in steps[1]["detail"],
       json.dumps(steps, ensure_ascii=False))
@@ -78,6 +93,29 @@ check("失败时只列到挂掉的那一步，且仍带耗时",
       len(failed_steps) == 2 and failed_steps[-1]["ok"] is False
       and failed_steps[-1]["elapsed"] == 92.7,
       json.dumps(failed_steps, ensure_ascii=False))
+
+# 可选步骤（自媒体/微信/网站）不再中断链路，失败只能靠显式标记上报。
+# 如果标记被忽略，同步日志会把失败渲染成 ✔ —— 那等于骗自己。
+optional_fail = "\n".join([
+    "__WB_STEP__\t前置检查\t0.4",
+    "__WB_STEP__\t自媒体快照\t1.0",
+    "__WB_STEP_FAIL__\t自媒体快照",
+    "__WB_STEP__\t微信快照\t2.0",
+    "__WB_STEP_FAIL__\t微信快照",
+    "__WB_STEP__\t网站监控\t0.5",
+])
+opt_steps = app._build_sync_steps(0, optional_fail, {"earnings": [], "projects": []})
+by_name = {s["name"]: s for s in opt_steps}
+check("可选步骤失败会被标成 ✗，不会被渲染成 ✔",
+      by_name["自媒体快照"]["ok"] is False and by_name["微信快照"]["ok"] is False,
+      json.dumps(opt_steps, ensure_ascii=False))
+check("失败的可选步骤保留上一份快照的说法",
+      by_name["自媒体快照"]["detail"] == "失败，保留上一份快照",
+      by_name["自媒体快照"]["detail"])
+check("没有标记的可选步骤仍是成功", by_name["网站监控"]["ok"] is True,
+      by_name["网站监控"]["detail"])
+check("给用户看的输出里不出现失败标记行",
+      "__WB_STEP_FAIL__" not in app._strip_sync_step_timings(optional_fail))
 
 print("\n结果：%d 通过 / %d 失败" % (passed, failed))
 raise SystemExit(1 if failed else 0)

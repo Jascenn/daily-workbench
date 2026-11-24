@@ -1,10 +1,10 @@
 #!/bin/bash
-# 一键同步：Notion（经 ntn 直连）→ data.json → 离线兜底页
+# 一键全量同步：Notion、类型区、自媒体、微信、网站 → 离线兜底页
 #
 # 用法：bash scripts/sync-now.sh
 set -uo pipefail
 
-DIR="/Users/jascen/Development/daily-workbench"
+DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PY="/opt/homebrew/bin/python3"
 cd "$DIR" || exit 1
 
@@ -41,51 +41,106 @@ fi
 emit_step "前置检查" "$STEP_STARTED"
 echo "✓ 前置检查通过（ntn 存在，Notion 通路 401）"
 
-# 1. 只读拉取并写入 data.json（经本地同步服务，自动轮转备份 + 骤降保护）
-STEP_STARTED=$(clock_now)
-if ! "$PY" scripts/sync/notion-sync.py; then
-    echo "✗ 同步失败，data.json 未被修改。"
+# 1-3. 按资源互斥分组并行：
+#   * 组 1（Notion 主链）：Notion 拉取 → 资讯快照（写作区依赖最新 data.json，因此组内串行）
+#   * 组 2（本机浏览器/MCP 互斥组）：自媒体快照 → 微信快照（实测争用本机资源，组内严格串行）
+#   * 组 3 / 组 4（纯轻量网络 I/O）：网站监控、选题雷达各自独立并行
+# 各组输出先写进独立临时日志，汇合后再按固定顺序回放到 stdout，既避免日志穿插，
+# 又保持 __WB_STEP__ / __WB_STEP_FAIL__ 顺序与 app.py 同步日志展示完全一致。
+RUN_TMP=$(mktemp -d "${TMPDIR:-/tmp}/wb-sync.XXXXXX")
+trap 'rm -rf "$RUN_TMP"' EXIT
+
+OPTIONAL_FAILED=0
+run_optional() {
+    local name="$1" script="$2"
+    local started rc
+    started=$(clock_now)
+    echo "[$name] 开始"
+    rc=0
+    "$PY" "$script" || rc=$?
+    emit_step "$name" "$started"
+    if [ "$rc" -ne 0 ]; then
+        # 失败必须让 app.py 看见：可选步骤不再用退出码中断整条链路，
+        # 若不显式标记，同步日志会把"失败"渲染成 ✔（2026-11-21 修）。
+        printf '__WB_STEP_FAIL__\t%s\n' "$name"
+        echo "⚠ $name 失败（exit $rc），保留上一份快照"
+        touch "$RUN_TMP/opt_failed"
+    else
+        echo "✓ $name 完成"
+    fi
+}
+
+# 组 1：Notion 只读拉取 → 重建派生快照（sections.json 必须在 make-local 之前）
+(
+    STEP_STARTED=$(clock_now)
+    if ! "$PY" scripts/sync/notion-sync.py; then
+        echo "✗ 同步失败，data.json 未被修改。"
+        emit_step "Notion 拉取" "$STEP_STARTED"
+        echo 4 > "$RUN_TMP/core_rc"
+        exit 0
+    fi
     emit_step "Notion 拉取" "$STEP_STARTED"
-    exit 4
-fi
-emit_step "Notion 拉取" "$STEP_STARTED"
 
-# 2. 重建派生快照（资讯 / 写作 / 复盘）。
-#    ⚠️ 顺序：必须在 make-local.py **之前** —— 离线页会把 sections.json 整份内嵌，
-#    先建页后建快照就会把上一版嵌进去（页面上看不出任何异常，只是数据旧了）。
-#    为什么同步后要重建：写作区的「客户内容」读的是 data.json 里 category=客户服务 的项目，
-#    刚同步完那份才是新的；不重建就会停在上一次的状态。
-#    （2026-09-30 补：原来这里只有 make-local，sections.json 得靠人记得手跑。）
-STEP_STARTED=$(clock_now)
-if ! "$PY" scripts/sync/sections.py --write; then
+    STEP_STARTED=$(clock_now)
+    if ! "$PY" scripts/sync/sections.py --write; then
+        emit_step "资讯快照" "$STEP_STARTED"
+        echo 6 > "$RUN_TMP/core_rc"
+        exit 0
+    fi
+    # 只作信息展示，不判死：跨零点那一瞬可能刚好翻一天，不该让整条同步失败。
+    "$PY" scripts/sync/sections.py --check || true
     emit_step "资讯快照" "$STEP_STARTED"
-    exit 6
-fi
-# 只作信息展示，不判死：紧接 --write 之后，跨零点那一瞬可能刚好翻一天
-# （days_since 按日历日算，跨零点全体 +1）—— 那种红不是缺陷，不该让整条同步失败。
-"$PY" scripts/sync/sections.py --check || true
-emit_step "资讯快照" "$STEP_STARTED"
+    echo 0 > "$RUN_TMP/core_rc"
+) > "$RUN_TMP/1_core.log" 2>&1 &
+PID_CORE=$!
 
-# 3. 刷新自媒体只读快照。X 授权可用时读取公开账号与最近推文，失败时才回落历史报告；
-#    知识星球继续读逐条导出。尚未接数据通道的公众号 / 小红书保持“未核验”，绝不写成 0。
-STEP_STARTED=$(clock_now)
-if ! "$PY" scripts/sync/social-sync.py; then
-    emit_step "自媒体快照" "$STEP_STARTED"
-    exit 7
+# 组 2：自媒体快照 → 微信快照（组内串行防争用，但与 Notion/网站/雷达并发）
+(
+    run_optional "自媒体快照" "scripts/sync/social-sync.py"
+    run_optional "微信快照" "scripts/sync/wechat-sync.py"
+) > "$RUN_TMP/2_local.log" 2>&1 &
+PID_LOCAL=$!
+
+# 组 3：网站监控
+(
+    run_optional "网站监控" "scripts/sync/web-monitor.py"
+) > "$RUN_TMP/3_web.log" 2>&1 &
+PID_WEB=$!
+
+# 组 4：选题雷达
+(
+    run_optional "选题雷达" "scripts/sync/radar-sync.py"
+) > "$RUN_TMP/4_radar.log" 2>&1 &
+PID_RADAR=$!
+
+wait "$PID_CORE" "$PID_LOCAL" "$PID_WEB" "$PID_RADAR" || true
+
+CORE_RC=$(cat "$RUN_TMP/core_rc" 2>/dev/null || echo 4)
+cat "$RUN_TMP/1_core.log"
+if [ "$CORE_RC" -ne 0 ]; then
+    exit "$CORE_RC"
 fi
-emit_step "自媒体快照" "$STEP_STARTED"
+cat "$RUN_TMP/2_local.log" "$RUN_TMP/3_web.log" "$RUN_TMP/4_radar.log"
+[ -f "$RUN_TMP/opt_failed" ] && OPTIONAL_FAILED=1
 
 # 4. 重建离线兜底页，让 file:// 打开也是新数据
-STEP_STARTED=$(clock_now)
-"$PY" scripts/sync/web-monitor.py || echo "⚠ 网站监控刷新失败，保留上一份快照"
-emit_step "网站监控" "$STEP_STARTED"
 STEP_STARTED=$(clock_now)
 if ! "$PY" scripts/sync/make-local.py; then
     emit_step "离线兜底页" "$STEP_STARTED"
     exit 5
 fi
-"$PY" scripts/sync/make-local.py --check >/dev/null 2>&1
+CHECK_OUTPUT=""
+if ! CHECK_OUTPUT=$("$PY" scripts/sync/make-local.py --check 2>&1); then
+    echo "✗ 离线兜底页自检失败：$CHECK_OUTPUT"
+    emit_step "离线兜底页" "$STEP_STARTED"
+    exit 5
+fi
 emit_step "离线兜底页" "$STEP_STARTED"
-echo "✓ 离线兜底页已更新（含类型区与自媒体快照）"
+if [ "$OPTIONAL_FAILED" -ne 0 ]; then
+    echo "⚠ 离线兜底页已更新，但有可选快照失败（旧数据已保留）"
+else
+    echo "✓ 离线兜底页已更新（含类型区与自媒体快照）"
+fi
 
 echo "===== 同步完成 ====="
+exit 0

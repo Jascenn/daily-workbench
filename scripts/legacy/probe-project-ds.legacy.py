@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """从「项目管理」(真实项目库) 只读拉取全部项目，字段映射到 data.json 的 projects 结构。
 
-数据源：collection://264b66ad-8b35-806b-bb64-000bb903657c（"项目管理"）
-注意：不是自动化里写的 24db66ad-8b35-8090-937b-000b5a5ec527 ——
+数据源：collection://00000000-0000-4000-8000-000000000002（"项目管理"）
+注意：不是自动化里写的 00000000-0000-4000-8000-000000000005 ——
 那个库只有「项目一/项目二」两条 Notion 模板示例数据，字段也对不上。
 本脚本是早期探针，经 ntn CLI + Surge 代理读取 Notion 公共 API。
 """
@@ -14,7 +14,7 @@ import sys
 NTN = "/usr/local/bin/ntn"
 ENV = dict(os.environ, HTTPS_PROXY="http://127.0.0.1:7890",
            HTTP_PROXY="http://127.0.0.1:7890")
-DS = "264b66ad-8b35-806b-bb64-000bb903657c"
+DS = "00000000-0000-4000-8000-000000000002"
 
 
 def api(path, body):

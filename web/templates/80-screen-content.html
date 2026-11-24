@@ -1,0 +1,139 @@
+  <!-- ── 类型：自媒体运营（真实快照 + 本地今日计划） ─────────────────── -->
+  <div class="screen" id="screenContent" hidden>
+    <div class="subnav" role="toolbar" aria-label="自媒体运营子页面">
+      <button class="segbtn on" type="button" onclick="setType('content')">账号概览</button>
+      <button class="segbtn" type="button" onclick="setType('zsxq')">知识星球</button>
+    </div>
+    <div id="socialFresh"></div>
+    <section class="media-focus" id="mediaFocus" aria-labelledby="mediaFocusTitle">
+      <div>
+        <span class="media-eyebrow">TODAY · 内容节奏</span>
+        <h2 id="mediaFocusTitle">今天先确认发布计划</h2>
+        <p id="mediaFocusNote">先决定今天在哪些平台出现，再去写内容。Agent 负责提醒和分析，最终发送仍由你确认。</p>
+      </div>
+      <div class="media-focus-side">
+        <div class="media-score" id="contentStats"></div>
+        <button class="media-focus-action" id="mediaFocusAction" type="button"
+          onclick="focusMediaVerification()">开始核验</button>
+      </div>
+    </section>
+    <section class="card media-account-card" aria-labelledby="mediaAccountTitle">
+      <details class="media-overview-fold" open>
+        <summary>
+          <div class="media-section-head" style="margin-bottom:0">
+            <div class="media-section-title"><span class="media-section-index">01</span><h2 id="mediaAccountTitle">账号数据概述</h2></div>
+            <span class="media-overview-brief" id="mediaOverviewBrief">4 个平台</span>
+            <span class="media-section-meta" id="mediaAccountsTag">真实快照 · 未接入不写 0</span>
+          </div>
+        </summary>
+        <div id="mediaPulse" class="media-pulse" aria-label="核心运营状态"></div>
+        <div class="media-account-grid" id="mediaAccounts"></div>
+        <details class="media-trend-fold">
+          <summary><span>近 7 天发布趋势</span><span class="media-trend-brief" id="mediaTrendBrief">按需查看</span></summary>
+          <div class="media-trend" id="mediaTrend" aria-label="近 7 天内容发布趋势"></div>
+        </details>
+      </details>
+    </section>
+    <section class="card zsxq-card" aria-labelledby="zsxqTitle">
+      <div class="media-section-head">
+        <div class="media-section-title"><h2 id="zsxqTitle">知识星球数据大盘</h2></div>
+        <span class="media-section-meta" id="zsxqTag">—</span>
+        <select class="zsxq-scope-sel" id="zsxqMemberSel" aria-label="大盘统计星球" onchange="setZsxqMemberGroup(this.value)"></select>
+      </div>
+      <div class="zsxq-grid" id="zsxqStats"></div>
+      <div class="zsxq-foot" id="zsxqNote">—</div>
+      <div class="zsxq-top" id="zsxqTop"></div>
+    </section>
+    <section class="card media-web-card" aria-labelledby="mediaWebTitle">
+      <details class="media-overview-fold">
+        <summary>
+          <div class="media-section-head" style="margin-bottom:0">
+            <div class="media-section-title"><span class="media-section-index">02</span><h2 id="mediaWebTitle">网站与博客</h2></div>
+            <span class="media-overview-brief" id="mediaWebBrief">检查中</span>
+            <span class="media-section-meta" id="mediaWebTag">每 5 分钟检测</span>
+          </div>
+        </summary>
+        <div class="media-web-grid" id="mediaWeb"></div>
+      </details>
+    </section>
+    <div class="media-layout" id="mediaPlanLayout">
+      <section class="card media-today-card" id="mediaTodayCard" tabindex="-1">
+        <div class="media-section-head">
+          <div class="media-section-title"><span class="media-section-index">03</span><h2>发布核验</h2></div>
+          <span class="media-today-brief" id="mediaTodayBrief">4 个平台待核验</span>
+          <span class="media-section-meta">今天 · 只存本机</span>
+        </div>
+        <div class="media-matrix" id="mediaMatrix"></div>
+        <div class="media-note">没有平台回执时保持“未核验”，不会把未知误写成“没发”。</div>
+      </section>
+      <aside class="card media-brief-card">
+        <details class="media-brief-fold">
+          <summary>
+            <div class="media-section-head" style="margin-bottom:0">
+              <div class="media-section-title"><span class="media-section-index">04</span><h2>Agent 简报</h2></div>
+              <span class="media-section-meta">只提醒，不代发</span>
+              <span class="media-brief-caret">▾</span>
+            </div>
+          </summary>
+          <div class="agent-list" id="mediaAgent"></div>
+        </details>
+      </aside>
+    </div>
+    <section class="card" aria-labelledby="mediaPerfTitle">
+      <details class="perf-fold" id="perfFold">
+        <summary>
+          <div class="media-section-head" style="margin-bottom:0">
+            <div class="media-section-title"><span class="media-section-index">05</span><h2 id="mediaPerfTitle">内容表现</h2></div>
+            <span class="media-section-meta" id="mediaPerfBrief">互动分 = 阅读 + 赞×3 + 评×5 · 仅真实数据参与</span>
+          </div>
+        </summary>
+        <div class="media-perf-grid" id="mediaPerf" style="margin-top:12px"></div>
+      </details>
+    </section>
+    <div class="media-evidence-layout">
+      <section class="card media-insight-card">
+        <details class="media-insight-fold">
+          <summary>
+            <div class="media-section-head" style="margin-bottom:0">
+              <div class="media-section-title"><span class="media-section-index">06</span><h2>内容信号</h2></div>
+              <span class="media-section-meta" id="mediaPostsTag">真实导出 · 成熟样本优先</span>
+              <span class="media-brief-caret">▾</span>
+            </div>
+          </summary>
+          <div id="mediaWeeklyRecap"></div>
+          <div class="nlist" id="mediaPosts"></div>
+        </details>
+      </section>
+      <aside class="card media-knowledge-card">
+        <details class="media-knowledge-fold">
+          <summary>
+            <div class="media-section-head" style="margin-bottom:0">
+              <div class="media-section-title"><span class="media-section-index">07</span><h2>知识库联动</h2></div>
+              <span class="media-section-meta" id="mediaKnowledgeTag">Obsidian · 只读</span>
+              <span class="media-brief-caret">▾</span>
+            </div>
+          </summary>
+          <div class="knowledge-list" id="mediaKnowledge"></div>
+        </details>
+      </aside>
+    </div>
+    <!-- 发布预测从复盘页移入：预测发生在发布前，卡片跟着内容运营走 -->
+    <div class="card" id="predCard">
+      <details class="review-tool-fold">
+        <summary><h2>发布预测 <span class="tag" id="predTag">—</span></h2>
+          <span class="review-fold-brief">预测与实际对比</span></summary>
+        <div class="no-note">发布前记下预期档位，发布后回填真实数据；偏差方向连续 3 次一致才提醒你调整预期标准。</div>
+        <div id="predList"></div>
+        <div class="media-actions" style="margin-top:10px"><button class="btn" onclick="predOpenForm()">+ 新预测</button></div>
+      </details>
+    </div>
+    <div id="mediaEnhancements"></div>
+    <details class="media-connect">
+      <summary>发布连接和数据来源 <span>按需展开</span></summary>
+      <div class="media-adapter-list" id="mediaAutomation"></div>
+    </details>
+  </div>
+
+  </main>
+</div>
+

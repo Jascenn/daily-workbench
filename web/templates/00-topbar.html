@@ -1,0 +1,75 @@
+<a class="skip" href="#main">跳到主内容</a>
+<div class="wrap">
+  <div class="guestlamp" id="guestLamp" hidden aria-live="polite">
+    <span class="gl-dot" aria-hidden="true"></span>
+    <span class="gl-txt"><b>访客模式</b> · 当前看到的全是示例数据，不含真实收益与自媒体账号</span>
+    <button class="gl-exit" onclick="toggleGuest()">退出访客</button>
+  </div>
+  <header>
+    <div>
+      <h1 class="brand" title="Daily Workbench v<!-- @VERSION -->"><span class="brand-word">LingYi</span><span class="brand-sep" aria-hidden="true"></span><span>每日工作台</span></h1>
+      <div class="who" id="who">—</div>
+      <div class="todayline" id="todayLine">—</div>
+    </div>
+    <div class="spacer"></div>
+    <nav class="actions" id="actions" aria-label="页面操作">
+      <button class="btn primary" onclick="openEarn()">+ 记一笔</button>
+      <button class="btn" onclick="runSync()"><span class="sync-dot lead" id="syncDotTop" title="同步状态"></span>同步数据</button>
+      <details class="actionmenu">
+        <summary class="btn ghost">更多 ▾</summary>
+        <div class="morepanel">
+          <button class="btn ghost wide2" onclick="toggleFocusMode()" id="focusBtn">进入专注模式</button>
+          <button class="btn ghost wide2" onclick="toggleMetrics()" id="metricsMenuBtn">展开全部指标</button>
+          <button class="btn ghost wide2" onclick="toggleJev()" id="jevBtn"><span class="sync-dot" id="jevDot"></span>Jev 增强 · 关</button>
+          <button class="btn" onclick="openProj()">+ 本地项目</button>
+          <button class="btn" onclick="toggleGuest()" id="guestBtn">访客模式</button>
+        <button class="btn ghost" onclick="toggleTheme()" id="themeBtn">深色</button>
+        <button class="btn ghost" onclick="exportCSV()">导出 CSV</button>
+        <button class="btn ghost" onclick="openSources()">数据来源</button>
+        <button class="btn ghost" onclick="exportJSON()">导出 JSON</button>
+        <button class="btn ghost" onclick="document.getElementById('imp').click()">导入 JSON</button>
+        <button class="btn ghost wide2" onclick="toggleSyncLog()" id="syncLogBtn">同步日志 · <span id="syncLogHint">查看</span></button>
+        <div class="synclog-wrap" id="syncLogWrap" hidden><div id="syncLogList">还没有同步记录</div></div>
+        <div class="morepanel-note" id="notionNote"></div>
+        <div class="morepanel-note" id="appVersionNote">Daily Workbench v<!-- @VERSION --></div>
+      </div>
+      </details>
+      <input id="imp" type="file" accept="application/json" aria-label="导入 JSON 备份" style="display:none" onchange="importJSON(event)">
+      <input id="reloadFile" type="file" accept="application/json" aria-label="从本地 JSON 文件刷新" style="display:none" onchange="reloadFromFile(event)">
+    </nav>
+  </header>
+
+  <!-- 屏读器状态通道：这三处的内容变化要能被播报，而不是只"画"在屏幕上 -->
+  <div class="banner" id="banner" role="status" aria-live="polite"></div>
+  <div class="sync-alert" id="syncAlert" role="status" aria-live="polite" hidden>
+    <span class="sync-alert-icon" aria-hidden="true">!</span>
+    <span class="sync-alert-copy">
+      <b class="sync-alert-title">最近一次同步失败</b>
+      <span class="sync-alert-meta" id="syncAlertMeta"></span>
+    </span>
+    <button class="btn ghost" type="button" onclick="runSync()">重新同步</button>
+  </div>
+  <div class="notify" id="notify" role="status" aria-live="polite"></div>
+  <div class="undo" id="undo" role="status" aria-live="polite"></div>
+
+  <main id="main" tabindex="-1">
+
+  <!-- 功能类型切换。放在 <main> 里面，键盘用户跳到主内容后先遇到页面切换。
+       使用 toolbar + aria-pressed，而不是 tab：这组按钮始终只有一个页面可见，
+       同时配套方向键与 roving tabindex，避免只声明语义却不实现键盘契约。 -->
+  <nav class="typebar" id="typeBar" aria-label="功能类型">
+    <span class="seg" id="typeSeg" role="toolbar" aria-label="工作台页面切换，可左右滑动查看更多页面" aria-orientation="horizontal" onkeydown="typeKeydown(event)">
+      <button class="segbtn on" id="tyLedger"  type="button" tabindex="0"  aria-pressed="true"  aria-controls="screenLedger"  onclick="setType('ledger')">总览</button>
+      <button class="segbtn"    id="tyProject" type="button" tabindex="-1" aria-pressed="false" aria-controls="screenProject" onclick="setType('project')">项目<span class="realTag">Notion</span></button>
+      <button class="segbtn"    id="tyClient"  type="button" tabindex="-1" aria-pressed="false" aria-controls="screenClient"  onclick="setType('client')">客户<span class="realTag">Notion</span></button>
+      <button class="segbtn"    id="tyWechat"  type="button" tabindex="-1" aria-pressed="false" aria-controls="screenWechat"  onclick="setType('wechat')">微信<span class="realTag">MCP</span><span id="tyWechatN"></span></button>
+      <button class="segbtn"    id="tyTime"    type="button" tabindex="-1" aria-pressed="false" aria-controls="screenTime"    onclick="setType('time')">时间<span class="localTag">本地</span></button>
+      <button class="segbtn"    id="tyNews"    type="button" tabindex="-1" aria-pressed="false" aria-controls="screenNews"    onclick="setType('news')">资讯<span id="tyNewsN"></span></button>
+      <button class="segbtn"    id="tyWriting" type="button" tabindex="-1" aria-pressed="false" aria-controls="screenWriting" onclick="setType('writing')">写作</button>
+      <button class="segbtn"    id="tyContent" type="button" tabindex="-1" aria-pressed="false" aria-controls="screenContent" onclick="setType('content')">自媒体运营</button>
+      <button class="segbtn"    id="tyReview"  type="button" tabindex="-1" aria-pressed="false" aria-controls="screenReview"  onclick="setType('review')">复盘</button>
+    </span>
+    <span class="typehint" id="typeHint">—</span>
+    <button class="metric-toggle" id="metricBtn" onclick="toggleMetrics()" aria-expanded="false">展开指标</button>
+  </nav>
+

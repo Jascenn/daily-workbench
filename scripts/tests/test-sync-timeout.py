@@ -80,5 +80,19 @@ with tempfile.TemporaryDirectory() as tmp:
           "同步超时" in saved[-1]["error"] and saved[-1]["elapsed"] >= 1)
     check("超时记录保留触发来源", saved[-1]["trigger"] == "manual")
 
+print("\n被测：同步失败日志提取真正错误")
+raw_output = "\n".join([
+    "===== 2026-11-01 21:37:08 开始同步 =====",
+    "✓ 前置检查通过（ntn 存在，Notion 通路 401）",
+    "Traceback (most recent call last):",
+    "RuntimeError: ntn 无输出。stderr=HTTP 502",
+    "✗ 同步失败，data.json 未被修改。",
+])
+reason = app._sync_error_line(raw_output, 4)
+check("错误摘要跳过固定 banner", not reason.startswith("====="), reason)
+check("错误摘要优先保留真实异常", "RuntimeError: ntn 无输出" in reason, reason)
+fallback = app._sync_error_line("===== 开始同步 =====\n", 4)
+check("没有具体异常时保留退出码", "code 4" in fallback, fallback)
+
 print("\n结果：%d 通过 / %d 失败" % (passed, failed))
 raise SystemExit(1 if failed else 0)

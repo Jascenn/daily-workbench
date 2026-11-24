@@ -5,6 +5,7 @@
 
 # Backups and generated outputs
 *.bak*
+*.tmp
 *.local.html
 *映射表*.html
 backups/

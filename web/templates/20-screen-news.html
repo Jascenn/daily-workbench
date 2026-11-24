@@ -1,0 +1,81 @@
+  <!-- ── 类型：资讯 ────────────────────────────────────────────────────────
+       数据来自工作台自有订阅库 rss-store.json（首建时从 Obsidian Qiaomu 插件只读导入，见 scripts/sync/sections.py）。
+       这个区要回答的是"今天先读什么"和"我的订阅源还活着吗"：
+       数量、更新时间与源健康合成一条状态带，前三条内容单独成为焦点区。 -->
+  <div class="screen workspace-screen" id="screenNews" hidden>
+    <header class="workspace-head">
+      <div><span class="workspace-eyebrow">资讯 · 今日阅读</span><h2>今天值得读的，先摆到眼前</h2>
+        <p>先处理前三条，再按来源、分组或未读筛选；订阅源异常集中在状态带里。</p></div>
+      <div class="workspace-source"><b>自有订阅库</b> · 只读快照</div>
+    </header>
+    <section class="news-command" aria-label="今日资讯状态">
+      <div class="news-command-main">
+        <div class="news-overview" id="newsOverview" aria-label="资讯概览"></div>
+        <div class="news-risk-brief" id="newsRiskBrief"></div>
+      </div>
+      <div id="newsFresh"></div>
+    </section>
+    <div class="grid">
+      <div class="leftcol">
+        <div class="card radar-card">
+          <h2>选题雷达 <span class="tag" id="radarTag">—</span>
+            <span class="seg">
+              <button class="segbtn on" id="radarS1" onclick="setRadarAll(false)">可写</button>
+              <button class="segbtn" id="radarS2" onclick="setRadarAll(true)">全部</button>
+            </span>
+          </h2>
+          <div class="no-note" id="radarNote">—</div>
+          <div class="radar-list" id="radarList"></div>
+          <div class="radar-sources" id="radarSources"></div>
+        </div>
+        <div class="card">
+          <h2>条目 <span class="tag" id="newsTag">—</span>
+            <span class="seg" id="newsSeg">
+              <button class="segbtn on" id="newsS1" onclick="setNewsScope('recent')">最近 20</button>
+              <button class="segbtn"    id="newsS2" onclick="setNewsScope('window')">近 21 天</button>
+              <button class="segbtn"    id="newsS3" onclick="setNewsScope('all')">全部</button>
+            </span>
+          </h2>
+          <div class="news-filter" id="newsFilter">
+            <input class="news-q" id="newsQ" type="search" placeholder="搜索标题 / 摘要 / 来源" aria-label="搜索资讯" oninput="setNewsFilter()">
+            <select id="newsFeedSel" aria-label="按订阅源筛选" onchange="setNewsFilter()"><option value="">全部源</option></select>
+            <select id="newsGroupSel" aria-label="按分组筛选" onchange="setNewsFilter()"><option value="">全部分组</option></select>
+            <label class="news-unread"><input type="checkbox" id="newsUnreadOnly" onchange="setNewsFilter()">只看未读</label>
+            <button class="btn ghost news-clear" id="newsClear" type="button" onclick="clearNewsFilter()">清除筛选</button>
+          </div>
+          <div class="nlist" id="newsItems"></div>
+          <div class="no-note" style="margin-top:10px" id="newsListNote"></div>
+        </div>
+      </div>
+      <div class="rightcol">
+        <div class="card feed-health-card">
+          <h2 class="feed-health-head"><span class="feed-health-title">订阅源健康</span>
+            <span class="tag" id="newsFeedTag">—</span>
+            <span class="feed-acts">
+              <select id="feedSortSel" aria-label="订阅源排序" onchange="setFeedSort(this.value)">
+                <option value="stale">停更优先</option>
+                <option value="fresh">最新优先</option>
+                <option value="count">条数优先</option>
+                <option value="group">按分组</option>
+              </select>
+              <button class="btn" onclick="probeFeeds()">探查新源</button>
+              <button class="btn" onclick="openFeedManage()">管理</button>
+            </span></h2>
+          <table class="mini" id="newsFeeds">
+            <thead><tr>
+              <th scope="col">源</th><th scope="col">分组</th>
+              <th scope="col" class="num">条数</th><th scope="col" class="num">最新</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+          <div class="no-note" style="margin-top:10px" id="newsFeedNote"></div>
+        </div>
+        <details class="workspace-disclosure news-data-detail">
+          <summary>归档指标与数据口径</summary>
+          <div class="statgrid" id="newsStats"></div>
+          <div class="no-note" id="newsNote">—</div>
+        </details>
+      </div>
+    </div>
+  </div>
+

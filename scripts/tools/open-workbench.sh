@@ -11,7 +11,7 @@
 #     bash scripts/tools/open-workbench.sh --qrcode # 打印链接 + 终端二维码（手机同局域网可扫）
 
 set -u
-DIR="/Users/jascen/Development/daily-workbench"
+DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 TOKEN_FILE="$HOME/.config/daily-workbench/sync-token"
 PORT=8787
 

@@ -63,7 +63,7 @@ TOOLS_DIR = ROOT / "scripts" / "tools"
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 OUT = ROOT / "web-presence.json"
-BLOG_REPO = Path("/Users/jascen/.zcode/workspace/default/lingyi-blog")
+BLOG_REPO = Path("~/workspace/blog")
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X) WorkbenchMonitor/1.0"
 SITES = [
     ("tools", "工具网站", "https://lingyi.tools/"),
@@ -71,7 +71,7 @@ SITES = [
     ("blog-www", "博客 www", "https://www.lingyi.me/"),
 ]
 RSS_URL = "https://lingyi.me/rss.xml"
-ANALYTICS_DS = "991b158c-798e-47e2-ab9b-42ffb4d0da77"  # Notion「每日访问数据」
+ANALYTICS_DS = "00000000-0000-4000-8000-000000000009"  # Notion「每日访问数据」
 NTN = "/usr/local/bin/ntn"
 
 

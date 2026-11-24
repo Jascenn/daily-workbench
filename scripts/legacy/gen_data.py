@@ -19,7 +19,7 @@ import json
 
 PAGE_ID = "f75db95e-15b5-4c39-aac2-ec1d6f240c2c"
 PAGE_URL = "https://app.notion.com/p/f75db95e15b54c39aac2ec1d6f240c2c"
-INC_DS = "8f50f480-8449-4dcd-8b1a-7edbb68d3214"   # 副业收入
+INC_DS = "00000000-0000-4000-8000-000000000006"   # 副业收入
 EXP_DS = "fbd55d2c-89fc-43ce-b1e1-72877493744b"   # 产品支出
 
 # (date, amount, product, note)  —— 来自 副业收入.分成金额
@@ -265,17 +265,17 @@ state = {
     "mode": "pull-only (read-only, 不回写)"
   },
   "notionMeta": {
-    "parentPageId": "3c4b66ad-8b35-8180-a92f-e6609b20bcd6",
+    "parentPageId": "00000000-0000-4000-8000-000000000007",
     "parentPageUrl": "https://app.notion.com/p/3c4b66ad8b358180a92fe6609b20bcd6",
     "projectsDs": "df55265b-330c-48cc-b133-c8947a323917",
     "earningsDs": "a57f3b1c-47d7-40b8-937e-22296d4ce2d5"
   },
   "projects": [],
   "projectsSource": {
-    "ds": "24db66ad-8b35-8090-937b-000b5a5ec527",
+    "ds": "00000000-0000-4000-8000-000000000005",
     "name": "我的项目",
     "status": "pending-sync",
-    "note": "占位示例项目已移除；待 Notion 查询限额恢复后，从你真实的「我的项目」库(collection://24db66ad-8b35-8090-937b-000b5a5ec527)拉取真实项目，绝不伪造"
+    "note": "占位示例项目已移除；待 Notion 查询限额恢复后，从你真实的「我的项目」库(collection://00000000-0000-4000-8000-000000000005)拉取真实项目，绝不伪造"
   },
   "earnings": earnings,
   "notes": {}

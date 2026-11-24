@@ -30,7 +30,7 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-DIR = Path("/Users/jascen/Development/daily-workbench")
+DIR = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA = DIR / "data.json"
 API = "http://127.0.0.1:8787/data.json"
 TOKEN_FILE = Path.home() / ".config" / "daily-workbench" / "sync-token"

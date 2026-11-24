@@ -1,0 +1,550 @@
+  /* ── 设计令牌（唯一真源）──────────────────────────────────────────────
+     2026-09-29 UI/UX 评审（designs/workbench/评审报告-20260929.md）：
+     ① 浅色主题原有 9 组文字对比不达标（最差 warn/card 2.15:1，需 4.5）；
+     ② 字号 12 档 / 圆角 13 档，且没有任何 --radius / --space / --fs 令牌。
+     这里把"阶"建成真源，语义名（--accent 等）只是它的别名 ——
+     所有调用点写法不变（零回归风险），但交互态从此只能从阶里取，
+     不会再出现 filter:brightness() 这种"另调一个近似色"的漂移。 */
+  :root{
+    /* 主色阶 100/500/600/700/900：hover→600、active→700、选中底→100 */
+    --pri-100:#eceae4; --pri-500:#1b2330; --pri-600:#3d4656; --pri-700:#5c6675; --pri-900:#7d8695;
+
+    /* 中性阶 */
+    --neu-0:#ffffff; --neu-50:#f7f4ef; --neu-100:#f1ede7; --neu-200:#e5dfd7;
+    --neu-500:#5c6675; --neu-900:#1b2330;
+
+    /* 语义别名（调用点用这些名字，值一律来自上面的阶） */
+    --bg:var(--neu-50); --card:var(--neu-0); --ink:var(--neu-900); --muted:var(--neu-500);
+    --line:var(--neu-200);
+    /* 控件边框与装饰性发丝线必须分开：发丝线只需好看，控件边框要能"划出可编辑区"，
+       而 WCAG 1.4.11 要求非文字对比 ≥3:1。浅色下浅灰边框只有 1.20:1 —— 输入框看不出边界。 */
+    --line-strong:#878d97;
+    --accent:var(--pri-500); --accent2:var(--pri-600);
+    /* 红=收入/涨、绿=支出/跌（中国股市惯例）。语义色同时当文字用，所以必须 ≥4.5 */
+    --pos:#c8292c; --neg:#0f7a37; --ok:#0f7a37; --warn:#a15c00;
+
+    /* 字号 6 档（原 12 档收敛） */
+    --fs-xs:12px; --fs-sm:13px; --fs-base:15px; --fs-lg:16px; --fs-xl:20px; --fs-2xl:22px;
+    /* 圆角 5 档。--radius-xs 是为 ≤12px 的小色块（图例方块）单列的：
+       同一个 6px 落在 10px 方块上会变成圆形，与它标注的柱状图不一致。 */
+    --radius-xs:3px; --radius-sm:6px; --radius-md:10px; --radius-lg:16px; --radius-full:999px;
+    /* 间距 4px 栅格 */
+    --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:24px; --space-6:32px;
+
+    /* 阴影即海拔：sm 平面（卡片）/ md 悬浮（条）/ lg 弹层（模态） */
+    --shadow-sm:0 1px 3px rgba(20,30,60,.06),0 6px 20px rgba(20,30,60,.05);
+    --shadow-md:0 2px 6px rgba(20,30,60,.08),0 10px 28px rgba(20,30,60,.08);
+    --shadow-lg:0 8px 20px rgba(20,30,60,.12),0 24px 60px rgba(20,30,60,.18);
+    --shadow:var(--shadow-sm);
+    --zebra:rgba(20,30,60,.022);
+
+    --dur-fast:120ms; --dur-base:200ms; --ease:cubic-bezier(.2,0,0,1);
+    /* 撤销条与提示条：底色用 ink、字色用 card —— 两套主题自动互换且都高对比 */
+    --toast-bg:var(--ink); --toast-fg:var(--card);
+    --workspace-accent:#1b2330; --workspace-wash:#f1ede7;
+    --paper-2:var(--neu-100);
+    /* 反色面板（今日驾驶舱 / 时间聚焦 / 自媒体头图）：固定深底，不随主题翻转，
+       否则暗色主题下 --ink/--card 互换，白字落在浅底上不可读。 */
+    --deck-bg:#141b28; --deck-fg:#f1ede7;
+  }
+  /* 暗色是"令牌翻转"而非颜色反色：bg/surface/border 三层分离，主色调亮一档 */
+  [data-theme="dark"]{
+    --pri-100:#243047; --pri-500:#e7ecf5; --pri-600:#c3cbdb; --pri-700:#9aa6bd; --pri-900:#7d8695;
+    --neu-0:#161d2c; --neu-50:#0f1420; --neu-100:#1a2233; --neu-200:#2d3b57;
+    --neu-500:#a7b2c7; --neu-900:#e7ecf5;
+    --bg:var(--neu-50); --card:var(--neu-0); --ink:var(--neu-900); --muted:var(--neu-500);
+    --line:var(--neu-200);
+    --line-strong:#5d6c88;
+    --accent:var(--pri-500); --accent2:var(--pri-600);
+    --pos:#ff6b6e; --neg:#4ade80; --ok:#4ade80; --warn:#fbbf24;
+    --shadow-sm:0 1px 3px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+    --shadow-md:0 2px 8px rgba(0,0,0,.35),0 12px 32px rgba(0,0,0,.4);
+    --shadow-lg:0 10px 28px rgba(0,0,0,.45),0 28px 64px rgba(0,0,0,.5);
+    --shadow:var(--shadow-sm);
+    --zebra:rgba(255,255,255,.03);
+    --workspace-accent:#e7ecf5; --workspace-wash:#243047;
+    --paper-2:var(--neu-100);
+    --deck-bg:#10151f; --deck-fg:#e7ecf5;
+  }
+  *{box-sizing:border-box}
+  /* tabular-nums：这是金额应用，账本/排行/KPI/达成史全是数字列。
+     非等宽时竖排对不齐、扫读时位数在跳（规则 V6「数字一律等宽」）。
+     放在 body 上而不是枚举 12 个选择器 —— 一处实现，且对中文正文无影响。 */
+  /* 字体：主工作台继续使用系统中文黑体，保证高密度界面稳定；
+     霞鹜文楷只用于资讯站内阅读页。 */
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+    text-autospace:normal;hanging-punctuation:first allow-end}
+  /* 排版细节（参考 Apple 官网做法，skywt.net/blog/apple-typography-details）：
+     多行标题视觉均衡、说明性段落防孤行。都是渐进增强，不支持的浏览器忽略。 */
+  h1,h2{text-wrap:balance}
+  p,.note,.no-note,.fnote,.hdet,.media-account-more>div{text-wrap:pretty}
+  button,a,input,select,textarea{touch-action:manipulation}
+  /* 焦点可见（规则 A14）。改造前全文件 :focus-visible 出现 0 次，
+     唯一一条 :focus 规则还写着 outline:none —— 键盘用户完全看不到自己在哪。
+     用 box-shadow 而非 outline：outline 在旧 Safari 上不跟随圆角（规则 V10）。 */
+  :focus-visible{outline:none;box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--accent)}
+  input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex="0"]:focus-visible{
+    outline:none;box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--accent);border-color:var(--accent)}
+
+  a{color:var(--accent)}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 20px 64px}
+  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+  header h1{font-size:var(--fs-xl);margin:0;font-weight:700;letter-spacing:.3px}
+  header h1.brand{display:inline-flex;align-items:center;gap:10px}
+  .brand-word{font-family:Georgia,'Times New Roman',serif;font-variant:small-caps;font-style:italic;letter-spacing:.14em;font-weight:400}
+  .brand-sep{width:1px;height:20px;background:var(--line)}
+  header .who{color:var(--muted);font-size:var(--fs-sm)}
+  .todayline{color:var(--muted);font-size:var(--fs-xs);margin-top:2px}
+  .spacer{flex:1}
+  .actions{display:flex;gap:8px;flex-wrap:wrap}
+  /* transition 只过渡边框/背景：color 参与过渡时，WebKit 对「变量翻转驱动」的
+     颜色过渡有停留在旧值的 bug —— 暗色切换后按钮文字会一直不可见 */
+  .btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 12px;border-radius:var(--radius-md);cursor:pointer;font-size:var(--fs-sm);transition:border-color .15s,background-color .15s}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  /* 交互态从主色阶取相邻档，而不是 filter:brightness() —— 后者等于在色阶外又调了一个近似色 */
+  .btn.primary{background:var(--pri-500);border-color:var(--pri-500);color:#fff}
+  .btn.primary:hover{background:var(--pri-600);border-color:var(--pri-600);filter:none}
+  .btn.primary:active{background:var(--pri-700);border-color:var(--pri-700)}
+  .btn.ghost{background:transparent}
+  /* 暗色下 --accent 翻转为浅墨，主按钮文字必须是深色才可见 */
+  [data-theme="dark"] .btn.primary{color:#141b28}
+  /* 暗色按钮/输入框边框比 --line 再亮一档：card(#161d2c) 上的控件轮廓要可辨 */
+  [data-theme="dark"] .btn:not(.primary),[data-theme="dark"] input,[data-theme="dark"] select,[data-theme="dark"] textarea{border-color:#3a4a6b}
+  .actionmenu{position:relative}
+  .actionmenu>summary{list-style:none;user-select:none}
+  .actionmenu>summary::-webkit-details-marker{display:none}
+  /* summary 不继承 .btn 的 color（浏览器 UA 样式干预），显式钉住，否则暗色下近黑不可读 */
+  .actionmenu>summary.btn{color:var(--ink)}
+  /* 236px 时同步步骤的「结果 + 耗时」只剩一个字宽，桌面端会把每行折成五六行。
+     扩到 340px 仍是一个紧凑的菜单浮层，同时让诊断日志可扫读。 */
+  .morepanel{position:absolute;right:0;top:calc(100% + 8px);z-index:40;width:340px;padding:8px;
+    display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius-md);box-shadow:var(--shadow-md);
+    max-height:calc(100vh - 80px);overflow-y:auto}
+  .morepanel .btn{width:100%;text-align:left}
+  .morepanel .wide2{grid-column:1/-1}
+  .morepanel-note{grid-column:1/-1;margin-top:4px;padding-top:8px;border-top:1px solid var(--line);
+    font-size:var(--fs-xs);color:var(--muted);line-height:1.6}
+  /* 命令面板：复用 .ov 遮罩（z-index 50），面板本身顶部对齐更像启动器，不用垂直居中 */
+  .cmd-ov{align-items:flex-start;padding-top:12vh}
+  .cmd-panel{width:min(560px,92vw);background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);overflow:hidden}
+  .cmd-panel input{width:100%;border:none;background:transparent;color:var(--ink);
+    padding:14px 18px;font-size:var(--fs-base);border-bottom:1px solid var(--line)}
+  .cmd-list{max-height:min(420px,55vh);overflow-y:auto;padding:6px}
+  .cmd-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:none;
+    background:transparent;color:var(--ink);padding:9px 12px;border-radius:var(--radius-sm);
+    font-size:var(--fs-sm);cursor:pointer}
+  .cmd-item .ci-hint{margin-left:auto;font-size:var(--fs-xs);color:var(--muted);flex:none}
+  .cmd-item .ci-sec{font-size:var(--fs-xs);color:var(--muted);flex:none;min-width:5.5em;text-align:right}
+  .cmd-item.active{background:var(--neu-100)}
+  .cmd-item:hover{background:var(--neu-100)}
+  .cmd-foot{padding:8px 16px;border-top:1px solid var(--line);font-size:var(--fs-xs);color:var(--muted)}
+  .banner{border-radius:var(--radius-md);padding:9px 14px;font-size:var(--fs-sm);margin-bottom:14px;display:none}
+  .banner.show{display:block}
+  .banner.guest{background:var(--neu-100);color:var(--ink);border:1px solid var(--line-strong)}
+  .banner.offline{background:rgba(161,92,0,.12);color:var(--warn);border:1px solid rgba(161,92,0,.3)}
+  .banner.online{background:var(--neu-100);color:var(--ink);border:1px solid var(--line-strong)}
+  /* 令牌缺失/读取被拒：这是"看着正常其实数据是旧的"的场景，用红色压过其他提示 */
+  .banner.auth{background:rgba(200,41,44,.1);color:var(--pos);border:1px solid rgba(200,41,44,.32);line-height:1.7}
+  .banner.auth code{background:var(--card);border:1px solid var(--line);border-radius:var(--radius-sm);padding:1px 5px;font-size:var(--fs-xs)}
+  /* 最近一次同步失败是数据可信度问题，必须常驻在主区域；成功后再自动消失。 */
+  .sync-alert{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:11px 14px;
+    border:1px solid rgba(161,92,0,.34);border-left:3px solid var(--warn);border-radius:var(--radius-md);
+    background:rgba(161,92,0,.08);color:var(--ink)}
+  .sync-alert[hidden]{display:none}
+  .sync-alert-icon{flex:none;display:grid;place-items:center;width:22px;height:22px;border-radius:var(--radius-full);
+    background:var(--warn);color:var(--card);font-size:var(--fs-xs);font-weight:800}
+  .sync-alert-copy{flex:1 1 auto;min-width:0}
+  .sync-alert-title{display:block;color:var(--warn);font-size:var(--fs-sm);font-weight:750}
+  .sync-alert-meta{display:block;margin-top:2px;color:var(--muted);font-size:var(--fs-xs);line-height:1.55}
+  .sync-alert .btn{flex:none}
+  /* 访客提示灯：顶部常驻。访客模式满屏都是示例数字，只在进入时弹一次横幅不够 ——
+     横幅会被忽略，之后看起来跟真实数据一模一样。这条常驻、带文字说明和退出按钮，
+     滚到哪都看得见自己正在看的是示例。 */
+  /* z-index 30：够压住随滚动经过它的正文，又低于「更多」菜单(40) 与弹窗(50)，
+     菜单展开时不会被这条盖住。 */
+  .guestlamp{position:sticky;top:8px;z-index:30;display:flex;align-items:center;gap:10px;
+    margin:0 0 14px;padding:8px 12px;background:var(--card);border:1px solid var(--warn);
+    border-left-width:3px;border-radius:var(--radius-md);box-shadow:var(--shadow-sm)}
+  .guestlamp[hidden]{display:none}
+  .guestlamp .gl-dot{flex:none;width:8px;height:8px;border-radius:var(--radius-full);background:var(--warn)}
+  .guestlamp .gl-txt{flex:1 1 auto;min-width:0;font-size:var(--fs-sm);color:var(--ink)}
+  .guestlamp .gl-txt b{color:var(--warn)}
+  .guestlamp .gl-exit{flex:none;border:1px solid var(--line-strong);background:transparent;color:var(--ink);
+    border-radius:var(--radius-full);padding:3px 10px;font-size:var(--fs-xs);cursor:pointer;font-family:inherit}
+  .guestlamp .gl-exit:hover{border-color:var(--accent);color:var(--accent)}
+
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--radius-lg);padding:13px 14px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .kpi .label{color:var(--muted);font-size:var(--fs-xs);display:flex;align-items:center;gap:6px}
+  .kpi .dot{width:8px;height:8px;border-radius:var(--radius-full)}
+  .kpi .value{font-size:var(--fs-2xl);font-weight:700;margin:6px 0 2px;letter-spacing:.2px}
+  .kpi .sub{font-size:var(--fs-xs);color:var(--muted)}
+  .kpi .delta{font-size:var(--fs-xs);margin-top:3px}
+  .up{color:var(--pos)} .down{color:var(--neg)} .flat{color:var(--muted)}
+  .kpi .spark{position:absolute;right:10px;bottom:10px;width:64px;height:22px;opacity:.85;pointer-events:none}
+  .kpi.hide .value{filter:blur(6px);user-select:none}
+
+  /* 今日驾驶舱：先给行动，再给指标。三个入口分别通向项目、体检和目标。 */
+  .dailydeck{background:var(--deck-bg);color:var(--deck-fg);border-radius:var(--radius-lg);padding:16px;
+    margin-bottom:14px;box-shadow:var(--shadow-md)}
+  .deckhead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px}
+  .deckhead h2{font-size:var(--fs-lg);margin:0}
+  .deckhead span{font-size:var(--fs-xs);color:var(--neu-200)}
+  [data-theme="dark"] .deckhead span{color:var(--neu-500)}
+  .deckgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .since-bar{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin:0 0 10px;
+    padding:8px 12px;border:1px solid rgba(255,255,255,.14);border-radius:var(--radius-md);background:rgba(255,255,255,.05)}
+  .since-k{font-size:var(--fs-xs);font-weight:800;color:var(--neu-200);letter-spacing:.06em}
+  .since-i{font-size:var(--fs-xs);color:var(--card)}
+  .deckitem{appearance:none;text-align:left;color:inherit;background:rgba(255,255,255,.07);
+    border:1px solid rgba(255,255,255,.18);border-radius:var(--radius-md);padding:11px 12px;cursor:pointer;
+    min-width:0;transition:border-color var(--dur-fast) var(--ease),background var(--dur-fast) var(--ease)}
+  .deckitem:hover{background:rgba(255,255,255,.11);border-color:rgba(255,255,255,.42)}
+  .deckitem .dk{display:block;color:var(--neu-200);font-size:var(--fs-xs);font-weight:600;margin-bottom:4px}
+  [data-theme="dark"] .deckitem .dk{color:var(--neu-500)}
+  .deckitem strong{display:block;font-size:var(--fs-lg);line-height:1.35;overflow-wrap:anywhere}
+  .deckitem small{display:block;color:var(--neu-200);font-size:var(--fs-xs);line-height:1.55;margin-top:4px}
+  [data-theme="dark"] .deckitem small{color:var(--neu-500)}
+
+  .grid{display:grid;grid-template-columns:1.55fr 1fr;gap:14px}
+  .grid>*{min-width:0}
+  .card{min-width:0;background:var(--card);border:1px solid var(--line);border-radius:var(--radius-lg);padding:16px;box-shadow:var(--shadow);margin-bottom:14px}
+  .card h2{font-size:var(--fs-lg);margin:0 0 12px;display:flex;align-items:center;gap:8px}
+  .card h2 .tag{font-size:var(--fs-xs);font-weight:600;color:var(--muted);background:var(--bg);border:1px solid var(--line);padding:2px 8px;border-radius:var(--radius-full)}
+  .rightcol .card{margin-bottom:14px}
+
+  .goalbar{position:relative;height:10px;background:var(--neu-100);border-radius:var(--radius-sm);overflow:hidden;margin:10px 0 8px}
+  .goalbar>i{display:block;height:100%;background:var(--ink);border-radius:var(--radius-sm)}
+  .goalmeta{display:flex;justify-content:space-between;font-size:var(--fs-xs);color:var(--muted)}
+  .rag{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-xs);font-weight:600;margin-top:8px}
+  .rag::before{content:"";width:7px;height:7px;border-radius:var(--radius-full);background:currentColor;flex:none}
+  .rag.ok{color:var(--ok)}
+  .rag.warn{color:var(--warn)}
+  .rag.bad{color:var(--pos)}
+
+  .chart{width:100%;height:170px;display:block}
+  .legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;font-size:var(--fs-xs);color:var(--muted)}
+  .legend i{width:10px;height:10px;border-radius:var(--radius-xs);display:inline-block;margin-right:5px;vertical-align:middle}
+
+  .donutwrap{display:flex;align-items:center;gap:16px}
+  .donut{width:140px;height:140px;flex:none}
+  .donutlg{font-size:var(--fs-xs);color:var(--muted)}
+  .donutlg div{margin:3px 0;display:flex;align-items:center;gap:6px}
+  .expense{margin-top:10px;font-size:var(--fs-sm);color:var(--muted)}
+  .expense b{color:var(--neg)}
+
+  .streak{font-size:var(--fs-sm);color:var(--muted)}
+  /* Notion 同步状态点（绿=已连 灰=未连 橙=从未），显示在顶部「同步数据」按钮内 */
+  .sync-dot{display:inline-block;width:8px;height:8px;border-radius:var(--radius-full);vertical-align:2px;margin-left:2px}
+  .sync-dot.lead{margin-left:0;margin-right:5px;vertical-align:1.5px}
+  .sync-dot.ok{background:var(--ok)}
+  .sync-dot.off{background:var(--neu-200)}
+  .sync-dot.warn{background:var(--warn)}
+  .todaystrip{display:grid;grid-template-columns:auto 1fr;gap:24px;padding:13px 18px;margin-bottom:14px}
+  .ts-streak{border-right:1px solid var(--line);padding-right:24px;min-width:170px;display:flex;flex-direction:column;justify-content:center}
+  .ts-streak .streak b{font-size:var(--fs-2xl)}
+  .ts-note{min-width:0}
+  .notebox.slim{min-height:46px;margin-top:2px}
+  .ts-notebar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:6px}
+  .ts-savestate{font-size:var(--fs-xs);color:var(--muted);transition:opacity .2s;opacity:0}
+  .ts-savestate.show{opacity:1}
+  .ts-savestate.err{color:var(--pos)}
+  .streak b{font-size:var(--fs-xl);color:var(--accent);font-weight:800}
+
+  .proj{background:var(--bg);border:1px solid var(--line);border-radius:var(--radius-md);padding:12px 13px;margin-bottom:10px;transition:border-color .15s,background-color .15s}
+  .proj:hover{border-color:var(--accent)}
+  .proj .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .proj .nm{font-weight:600;font-size:var(--fs-base)}
+  .proj .cat{font-size:var(--fs-xs);color:var(--muted);background:var(--card);border:1px solid var(--line);padding:1px 7px;border-radius:var(--radius-full)}
+  /* 状态徽标不许折行：窄屏下「未开始」曾被挤成"未/开/始"三行。 */
+  .badge{font-size:var(--fs-xs);font-weight:700;padding:2px 9px;border-radius:var(--radius-full);white-space:nowrap;flex:0 0 auto}
+  .b-进行中{background:var(--neu-100);color:var(--ink)}
+  .b-已完成{background:rgba(15,122,55,.14);color:var(--ok)}
+  .b-已延迟{background:rgba(200,41,44,.13);color:var(--pos)}
+  .b-风险{background:rgba(200,41,44,.14);color:var(--pos)}
+  .b-待启动,.b-未开始{background:rgba(92,102,117,.16);color:var(--muted)}
+  .b-已取消{background:rgba(92,102,117,.10);color:var(--muted)}
+  /* 树状视图：缩进用固定步长，行高与卡片列表对齐 */
+  .ptree{display:flex;flex-direction:column}
+  .ptree-row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius-sm,8px);min-width:0}
+  .ptree-row:nth-child(odd){background:rgba(92,102,117,.05)}
+  .ptree-row.done{opacity:.55}
+  .ptree-row.ctx{opacity:.38}
+  .ptree-row.ctx .ptree-name::after{content:"（未在当前筛选）";font-size:var(--fs-xs);color:var(--muted);margin-left:6px}
+  .ptree-row:hover{background:rgba(92,102,117,.09)}
+  .ptree-ind{flex:0 0 auto}
+  .ptree-branch{flex:0 0 auto;color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:var(--fs-xs)}
+  .ptree-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-sm)}
+  .ptree-kids{flex:0 0 auto;font-size:var(--fs-xs);color:var(--muted);border:1px solid var(--line);border-radius:var(--radius-full);padding:1px 8px}
+  .ptree-meta{flex:0 0 44px;text-align:right;font-size:var(--fs-xs);color:var(--muted);font-variant-numeric:tabular-nums}
+  /* 告警定位：滚动到卡片后闪烁两下，别让用户自己在 29 张卡里找 */
+  .risk[role="button"]{cursor:pointer;transition:transform .12s,box-shadow .12s}
+  .risk[role="button"]:hover{transform:translateX(2px)}
+  .risk[role="button"]:focus-visible{outline:2px solid var(--pri-500);outline-offset:2px}
+  /* 定位高亮：静态样式为主（红边框+浅红底，持续 6s），不依赖动画——
+     系统开「减弱动态效果」时 animation:none 会让纯动画高亮彻底失效。
+     有动画时叠加 3 次脉冲强化；高亮期间目标卡置顶不被邻居盖住。 */
+  @keyframes projFlash{0%,100%{box-shadow:0 0 0 4px var(--pos-a14,rgba(200,41,44,.14))}50%{box-shadow:0 0 0 8px var(--pos-a14,rgba(200,41,44,.28))}}
+  .proj.flash{border-color:var(--pos)!important;box-shadow:0 0 0 4px var(--pos-a14,rgba(200,41,44,.14));background:var(--pos-a06,rgba(200,41,44,.05));position:relative;z-index:2;animation:projFlash 1.2s ease 2}
+  .proj.flash .pbar i{background:var(--pos)}
+  .notionlink{margin-left:auto;font-size:var(--fs-xs);color:var(--muted);text-decoration:none;border:1px solid var(--line);border-radius:var(--radius-full);padding:1px 8px;white-space:nowrap;transition:color .12s,border-color .12s}
+  .notionlink:hover{color:var(--ink);border-color:var(--line-strong)}
+  /* 工时徽标 / 备注标记（字段填了才出现；超支红、结余绿） */
+  .hchip{display:inline-block;margin-left:6px;padding:0 6px;border-radius:var(--radius-full);border:1px solid var(--line);font-size:var(--fs-xs);color:var(--muted);white-space:nowrap}
+  .hchip.over{color:var(--pos);border-color:var(--pos);font-weight:700}
+  .hchip.ok{color:var(--ok)}
+  .notemark{margin-left:6px;color:var(--muted);font-size:var(--fs-xs);cursor:help}
+  /* 交付节奏 sparkline / 里程碑月带（复用优先级分布的留白与字号） */
+  .pulseblock{margin-top:14px}
+  .pulsespark{display:flex;align-items:flex-end;gap:3px;height:44px;margin:8px 0 4px}
+  .pulsespark i{flex:1;min-height:3px;background:var(--pri-600);border-radius:var(--radius-xs) var(--radius-xs) 0 0;opacity:.85}
+  .pulsespark i[style*="height:0%"],.pulsespark i[title$=": 0 个"]{opacity:.25}
+  .msband{display:flex;align-items:flex-end;gap:6px;height:64px;margin:8px 0 4px}
+  .mscol{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;min-width:0;cursor:default}
+  .mscol i{width:100%;background:var(--pri-500);border-radius:var(--radius-xs) var(--radius-xs) 0 0;opacity:.9}
+  .mscol i.top{background:var(--pri-700)}
+  .mscol em{font-style:normal;font-size:var(--fs-xs);color:var(--muted);white-space:nowrap}
+  /* 日历视图 */
+  .calhead{display:flex;align-items:center;gap:10px;margin:0 0 10px}
+  .calhead b{font-size:var(--fs-base)}
+  .calgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+  .calwd{font-size:var(--fs-xs);color:var(--muted);text-align:center;padding:2px 0}
+  .calcell{min-height:104px;border:1px solid var(--line);border-radius:var(--radius-sm);padding:5px;display:flex;flex-direction:column;gap:4px;min-width:0;overflow:hidden}
+  .calcell.empty{background:transparent;border-style:dashed;opacity:.4}
+  .calcell.today{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+  .calday{font-size:var(--fs-xs);color:var(--muted);font-variant-numeric:tabular-nums}
+  .calcell.today .calday{color:var(--ink);font-weight:700}
+  .calev{display:block;width:100%;text-align:left;border:0;border-left:2px solid var(--pri-600);background:rgba(92,102,117,.07);color:var(--ink);font-size:var(--fs-xs);line-height:1.3;padding:3px 5px;border-radius:var(--radius-xs);cursor:pointer;overflow:hidden}
+  .calev .calt{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-all}
+  .calev .cals{display:block;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .calev:hover{background:rgba(92,102,117,.14)}
+  .calev.late{border-left-color:var(--pos);color:var(--pos);background:rgba(200,41,44,.07)}
+  .calev.late .cals{color:var(--pos);opacity:.8}
+  .calev.done{border-left-color:var(--line-strong);color:var(--muted);background:rgba(92,102,117,.04)}
+  .calev b{font-weight:700}
+  /* 依赖链：等（被挡）/ 挡（卡着别人）两种语义颜色区分，别混成一句 */
+  .deprow{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0}
+  .depchip{font-size:var(--fs-xs);border-radius:var(--radius-full);padding:1px 8px;border:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .depchip.blocked{color:var(--warn);border-color:var(--warn)}
+  .depchip.blocks{color:var(--muted)}
+  .hrline{font-size:var(--fs-xs);color:var(--muted);margin:6px 0 0}
+  .hrline b{color:var(--ink)}
+  .hrline .over{color:var(--pos);font-weight:700}
+  .hrline .ok{color:var(--ok)}
+  .btn.wide{display:block;width:100%;margin-top:10px}
+  .ledbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  .ledbar input{flex:1 1 190px;min-width:130px;background:var(--card);border:1px solid var(--line-strong);color:inherit;
+    border-radius:var(--radius-sm);padding:7px 10px;font-size:var(--fs-sm);font-family:inherit}
+  .ledbar select{background:var(--card);border:1px solid var(--line-strong);color:inherit;border-radius:var(--radius-sm);
+    padding:7px 8px;font-size:var(--fs-sm);font-family:inherit;max-width:150px}
+  /* 只在鼠标聚焦时去掉默认轮廓；键盘聚焦交给上面的 :focus-visible 出焦点环 */
+  .ledbar input:focus:not(:focus-visible),.ledbar select:focus:not(:focus-visible){outline:none}
+  .ledbar input:focus,.ledbar select:focus{border-color:var(--accent)}
+  .pbar{height:8px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius-sm);margin:9px 0 6px;overflow:hidden}
+  .pbar>i{display:block;height:100%;background:var(--ink)}
+  .proj .meta{font-size:var(--fs-xs);color:var(--muted);display:flex;justify-content:space-between}
+
+  table{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
+  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600;font-size:var(--fs-xs)}
+  td.amt{font-weight:700;text-align:right;white-space:nowrap}
+  /* 日期列不换行。这是**改造前就存在**的缺陷，与本次整改无关：
+     日期列拿到 44.2px，而 "09-17" 需要 50.5px（实测），于是 257 行**每一行**的日期都被
+     连字符处断成两行「09-」/「17」。auto 布局只肯给它 44.2px，因为它在各列之间摊。
+     nowrap 会把列宽顶到 50.5px（从备注列借 6px，备注列 417.7 → ~411），
+     代价是备注列窄了 1.4%，换来的是 257 行日期不再断行。 */
+  #ledger tbody td:first-child{white-space:nowrap}
+  /* 窄屏只让账本表格自己滚动，不能把整页顶出视口。 */
+  .ledger-scroll{width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;
+    -webkit-overflow-scrolling:touch}
+  .ledger-scroll-hint{display:none;margin:0 0 6px;color:var(--muted);font-size:var(--fs-xs);text-align:right}
+
+  /* 金额列不换行。这不是美观问题：✎/✕ 就挂在这一列的末尾，而行内只差 1px 就会把
+     **删除按钮挤到下一行** —— 实测金额列 90.7px、内容需要 91px，于是行高从 56 涨到 81，
+     而且 ✕ 会跑到 ✎ 下面（想删一笔先看到一个孤零零的 ✕）。
+     这张表是 auto 布局，只有 min-content == max-content 时它才会把列宽给足 ——
+     nowrap 正是那个"告诉布局引擎这一列不许压"的开关。金额本身也从来不该换行。 */
+  .del{cursor:pointer;color:var(--muted);border:none;background:none;font-size:var(--fs-base);margin-left:12px}
+  .del:hover{color:var(--pos)}
+  /* ✎ 编辑按钮：与 ✕ 同一行，平时低对比、hover 才亮，避免表格变吵 */
+  .edit{cursor:pointer;color:var(--muted);border:none;background:none;font-size:var(--fs-sm);margin-left:3px}
+  .edit:hover{color:var(--accent)}
+  /* 可编辑行整行可点 —— 只在非只读、非访客时加上，避免误触 */
+  tr.clickable{cursor:pointer}
+  tr.clickable:hover td{background:var(--bg)}
+  /* .rochip 之前只写了类名没写样式，渲染成了裸文本（同 .b-未开始 那个坑） */
+  .rochip{font-size:var(--fs-xs);font-weight:600;color:var(--muted);background:var(--bg);border:1px solid var(--line);
+    padding:1px 6px;border-radius:var(--radius-full);white-space:nowrap;vertical-align:middle}
+  /* 趋势卡片的分段切换（近 30 天 / 近 12 月） */
+  .seg{display:inline-flex;gap:2px;margin-left:6px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius-full);padding:2px}
+  .segbtn{border:none;background:none;color:var(--muted);font:inherit;font-size:var(--fs-xs);font-weight:600;
+    padding:4px 10px;border-radius:var(--radius-full);cursor:pointer}
+  .segbtn.on{background:var(--card);color:var(--accent);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+  .segbtn:hover{color:var(--accent)}
+  /* 支出构成：分类 + 占比条 + 金额 */
+  .exprow{margin:9px 0}
+  .exprow .top{display:flex;justify-content:space-between;font-size:var(--fs-sm);margin-bottom:4px;gap:8px}
+  .exprow .nm{color:var(--ink)}
+  .exprow .amt{color:var(--neg);font-weight:700;white-space:nowrap}
+  .expbar{height:7px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden}
+  .expbar>i{display:block;height:100%}
+  .expnote{margin-top:10px;font-size:var(--fs-xs);color:var(--muted);line-height:1.6}
+  /* 明细里标出这条是支出（type 存的是真实分类，光看分类名看不出来） */
+  .rochip.exp{color:var(--warn);border-color:rgba(161,92,0,.35);background:rgba(161,92,0,.1)}
+  .empty{color:var(--muted);text-align:center;padding:20px;font-size:var(--fs-sm)}
+
+  /* 收入来源排行：备注归并后的"谁在给我钱" */
+  .srcrow{display:grid;grid-template-columns:22px 1fr auto auto 42px;
+    align-items:center;gap:8px;font-size:var(--fs-sm);padding:6px 0 2px}
+  .srcrow .rk{color:var(--muted);font-size:var(--fs-xs);text-align:right}
+  .srcrow .nm{color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .srcrow .n{color:var(--muted);font-size:var(--fs-xs);white-space:nowrap}
+  .srcrow .amt{font-weight:700;white-space:nowrap;color:var(--ink)}
+  .srcrow .pc{color:var(--muted);font-size:var(--fs-xs);text-align:right;white-space:nowrap}
+  .srcrow .srcbar{grid-column:1/-1;height:5px;background:var(--bg);
+    border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;margin-bottom:2px}
+  .srcrow .srcbar>i{display:block;height:100%;background:var(--accent)}
+  .srcrow.agg{opacity:.75;border-top:1px dashed var(--line);margin-top:4px;padding-top:8px}
+  .srcrow.agg .srcbar>i{background:var(--line)}
+  .srcrow:not(.agg):hover{background:var(--bg);border-radius:var(--radius-sm)}
+  .srcrow.on{background:var(--neu-100);border-radius:var(--radius-sm);outline:1px solid var(--line-strong)}
+  .srcrow.on .srcbar>i{background:var(--ink)}
+  .srcrow .kindchip{font-size:var(--fs-xs);font-weight:700;padding:1px 6px;border-radius:var(--radius-full);
+    margin-left:4px;vertical-align:1px}
+  .kindchip.k-a{background:rgba(15,122,55,.12);color:var(--neg)}
+  .kindchip.k-b1{background:rgba(161,92,0,.14);color:var(--warn)}
+  .srcnote{margin-top:10px;font-size:var(--fs-xs);color:var(--muted);line-height:1.6}
+  .srcnote code,.srcwarn code{background:var(--bg);border:1px solid var(--line);
+    border-radius:var(--radius-xs);padding:0 4px;font-size:var(--fs-xs)}
+  /* 归并算不平 / 规则缺失：这是"看着正常其实算错"的场景，必须显式喊出来 */
+  .srcwarn{margin:8px 0;padding:8px 11px;border-radius:var(--radius-md);font-size:var(--fs-xs);line-height:1.6;
+    background:rgba(200,41,44,.1);color:var(--pos);border:1px solid rgba(200,41,44,.32)}
+  .srcdot{font-size:var(--fs-xs);color:var(--muted);margin:6px 0}
+
+  /* 数据体检：把"页面照常显示但有几笔是错的"这种事显式列出来 */
+  .hrow{border:1px solid var(--line);border-radius:var(--radius-md);padding:9px 11px;margin:8px 0;
+    background:var(--bg)}
+  .hrow.warn{border-left:3px solid var(--warn)}
+  .hrow.info{border-left:3px solid var(--accent)}
+  .hrow:not(.static):hover{border-color:var(--accent)}
+  .htop{display:flex;justify-content:space-between;gap:8px;font-size:var(--fs-sm);align-items:baseline}
+  .htop .nm{font-weight:600;color:var(--ink)}
+  .htop .amt{font-weight:700;color:var(--pos);white-space:nowrap}
+  .hdet{font-size:var(--fs-xs);color:var(--muted);line-height:1.6;margin-top:4px}
+  .hjump{font-size:var(--fs-xs);color:var(--accent);margin-top:5px}
+  .notebox{width:100%;min-height:70px;border:1px solid var(--line-strong);border-radius:var(--radius-md);background:var(--bg);color:var(--ink);padding:9px 11px;font:inherit;resize:vertical}
+
+  /* 目标带（hero）：第一屏主轴，全宽，压在 KPI 之下。
+     放在这里而不是右栏，是因为「离目标还差多少」是这个工作台存在的理由。 */
+  .hero{background:var(--card);border:1px solid var(--line);border-radius:var(--radius-lg);
+    padding:15px 18px;margin-bottom:14px;box-shadow:var(--shadow)}
+  .heroh{font-size:var(--fs-lg);margin:0 0 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .heroh .seg{margin-left:auto}
+  .heroctx{font-size:var(--fs-xs);font-weight:400;color:var(--muted)}
+  .goalPrimary{display:grid;grid-template-columns:1.55fr 1fr;gap:24px;align-items:start}
+  .heroCol{min-width:0}
+  .heroCol+.heroCol{border-left:1px solid var(--line);padding-left:18px}
+  .hlab{font-size:var(--fs-xs);font-weight:600;color:var(--muted);margin-bottom:6px}
+  .hval{font-size:var(--fs-xl);font-weight:700;letter-spacing:.2px}
+  .hval.dim{font-size:var(--fs-base);font-weight:600;color:var(--muted)}
+  .goal-target-row{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  .goal-target-row .hlab{margin:0}
+  .goal-target-row .hval{font-size:var(--fs-2xl)}
+  .goalProgressCol .goalbar.big{height:16px;margin:0 0 8px}
+  .goalProgressCol .goalmeta{font-size:var(--fs-sm)}
+  .goalProgressCol #goalProj{margin-top:8px}
+  .goalActionCol .gact{max-width:52ch}
+  .goalbar.big{height:14px;margin:0 0 8px}
+  .goalbar>u{position:absolute;top:-3px;width:2px;height:20px;background:var(--ink);opacity:.55}
+  .gact{margin:0;padding-left:16px;font-size:var(--fs-sm);line-height:1.75;color:var(--muted)}
+  .gact b{color:var(--ink)}
+  .gact li{margin:2px 0}
+  .gempty{font-size:var(--fs-sm);line-height:1.7;color:var(--muted)}
+  .gempty b{color:var(--ink)}
+  .gempty .btn{margin-top:8px}
+  .goalgap{display:flex;align-items:baseline;gap:10px;margin:4px 0 2px}
+  .goalgap .gk{font-size:var(--fs-sm);color:var(--muted)}
+  .goalgap b{font-size:var(--fs-xl);font-weight:800;letter-spacing:.2px;color:var(--ink)}
+  .goalgap .gs{font-size:var(--fs-xs);color:var(--muted);margin-left:auto}
+
+  /* 目标带 v2：拖动条 / 等值回显 / 快捷预设 / 目标达成史。
+     拖动条与数字框是同一个值的两个视图，所以两者紧挨着放，中间只隔一行换算回显。 */
+  .goalrange{width:100%;height:22px;margin:6px 0 2px;accent-color:var(--ink);cursor:pointer}
+  .goalsec{display:flex;gap:6px;align-items:center}
+  .goalsec input[type=number]{flex:1;min-width:0;min-height:32px;padding:5px 8px;font-size:var(--fs-xs)}
+  .goalsec .btn{flex:none;white-space:nowrap}
+  .btn.sm{padding:4px 10px;font-size:var(--fs-xs);border-radius:var(--radius-sm)}
+  .goalecho{font-size:var(--fs-xs);color:var(--muted);min-height:15px;margin-bottom:6px}
+  .goalecho b{color:var(--ink)}
+  .goalpreset{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+  .pbtn{font:inherit;font-size:var(--fs-xs);padding:5px 10px;border:1px solid var(--line);background:var(--card);
+    color:var(--muted);border-radius:var(--radius-full);cursor:pointer;transition:border-color .15s,background-color .15s;white-space:nowrap}
+  .pbtn:hover{border-color:var(--line-strong);color:var(--ink)}
+  .goalhist{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:14px;
+    padding-top:12px;border-top:1px solid var(--line)}
+  .goalSettings{margin-top:14px;border-top:1px solid var(--line)}
+  .goalSettings>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:11px 0 2px;color:var(--muted);font-size:var(--fs-xs);font-weight:650;cursor:pointer;list-style:none}
+  .goalSettings>summary::-webkit-details-marker{display:none}
+  .goalSettings>summary::after{content:"＋";color:var(--muted);font-size:var(--fs-lg);font-weight:650;line-height:1}
+  .goalSettings[open]>summary::after{content:"−"}
+  .goalSettings>summary:hover{color:var(--ink)}
+  .goalSettingsHint{color:var(--muted);font-weight:400;margin-left:auto;margin-right:8px;text-align:right}
+  .goalSettingsGrid{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.4fr);gap:24px;padding:14px 0 2px}
+  .goalSettingsGrid .goalhist{margin-top:0;padding-top:0;border-top:0}
+  .ghcell{min-width:0}
+  .ghk{font-size:var(--fs-xs);font-weight:600;color:var(--muted)}
+  .ghv{font-size:var(--fs-base);font-weight:700;margin:1px 0;letter-spacing:.2px}
+  .ghr{font-size:var(--fs-xs);color:var(--muted)}
+  .ghr .ok{color:var(--ok);font-weight:700}
+  .ghr .bad{color:var(--pos);font-weight:700}
+  .ghcell.now .ghk{color:var(--ink)}
+
+  /* 分析口径条：收入来源 / 收益构成 / 支出构成 三张结构卡共用这一个开关，
+     避免出现「来源是累计、构成是本月」这种读者无从判断的错位。 */
+  .scopebar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius-md);
+    padding:8px 12px;margin-bottom:14px}
+  .scopek{font-size:var(--fs-xs);font-weight:600;color:var(--muted)}
+  .scopehint{font-size:var(--fs-xs);color:var(--muted)}
+  .scopehint b{color:var(--ink)}
+
+  /* Notion panel */
+  .no-status{display:flex;align-items:center;gap:8px;font-size:var(--fs-sm);margin-bottom:8px}
+  .pill{font-size:var(--fs-xs);font-weight:700;padding:3px 10px;border-radius:var(--radius-full)}
+  .pill.on{background:rgba(15,122,55,.14);color:var(--ok)}
+  .pill.off{background:rgba(92,102,117,.16);color:var(--muted)}
+  .pill.notion{background:var(--neu-100);color:var(--ink)}
+  .no-note{font-size:var(--fs-xs);color:var(--muted);line-height:1.6}
+
+  /* modal */
+  .ov{position:fixed;inset:0;background:rgba(10,16,30,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:18px}
+  .ov.show{display:flex}
+  .modal-open{overflow:hidden}
+  .modal{background:var(--card);border-radius:var(--radius-lg);padding:20px;border:none;width:min(440px,100%);box-shadow:var(--shadow-lg)}
+  .modal h3{margin:0 0 14px;font-size:var(--fs-lg)}
+  .field{margin-bottom:11px}
+  .field label,.field .field-label{display:block;font-size:var(--fs-xs);color:var(--muted);margin-bottom:4px}
+  /* 输入区靠边框划出可编辑范围，所以这里必须是 --line-strong（≥3:1）
+     按钮不在此列：按钮的可识别性来自它的文字标签，边界只承担装饰。 */
+  .field input,.field select,.field textarea{width:100%;border:1px solid var(--line-strong);border-radius:var(--radius-md);background:var(--bg);color:var(--ink);padding:8px 10px;font:inherit}
+  .modal .row{display:flex;gap:10px}
+  .modal .row .field{flex:1}
+  .modal .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+  /* 总览页晨间速览：聚合微信待办 / 选题雷达 / 星球简报，默认可折叠，专注模式下自动隐藏 */
+  .morning-card{margin-bottom:16px}
+  .morning-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
+  .morning-col{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--bg);min-width:0}
+  .morning-col-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .morning-col-title{font-size:var(--fs-sm);font-weight:700;color:var(--ink)}
+  .morning-col-link{border:0;background:none;padding:0;color:var(--accent);font:inherit;font-size:var(--fs-xs);cursor:pointer;text-decoration:none}
+  .morning-col-link:hover{text-decoration:underline}
+  .morning-col-list{display:flex;flex-direction:column;gap:4px;font-size:var(--fs-xs);color:var(--muted);line-height:1.55}
+  .morning-col-row{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+  .morning-col-row b{font-weight:600}
+  @media(max-width:980px){.morning-grid{grid-template-columns:1fr}}
+

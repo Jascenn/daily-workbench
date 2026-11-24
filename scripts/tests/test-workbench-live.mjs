@@ -3,8 +3,8 @@
 //   B. 真机点一次「同步一次」按钮的完整链路（runSync → POST /api/sync → sync-now.sh → Notion）
 import fs from 'fs';
 
-const HTML = '/Users/jascen/Development/daily-workbench/workbench.html';
-const DATA_PATH = '/Users/jascen/Development/daily-workbench/data.json';
+const HTML = new URL('../../workbench.html', import.meta.url).pathname;
+const DATA_PATH = new URL('../../data.json', import.meta.url).pathname;
 const BASE = 'http://127.0.0.1:8787';
 const TOKEN = fs.readFileSync(process.env.HOME + '/.config/daily-workbench/sync-token', 'utf8').trim();
 
@@ -235,7 +235,7 @@ console.log('\nD. 静态兜底白名单：令牌之外的文件不许被读到')
    也就是"锁了正门、侧门开着"。修法是 STATIC_ALLOW 白名单（只放 workbench.html）。
    下面每条都先确认**磁盘上真有这个文件** —— 否则 404 可能只是"文件不存在"，
    那是一条永远绿的假断言（本套件第 5 类假绿）。 */
-const DIR = '/Users/jascen/Development/daily-workbench';
+const DIR = '.';
 const probe = async (path, withToken) => {
   const r = await fetch(BASE + path + (withToken ? '?token=' + encodeURIComponent(TOKEN) : ''));
   return { code: r.status, len: (await r.arrayBuffer()).byteLength };

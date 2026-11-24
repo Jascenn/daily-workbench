@@ -1,0 +1,184 @@
+  <!-- ── 类型：项目（Notion「项目管理」真实数据 + 白名单回写） ─────────────── -->
+  <div class="screen workspace-screen" id="screenProject" hidden>
+    <header class="workspace-head">
+      <div><span class="workspace-eyebrow">项目 · 推进</span><h2>只看正在推进和需要处理的事</h2>
+        <p>字段与选项跟随 Notion 项目管理库；资料可白名单回写，完成百分比等 rollup 保持只读。</p></div>
+      <div class="workspace-source" id="projSourceBar"><b>项目管理</b> · Notion 可回写</div>
+    </header>
+    <div class="statgrid" id="projStats"></div>
+    <div class="projecttools">
+      <span class="seg" id="projScopeSeg">
+        <button class="segbtn on" id="pjActive" onclick="setProjectScope('active')">当前</button>
+        <button class="segbtn" id="pjAll" onclick="setProjectScope('all')">全部</button>
+        <button class="segbtn" id="pjDone" onclick="setProjectScope('done')">已完成</button>
+        <button class="segbtn" id="pjCancelled" onclick="setProjectScope('cancelled')">已取消</button>
+      </span>
+      <input id="projQ" type="search" placeholder="搜索项目 / 类型 / 标签 / 负责人…" aria-label="搜索项目" oninput="renderProject()">
+      <span class="seg" aria-label="视图切换">
+        <button class="segbtn on" id="pjViewBoard" onclick="setProjectView('board')">看板</button>
+        <button class="segbtn" id="pjViewTree" onclick="setProjectView('tree')">树状</button>
+        <button class="segbtn" id="pjViewCal" onclick="setProjectView('calendar')">日历</button>
+      </span>
+      <button class="btn" onclick="openProj()">+ 本地项目</button>
+    </div>
+    <div class="grid eq project-grid">
+      <div class="card project-board">
+        <h2>项目看板 <span class="tag" id="projBoardTag">—</span></h2>
+        <div id="projBoard"></div>
+      </div>
+      <div class="card project-risk">
+        <details class="usage-fold" id="riskFold" open>
+          <summary><h2>需要处理 <span class="tag" id="riskTag">—</span></h2></summary>
+          <div class="note" style="margin:0 0 10px">只提示真实截止日期、逾期和“状态 × 进度”冲突；修改项目走卡片内的显式回写。</div>
+          <div id="riskList"></div>
+          <details class="project-subfold" id="closeAuditFold">
+            <summary>
+              <h3 class="prioh">项目收口 <span class="tag" id="closeAuditTag">—</span></h3>
+              <span class="project-subfold-brief" id="closeAuditBrief">按需查看</span>
+            </summary>
+            <div class="project-subfold-body">
+              <div class="prionote" style="margin:0 0 8px">只检查已结束项目是否留下完成日期或收口说明；取消原因复用 Notion「备注」，不另建字段。</div>
+              <div class="closeaudit" id="closeAuditList"></div>
+            </div>
+          </details>
+          <details class="project-subfold" id="prioFold">
+            <summary>
+              <h3 class="prioh">优先级分布 <span class="tag">来自 Notion</span></h3>
+              <span class="project-subfold-brief" id="prioFoldBrief">按需查看</span>
+            </summary>
+            <div class="project-subfold-body" id="projPrio"></div>
+          </details>
+          <details class="project-subfold" id="pulseFold">
+            <summary>
+              <h3 class="prioh">交付与工时 <span class="tag">近 8 周</span></h3>
+              <span class="project-subfold-brief" id="pulseFoldBrief">按需查看</span>
+            </summary>
+            <div class="project-subfold-body" id="projPulse"></div>
+          </details>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 类型：客户 / 贵人（新增方案 · 继续完善） ─────────────────────── -->
+  <div class="screen workspace-screen" id="screenClient" hidden>
+    <header class="workspace-head">
+      <div><span class="workspace-eyebrow">客户 · 经营</span><h2>先看关系和风险，再安排下一次跟进</h2>
+        <p>客户状态、来源与跟进日期可在详情里回写 Notion；收入、支出、利润仍由 Notion rollup / formula 维护。</p></div>
+      <div class="workspace-source" id="clientSource"><b>Notion</b> · 贵人计划 · 可回写</div>
+    </header>
+    <div class="labnote" id="clientLabnote" style="display:none"><strong>本地试验区</strong><span>这里尚未连接 Notion 贵人计划。当前条目只保存在本浏览器，示例数据不代表真实客户。</span></div>
+    <div class="statgrid" id="clientStats"></div>
+    <div class="client-layout">
+      <div class="card client-list">
+        <h2 id="clientListTitle">客户经营名单 <span class="tag" id="clientListTag">—</span></h2>
+        <div class="client-tools">
+          <input id="clientQ" type="search" placeholder="搜索客户 / 类型 / 来源…" aria-label="搜索客户" oninput="clientFilterChanged()">
+          <select id="clientTypeF" aria-label="客户类型" onchange="clientFilterChanged()"></select>
+          <select id="clientStatusF" aria-label="客户状态" onchange="clientFilterChanged()"></select>
+          <select id="clientSourceF" aria-label="关系来源" onchange="clientFilterChanged()"></select>
+          <select id="clientSort" aria-label="客户排序" onchange="clientSortChanged()">
+            <option value="profit">利润从高到低</option>
+            <option value="income">收入从高到低</option>
+            <option value="next">下次跟进从近到远</option>
+            <option value="name">名称 A–Z</option>
+          </select>
+          <button class="btn ghost client-clear" id="clientClear" type="button" onclick="clearClientFilters()" hidden>清除筛选</button>
+          <span class="client-count" id="clientCount">—</span>
+        </div>
+        <div class="client-table" id="clientList"></div>
+      </div>
+      <aside class="card client-side">
+        <details class="usage-fold" id="clientHealthFold" open>
+          <summary><h2>客户库体检 <span class="tag" id="clientHealthTag">—</span></h2></summary>
+          <div class="client-health" id="clientHealth"></div>
+          <details class="client-health-more" id="clientHealthMore">
+            <summary>查看全部体检项 <span class="client-health-more-tag" id="clientHealthMoreTag">—</span></summary>
+            <div class="client-health" id="clientHealthRest"></div>
+          </details>
+        </details>
+        <div class="prioblock">
+          <h3 class="prioh">跟进工作台 <span class="tag" id="clientFollowTag">—</span></h3>
+          <div class="followup-list" id="clientFollowups"></div>
+        </div>
+      </aside>
+    </div>
+    <div class="client-list" id="clientLocalTools">
+      <div class="ledbar" style="margin-top:10px" id="clientAddBar">
+        <input id="ncNm" placeholder="贵人姓名" aria-label="姓名">
+        <input id="ncRl" placeholder="关系" aria-label="关系" style="max-width:96px">
+        <select id="ncSt" aria-label="状态">
+          <option>线索</option><option>初步接触</option><option>深度沟通</option><option>已成交</option><option>待跟进</option><option>回款中</option>
+        </select>
+        <input id="ncDue" type="number" placeholder="跟进天" aria-label="跟进天" style="max-width:84px">
+        <button class="btn primary" onclick="addClient()">添加</button>
+        <button class="btn" onclick="seedNew('client')">恢复示例</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 类型：微信（本地 MCP 只读快照） ───────────────────────────────────
+       为什么单独一页而不是塞进总览：微信的消息不是「指标」，是**待办**。
+       总览那套 KPI 卡会把"3 个人在等你回"压成一行数字，反而看不出是谁。
+       所以这页第一个区块直接是名单，指标放后面 —— 与「行动优先」的设计契约一致。 -->
+  <div class="screen workspace-screen" id="screenWechat" hidden>
+    <header class="workspace-head">
+      <div><span class="workspace-eyebrow">微信 · 待办</span><h2>今天微信上有这几件事要做</h2>
+        <p>语音已转成文字、原始消息已读成"对方要什么"。只读不写：这里不能发消息，也不能改会话状态。</p></div>
+      <div class="workspace-source" id="wechatSource">读取中…</div>
+    </header>
+    <div class="labnote" id="wechatNote" style="display:none"></div>
+    <div class="wx-subnav" id="wxSubnav" role="tablist" aria-label="微信工作区">
+      <button class="segbtn on" type="button" role="tab" aria-selected="true" data-wxview="action" onclick="setWxView('action')">今日行动</button>
+      <button class="segbtn" type="button" role="tab" aria-selected="false" data-wxview="opportunity" onclick="setWxView('opportunity')">机会探索 <span class="wx-subcount" id="wxOpportunityCount"></span></button>
+      <button class="segbtn" type="button" role="tab" aria-selected="false" data-wxview="consultation" onclick="setWxView('consultation')">咨询分析 <span class="wx-subcount" id="wxConsultationCount"></span></button>
+      <button class="segbtn" type="button" role="tab" aria-selected="false" data-wxview="mentions" onclick="setWxView('mentions')">群提醒 <span class="wx-subcount" id="wxMentionCount"></span></button>
+    </div>
+    <div class="statgrid" id="wechatStats"></div>
+    <div class="wx-coverage" id="wxCoverage">经营分析覆盖范围读取中…</div>
+    <section class="card wx-panel wx-analysis-panel" id="wxOpportunityPanel" hidden>
+      <div class="wx-panel-head"><h2>机会探索 <span class="tag" id="wxOpportunityTag">—</span></h2><span class="wx-panel-meta">只展示有证据的业务信号 · 判定需要核对</span></div>
+      <div id="wxOpportunities"></div>
+    </section>
+    <section class="card wx-panel wx-analysis-panel" id="wxConsultationPanel" hidden>
+      <div class="wx-panel-head"><h2>咨询分析 <span class="tag" id="wxConsultationTag">—</span></h2><span class="wx-panel-meta">对方的问题、真实需求与建议追问</span></div>
+      <div id="wxConsultations"></div>
+    </section>
+    <section class="card wx-panel wx-todo-panel" id="wxActionPanel">
+      <div class="wx-panel-head">
+        <h2>待办 <span class="tag" id="wxTodoTag">—</span></h2>
+        <span class="wx-panel-meta">谁在等、要什么、你该做什么 · 按搁置时长排序</span>
+      </div>
+      <div id="wxTodo"></div>
+    </section>
+    <div class="wx-layout" id="wxActionSecondary">
+      <section class="card wx-panel">
+        <div class="wx-panel-head">
+          <h2>不用回 <span class="tag" id="wxWaitTag">—</span></h2>
+          <span class="wx-panel-meta">广告与已收尾的对话 · 原文保留，可点开核对</span>
+        </div>
+        <div id="wxWait"></div>
+      </section>
+      <section class="card wx-panel" id="wxMentionPanel">
+        <div class="wx-panel-head">
+          <h2>群里 @ 我 <span class="tag" id="wxMentionTag">—</span></h2>
+          <span class="wx-panel-meta">只认正文里 @ 到你昵称的消息</span>
+        </div>
+        <div id="wxMention"></div>
+      </section>
+    </div>
+    <section class="card wx-panel" id="wxActivePanel">
+      <details class="wx-active-fold">
+        <summary>
+          <div class="wx-panel-head" style="margin-bottom:0">
+            <h2>最近活跃会话 <span class="tag" id="wxActiveTag">—</span></h2>
+            <span class="wx-panel-meta" id="wxActiveBrief">展开看最近 40 个会话的最后一条</span>
+          </div>
+        </summary>
+        <div id="wxActive"></div>
+      </details>
+    </section>
+    <div class="wx-boundary" id="wxBoundary"></div>
+  </div>
+
+  <!-- ── 类型：时间（新增方案 · 继续完善） ─────────────────────────────── -->

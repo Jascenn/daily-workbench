@@ -16,7 +16,7 @@
 """
 import subprocess, os, re, sys
 
-ROOT = "/Users/jascen/Development/daily-workbench"
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC = f"{ROOT}/workbench.html"
 NODE = "/opt/homebrew/bin/node"
 TMP = "/tmp/wb-mut.html"

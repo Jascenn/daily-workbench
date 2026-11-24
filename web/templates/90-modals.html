@@ -1,0 +1,345 @@
+<!-- ── 写作编辑器：正文仍是 Obsidian Markdown，工作台只负责编辑、预览与安全保存 ── -->
+<div class="ov" id="writingEditorOv">
+  <article class="modal writing-editor-dialog" id="writingEditorDialog" data-view="edit"
+    role="dialog" aria-modal="true" aria-labelledby="writingEditorTitle">
+    <header class="writing-editor-head">
+      <div class="writing-editor-title">
+        <span class="writing-editor-kicker">OBSIDIAN · 原生 MARKDOWN</span>
+        <h3 id="writingEditorTitle">正在打开内容</h3>
+        <div class="writing-editor-meta">
+          <span id="writingEditorBook">—</span>
+          <span id="writingEditorModified">—</span>
+        </div>
+      </div>
+      <div class="writing-editor-head-actions">
+        <a class="writing-action-secondary" id="writingEditorObsidian" href="#"
+          target="_blank" rel="noopener noreferrer">在 Obsidian 中打开</a>
+        <button class="writing-editor-close" type="button" aria-label="关闭写作编辑器"
+          onclick="closeOv('writingEditorOv')">×</button>
+      </div>
+    </header>
+    <div class="writing-editor-toolbar">
+      <div class="writing-editor-state" id="writingEditorState" data-state="loading"
+        role="status" aria-live="polite">正在读取正文…</div>
+      <div class="writing-editor-mobile-tabs" role="group" aria-label="切换编辑与预览">
+        <button class="on" id="writingEditTab" type="button" onclick="setWritingEditorView('edit')">编辑</button>
+        <button id="writingPreviewTab" type="button" onclick="setWritingEditorView('preview')">预览</button>
+      </div>
+      <div class="writing-editor-count" id="writingEditorCount">0 字</div>
+    </div>
+    <div class="writing-editor-conflict" id="writingEditorConflict">
+      <span id="writingEditorConflictText">Obsidian 中的正文已变化。重新加载可查看最新版本；覆盖保存会替换该版本。</span>
+      <button class="btn ghost" type="button" onclick="reloadWritingEditor()">重新加载</button>
+      <button class="btn" type="button" onclick="forceSaveWritingEditor()">覆盖保存</button>
+    </div>
+    <div class="writing-editor-loading" id="writingEditorLoading">正在从 Obsidian 读取 Markdown…</div>
+    <div class="writing-editor-body" id="writingEditorBody" hidden>
+      <section class="writing-editor-pane writing-editor-input-pane" aria-label="Markdown 编辑">
+        <div class="writing-editor-pane-head"><b>编辑</b><span>Markdown 源文</span></div>
+        <textarea class="writing-editor-input" id="writingEditorInput" spellcheck="false"
+          aria-label="内容 Markdown 正文" oninput="onWritingEditorInput()"></textarea>
+      </section>
+      <section class="writing-editor-pane" aria-label="排版预览">
+        <div class="writing-editor-pane-head"><b>预览</b><span>只渲染安全的 Markdown</span></div>
+        <div class="writing-editor-preview" id="writingEditorPreviewScroll">
+          <div class="writing-editor-preview-inner" id="writingEditorPreview"></div>
+        </div>
+      </section>
+    </div>
+    <footer class="writing-editor-foot">
+      <div class="writing-editor-foot-note">
+        自动保存到 Obsidian 原文件；停止输入 2 秒后写入，⌘S / Ctrl+S 立即保存。小说按章节、其他类型按单篇稿件保存。
+      </div>
+      <div class="writing-editor-foot-actions">
+        <button class="writing-action-secondary" id="writingEditorSaveBtn" type="button"
+          onclick="saveWritingEditor(false)" disabled>保存到 Obsidian</button>
+      </div>
+    </footer>
+  </article>
+</div>
+
+<!-- 新建创作内容：类型固定，标题是唯一输入；保存后立即打开同一套 Markdown 编辑器。 -->
+<div class="ov" id="writingCreateOv">
+  <div class="modal writing-create-dialog" role="dialog" aria-modal="true" aria-labelledby="writingCreateTitle">
+    <form id="writingCreateForm" onsubmit="submitWritingCreate(event)">
+      <h3 id="writingCreateTitle">新建内容</h3>
+      <p class="create-hint" id="writingCreateHint">选择类型后，会在 Obsidian「创作」目录创建一篇新的 Markdown。</p>
+      <div class="field">
+        <span class="field-label">类型</span>
+        <div><span class="create-type" id="writingCreateType">公众号文章</span></div>
+      </div>
+      <div class="field">
+        <label for="writingCreateName" id="writingCreateNameLabel">标题</label>
+        <input id="writingCreateName" maxlength="80" autocomplete="off" required placeholder="先写一个可识别的标题">
+      </div>
+      <div class="modal-foot">
+        <button class="btn ghost" type="button" onclick="closeOv('writingCreateOv')">取消</button>
+        <button class="btn" id="writingCreateSubmit" type="submit">创建并开始写</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Project modal -->
+<div class="ov" id="projOv">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="projTitle">
+    <form id="projForm" onsubmit="return submitProj(event)">
+    <h3 id="projTitle">添加项目</h3>
+    <div class="field"><label for="pName">名称</label><input id="pName"></div>
+    <div class="row">
+      <div class="field"><label for="pStatus">状态</label><select id="pStatus">
+        <option>未开始</option><option>进行中</option><option>已延迟</option><option>已完成</option><option>已取消</option>
+      </select></div>
+      <div class="field"><label for="pProg">进度 %</label><input id="pProg" type="number" min="0" max="100"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="pCat">类别</label><input id="pCat" placeholder="设计/开发/内容…"></div>
+      <div class="field"><label for="pDue">截止日</label><input id="pDue" type="date"></div>
+    </div>
+    <div class="field"><label for="pNote">备注</label><textarea id="pNote" rows="2"></textarea></div>
+    <div class="acts">
+      <button class="btn ghost" type="button" onclick="closeOv()">取消</button>
+      <button class="btn primary" type="submit">保存</button>
+    </div>
+    </form>
+  </div>
+</div>
+
+<!-- Notion project writeback modal -->
+<div class="ov" id="projNotionOv">
+  <div class="modal client-drawer" role="dialog" aria-modal="true" aria-labelledby="projNotionTitle">
+    <form id="projNotionForm" onsubmit="return submitProjectWriteback(event)">
+      <div class="client-drawer-head">
+        <div><h3 id="projNotionTitle">编辑项目并回写</h3>
+          <p id="projNotionSubtitle">字段和选项来自 Notion「项目管理」</p></div>
+        <span class="chip">Notion 回写</span>
+      </div>
+      <div class="client-edit-grid">
+        <div class="wide"><div class="field"><label for="pnName">项目名称</label>
+          <input id="pnName" maxlength="200" required></div></div>
+        <div class="field"><label for="pnStatus">状态</label><select id="pnStatus"></select></div>
+        <div class="field"><label for="pnPriority">优先级</label><select id="pnPriority"></select></div>
+        <div class="field"><label for="pnType">类型</label><select id="pnType"></select></div>
+        <div class="field"><label for="pnSprint">冲刺</label><select id="pnSprint"></select></div>
+        <div class="wide"><div class="field"><label for="pnTags">标签（逗号分隔）</label>
+          <input id="pnTags" placeholder="例如：重要, 本周"></div></div>
+        <div class="field"><label for="pnStart">开始日期</label><input id="pnStart" type="date"></div>
+        <div class="field"><label for="pnDue">截止日期</label><input id="pnDue" type="date"></div>
+        <div class="field"><label for="pnDone">完成日期</label><input id="pnDone" type="date"></div>
+        <div class="field"><label for="pnParent">上级项目</label><select id="pnParent"></select></div>
+        <div class="field"><label for="pnSprintStart">冲刺开始</label><input id="pnSprintStart" type="date"></div>
+        <div class="field"><label for="pnSprintEnd">冲刺结束</label><input id="pnSprintEnd" type="date"></div>
+        <div class="field"><label for="pnEstHours">预计工时</label><input id="pnEstHours" type="number" min="0" step="0.1"></div>
+        <div class="field"><label for="pnActHours">实际工时</label><input id="pnActHours" type="number" min="0" step="0.1"></div>
+        <div class="wide"><div class="field"><span class="field-label" id="pnOwnersLabel">负责人</span>
+          <div class="relpick" role="group" aria-labelledby="pnOwnersLabel"><div class="relchoices" id="pnOwners"></div>
+            <div class="relhint" id="pnOwnersHint">只列当前同步数据里已经出现过的成员；新成员先在 Notion 项目中分配并同步。</div>
+          </div></div></div>
+        <div class="wide"><div class="field"><label for="pnTaskSearch">关联任务</label>
+          <div class="relpick">
+            <div class="relselected" id="pnTasksSelected" aria-live="polite"></div>
+            <input id="pnTaskSearch" type="search" placeholder="搜索待办标题，输入后选择" autocomplete="off"
+              oninput="scheduleProjectRelationSearch('task',this.value)">
+            <div class="relresults" id="pnTasksResults"></div>
+            <div class="relhint">保存时会替换为当前选择；清空全部即从 Notion 移除关联任务。</div>
+          </div></div></div>
+        <div class="wide"><div class="field"><label for="pnRecordSearch">来源记录</label>
+          <div class="relpick">
+            <div class="relselected" id="pnRecordsSelected" aria-live="polite"></div>
+            <input id="pnRecordSearch" type="search" placeholder="搜索日常记录标题，输入后选择" autocomplete="off"
+              oninput="scheduleProjectRelationSearch('record',this.value)">
+            <div class="relresults" id="pnRecordsResults"></div>
+            <div class="relhint">来源记录数量较多，按标题搜索；只显示标题、状态和日期，不读取正文。</div>
+          </div></div></div>
+        <div class="wide"><div class="field"><label for="pnLink">相关链接</label>
+          <input id="pnLink" type="url" placeholder="https://"></div></div>
+        <div class="wide"><div class="field"><label for="pnNote">备注</label>
+          <textarea id="pnNote" rows="4" maxlength="8000"></textarea></div></div>
+      </div>
+      <div class="prionote" id="projNotionBoundary"></div>
+      <div class="client-edit-state" id="projWriteState" role="status" aria-live="polite"></div>
+      <div class="acts">
+        <button class="btn ghost" type="button" onclick="closeOv('projNotionOv')">取消</button>
+        <button class="btn primary" id="projWriteSave" type="submit">保存并回写 Notion</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Earn modal -->
+<div class="ov" id="earnOv">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="earnTitle">
+    <form id="earnForm" onsubmit="return submitEarn(event)">
+    <h3 id="earnTitle">记一笔收益</h3>
+    <div class="row">
+      <div class="field"><label for="eDate">日期</label><input id="eDate" type="date"></div>
+      <div class="field"><label for="eAmt">金额（选「支出」自动记负）</label><input id="eAmt" type="number" step="0.01"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="eType">类型</label><select id="eType">
+        <option>项目收入</option>
+      </select></div>
+      <div class="field"><label for="eProj">关联项目</label><select id="eProj"></select></div>
+    </div>
+    <div class="field"><label for="eNote">备注</label><input id="eNote" placeholder="选填"></div>
+    <div class="acts">
+      <button class="btn ghost" type="button" onclick="closeOv()">取消</button>
+      <button class="btn primary" type="submit">保存</button>
+    </div>
+    </form>
+</div>
+</div>
+
+<div class="ov" id="feedProbeOv">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="fpTitle">
+    <h3 id="fpTitle">探查订阅源</h3>
+    <p class="fp-note">输入站点主页或 RSS 链接，自动发现可收录的订阅源。只探查、不收录；勾选后再点「收录」才写入。</p>
+    <div class="field"><label for="fpUrl">站点 / RSS 地址</label>
+      <input id="fpUrl" type="url" placeholder="https://example.com"></div>
+    <div class="acts">
+      <button class="btn ghost" type="button" onclick="closeOv('feedProbeOv')">取消</button>
+      <button class="btn" type="button" id="fpFind" onclick="fpFind()">探查</button>
+    </div>
+    <div id="fpResult" class="fp-result"></div>
+  </div>
+</div>
+
+<div class="ov" id="feedManageOv">
+  <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="fmTitle">
+    <h3 id="fmTitle">管理订阅源 <span class="tag" id="fmTag"></span></h3>
+    <div id="fmAdd" class="fm-add">
+      <div class="row">
+        <div class="field"><label for="fmUrl">RSS 地址</label><input id="fmUrl" type="url" placeholder="https://example.com/rss.xml"></div>
+        <div class="field" style="max-width:150px"><label for="fmGroup">分组</label><input id="fmGroup" list="fmGroupOptions" placeholder="选填"><datalist id="fmGroupOptions"></datalist></div>
+      </div>
+      <div class="acts" style="justify-content:flex-start">
+        <button class="btn primary" type="button" onclick="fmAdd()">收录</button>
+        <span class="fm-err" id="fmErr" role="alert"></span>
+      </div>
+    </div>
+    <div id="fmList" class="fm-list"></div>
+    <div class="acts">
+      <button class="btn ghost" type="button" onclick="closeOv('feedManageOv')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 数据来源：每个信息源的采集方式 / 频率 / 凭据 / 落盘文件 ── -->
+<div class="ov" id="sourcesOv">
+  <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="srcTitle">
+    <h3 id="srcTitle">数据来源 <span class="tag" id="srcTagModal"></span></h3>
+    <div id="draftPushBar"></div>
+    <div id="srcList"></div>
+    <div class="acts">
+      <button class="btn ghost" type="button" onclick="closeOv('sourcesOv')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 客户详情：本地卡片优先，Notion 页作为只读来源入口 ── -->
+<div class="ov" id="clientOv">
+  <div class="modal client-drawer" role="dialog" aria-modal="true" aria-labelledby="clientDetailTitle">
+    <div id="clientDetailBody"></div>
+    <div class="acts">
+      <button class="btn ghost" type="button" onclick="closeOv('clientOv')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 资讯站内阅读：保留外站原文入口，正文在工作台主题内阅读 ── -->
+<div class="ov" id="newsReaderOv" data-reader-font="wenkai">
+  <article class="modal reader-drawer" role="dialog" aria-modal="true" aria-labelledby="newsReaderTitle">
+    <div class="reader-progress" aria-hidden="true"><i id="newsReaderProgress"></i></div>
+    <aside class="reader-sidebar" aria-label="当前资讯列表">
+      <header class="reader-sidebar-head">
+        <div>
+          <span class="reader-sidebar-eyebrow" id="readerSidebarEyebrow">今日阅读</span>
+          <span class="reader-sidebar-title" id="readerSidebarTitle">资讯列表</span>
+        </div>
+        <button class="reader-close" type="button" aria-label="关闭阅读页"
+          onclick="closeOv('newsReaderOv')">×</button>
+      </header>
+      <div class="reader-sidebar-meta" id="newsReaderListCount">正在准备列表…</div>
+      <nav class="reader-news-list" id="newsReaderList" aria-label="切换文章"></nav>
+    </aside>
+    <section class="reader-pane">
+      <header class="reader-head">
+        <div class="reader-head-row">
+          <div class="reader-toolbar-main">
+            <button class="reader-mobile-back" type="button" aria-label="返回资讯列表"
+              onclick="closeOv('newsReaderOv')"><span aria-hidden="true">←</span> 返回列表</button>
+            <div class="reader-kicker" id="readerKicker">资讯 · 站内阅读</div>
+          </div>
+          <div class="reader-head-actions">
+            <div class="reader-font-picker" title="选择阅读字体">
+              <select class="reader-font-select" id="newsReaderFont" aria-label="阅读字体"
+                onchange="setNewsReaderFont(this.value)">
+                <option value="wenkai">霞鹜文楷</option>
+                <option value="fangsong">仿宋</option>
+                <option value="weekly">Tw93 金楷</option>
+                <option value="system">系统</option>
+              </select>
+            </div>
+            <a class="reader-original" id="newsReaderOriginal" href="#" target="_blank"
+              rel="noopener noreferrer" aria-label="打开原文" title="打开原文">
+              <span class="reader-original-label" id="readerOriginalLabel">打开原文</span>
+            </a>
+          </div>
+        </div>
+      </header>
+      <div class="reader-scroll" id="newsReaderScroll" onscroll="updateNewsReaderProgress()">
+        <div class="reader-content-shell">
+          <main class="reader-doc">
+            <header class="reader-article-head">
+              <h3 class="reader-title" id="newsReaderTitle">正在打开文章</h3>
+              <div class="reader-meta">
+                <span id="newsReaderSite">资讯</span>
+                <span id="newsReaderDate"></span>
+                <span id="newsReaderMeta"></span>
+              </div>
+            </header>
+            <div class="reader-state" id="newsReaderState" role="status" aria-live="polite">正在抓取正文…</div>
+            <div class="reader-body" id="newsReaderBody"></div>
+          </main>
+          <aside class="reader-toc" id="newsReaderToc" aria-label="本文目录" hidden>
+            <b>本文目录</b>
+            <nav id="newsReaderTocList"></nav>
+          </aside>
+        </div>
+      </div>
+    </section>
+  </article>
+</div>
+
+<!-- 图片大图查看：独立于阅读正文，支持按钮缩放、双击切换与 Esc 关闭。 -->
+<div class="ov" id="readerImageOv" aria-hidden="true">
+  <div class="reader-image-dialog" role="dialog" aria-modal="true" aria-label="图片预览">
+    <div class="reader-image-toolbar" aria-label="图片缩放工具">
+      <button class="reader-image-tool" type="button" aria-label="缩小图片"
+        onclick="zoomReaderImage(-.25)">−</button>
+      <button class="reader-image-tool reader-image-zoom" id="readerImageZoom" type="button"
+        aria-live="polite" title="恢复到适应窗口" onclick="resetReaderImageZoom()">100%</button>
+      <button class="reader-image-tool" type="button" aria-label="放大图片"
+        onclick="zoomReaderImage(.25)">＋</button>
+      <button class="reader-image-tool" type="button" aria-label="关闭图片预览"
+        onclick="closeReaderImage()">×</button>
+    </div>
+    <div class="reader-image-stage" id="readerImageStage">
+      <div class="reader-image-canvas">
+        <img class="reader-image-viewer" id="readerImageViewer" alt=""
+          onload="fitReaderImage()" ondblclick="toggleReaderImageZoom()">
+      </div>
+    </div>
+    <div class="reader-image-caption" id="readerImageCaption" hidden></div>
+  </div>
+</div>
+
+<!-- ── 命令面板：Cmd/Ctrl+K 呼出，跳页签 / 搜索账目 / 直达动作 ── -->
+<div class="ov cmd-ov" id="cmdOv" role="dialog" aria-modal="true" aria-label="命令面板">
+  <div class="cmd-panel">
+    <input id="cmdInput" type="search" placeholder="输入命令或搜索账目备注 / 分类…"
+      autocomplete="off" spellcheck="false" aria-label="搜索命令或账目">
+    <div id="cmdList" class="cmd-list" role="listbox"></div>
+    <div class="cmd-foot">↑↓ 选择 · Enter 执行 · Esc 关闭</div>
+  </div>
+</div>

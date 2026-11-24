@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>知识星球日报</title>
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<style>
+  :root{
+    --neu-0:#ffffff;--neu-50:#f7f4ef;--neu-100:#f1ede7;--neu-200:#e5dfd7;--neu-500:#5c6675;--neu-900:#1b2330;
+    --bg:var(--neu-50);--card:var(--neu-0);--ink:var(--neu-900);--muted:var(--neu-500);--line:var(--neu-200);
+    --ok:#0f7a37;--warn:#a15c00;--accent:#1b2330;
+    --fs-xs:12px;--fs-sm:13px;--fs-base:15px;--fs-lg:16px;--fs-xl:20px;--fs-2xl:22px;
+    --radius-sm:6px;--radius-md:10px;--radius-lg:16px;--radius-full:999px;
+    --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:24px;--space-6:32px;
+    --shadow-sm:0 1px 3px rgba(20,30,60,.06),0 6px 20px rgba(20,30,60,.05);
+  }
+  [data-theme="dark"]{
+    --neu-0:#161d2c;--neu-50:#0f1420;--neu-100:#1a2233;--neu-200:#2d3b57;--neu-500:#a7b2c7;--neu-900:#e7ecf5;
+    --ok:#4ade80;--warn:#fbbf24;--accent:#e7ecf5;
+    --shadow-sm:0 1px 3px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:var(--fs-base);line-height:1.6}
+  .wrap{max-width:920px;margin:0 auto;padding:var(--space-6) var(--space-4) 64px}
+  header.top{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-5)}
+  header.top h1{font-size:var(--fs-2xl);font-weight:600;margin:0}
+  header.top .sub{font-size:var(--fs-sm);color:var(--muted)}
+  .mode-bar{display:inline-flex;gap:3px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius-full);padding:3px}
+  .mode-btn{border:0;background:transparent;color:var(--muted);font:inherit;font-size:var(--fs-xs);font-weight:600;padding:5px 12px;border-radius:var(--radius-full);cursor:pointer}
+  .mode-btn.on{background:var(--accent);color:var(--neu-0)}
+  .pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:var(--space-2)}
+  .pill{font-size:var(--fs-xs);color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:var(--radius-full);padding:2px 10px}
+  .back{display:inline-flex;align-items:center;gap:6px;color:var(--muted);text-decoration:none;font-size:var(--fs-sm);margin-bottom:var(--space-3)}
+  .back:hover{color:var(--ink)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius-lg);padding:var(--space-5);box-shadow:var(--shadow-sm);margin-bottom:var(--space-4)}
+  .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:var(--space-3);margin:var(--space-3) 0}
+  .figure{background:var(--bg);border:1px solid var(--line);border-radius:var(--radius-md);padding:var(--space-3)}
+  .figure span{display:block;font-size:var(--fs-xs);color:var(--muted)}
+  .figure b{display:block;font-size:var(--fs-xl);line-height:1.3;margin-top:2px;font-variant-numeric:tabular-nums}
+  .note{font-size:var(--fs-xs);color:var(--muted);line-height:1.6}
+  .warn{border-left:3px solid var(--warn);padding-left:var(--space-3);margin-top:var(--space-3)}
+  h2{font-size:var(--fs-lg);font-weight:600;margin:0 0 var(--space-3)}
+  .cat{margin-top:var(--space-5)}
+  .cat:first-child{margin-top:0}
+  .cat-head{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);margin-bottom:var(--space-2)}
+  .cat-head h3{font-size:var(--fs-base);font-weight:600;margin:0}
+  .badge{font-size:var(--fs-xs);color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:var(--radius-full);padding:1px 9px}
+  .item{padding:var(--space-3) 0;border-top:1px solid var(--line)}
+  .item:first-of-type{border-top:0;padding-top:0}
+  .item-title{font-weight:600;line-height:1.45}
+  .item-title a{color:inherit;text-decoration:none}
+  .item-title a:hover{text-decoration:underline}
+  .item-meta{font-size:var(--fs-xs);color:var(--muted);margin-top:3px}
+  .item-excerpt{font-size:var(--fs-sm);color:var(--muted);margin-top:5px;line-height:1.55;white-space:pre-line}
+  .star{color:var(--warn);font-size:var(--fs-xs);margin-left:6px}
+  .tag{display:inline-block;font-size:var(--fs-xs);color:var(--muted);margin-right:6px}
+  .empty{padding:var(--space-5);text-align:center;color:var(--muted);font-size:var(--fs-sm)}
+  .err{padding:var(--space-4);background:var(--bg);border:1px solid var(--warn);border-radius:var(--radius-md);font-size:var(--fs-sm);line-height:1.7}
+  .foot{font-size:var(--fs-xs);color:var(--muted);text-align:center;margin-top:var(--space-6)}
+  @media(max-width:640px){.wrap{padding:var(--space-4) var(--space-3) 48px}.card{padding:var(--space-4)}header.top h1{font-size:var(--fs-xl)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/workbench.html" id="backLink">← 返回工作台</a>
+  <header class="top">
+    <h1 id="pageTitle">知识星球简报</h1>
+    <div class="mode-bar" role="tablist" aria-label="简报周期">
+      <button class="mode-btn on" id="btnDaily" type="button" role="tab" aria-selected="true">今日 24h</button>
+      <button class="mode-btn" id="btnWeekly" type="button" role="tab" aria-selected="false">本周 7 天</button>
+    </div>
+    <span class="sub" id="windowLabel">加载中…</span>
+  </header>
+
+  <div class="card" id="coverageCard" hidden>
+    <h2>采集覆盖</h2>
+    <div class="summary" id="figures"></div>
+    <div class="note warn" id="coverageNote"></div>
+  </div>
+
+  <div class="card" id="contentCard">
+    <div class="empty" id="loading">正在读取日报快照…</div>
+    <div id="body" hidden></div>
+  </div>
+
+  <div class="foot">只读快照 · 不发帖不修改 · 数据来自 zsxq-cli 可读星球</div>
+</div>
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  function readToken(){
+    var sp=new URLSearchParams(location.search);
+    var q=sp.get('token')||'';
+    if(q){
+      // 服务端已下发 HttpOnly Cookie，不再写入 localStorage，并清理历史残留
+      try{localStorage.removeItem('wb_token')}catch(e){}
+      try{
+        if(typeof history!=='undefined'&&typeof history.replaceState==='function'){
+          sp.delete('token');
+          var qs=sp.toString();
+          history.replaceState(null,'',location.pathname+(qs?('?'+qs):'')+(location.hash||''));
+        }
+      }catch(e){}
+      return q;
+    }
+    try{return localStorage.getItem('wb_token')||''}catch(e){return ''}
+  }
+  var TOKEN=readToken();
+  var API='/zsxq-daily.json';
+  var FETCH_OPTS={cache:'no-store',credentials:'same-origin',headers:TOKEN?{'Authorization':'Bearer '+TOKEN}:{}};
+  $('backLink').href='/workbench.html';
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+  function fmt(iso){
+    if(!iso)return '未知';
+    try{var d=new Date(iso);return isNaN(d.getTime())?String(iso).slice(5,16):(String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'))}catch(e){return String(iso).slice(5,16)}
+  }
+  function fig(label,value,hint){return '<div class="figure"><span>'+esc(label)+'</span><b>'+esc(value==null?'—':value)+'</b>'+(hint?'<em>'+esc(hint)+'</em>':'')+'</div>'}
+
+  var SNAP=null, MODE=(new URLSearchParams(location.search)).get('mode')==='weekly'?'weekly':'daily';
+  function renderItem(it){
+    var m=it.metrics||{};
+    var meta=[esc(it.group||'未知星球'),fmt(it.publishedAt)];
+    if(it.digested)meta.push('精华');
+    if(m.reads!=null)meta.push('阅 '+m.reads);
+    if(m.likes!=null)meta.push('赞 '+m.likes);
+    if(m.comments!=null)meta.push('评 '+m.comments);
+    var tags=(it.tags||[]).slice(0,4).map(function(t){return '<span class="tag">#'+esc(t)+'</span>'}).join('');
+    return '<div class="item">'+
+      '<div class="item-title"><a href="'+esc(it.url||it.mobileUrl||'#')+'" target="_blank" rel="noopener">'+esc(it.title||'无标题')+'</a>'+(it.digested?'<span class="star">★</span>':'')+'</div>'+
+      '<div class="item-meta">'+meta.join(' · ')+(tags?' · '+tags:'')+'</div>'+
+      (it.excerpt?'<div class="item-excerpt">'+esc(it.excerpt)+'</div>':'')+
+      '</div>';
+  }
+  function render(mode){
+    MODE=mode==='weekly'?'weekly':'daily';
+    $('btnDaily').classList.toggle('on',MODE==='daily');
+    $('btnDaily').setAttribute('aria-selected',String(MODE==='daily'));
+    $('btnWeekly').classList.toggle('on',MODE==='weekly');
+    $('btnWeekly').setAttribute('aria-selected',String(MODE==='weekly'));
+    if(!SNAP)return;
+    var d=SNAP, c=d.coverage||{}, isWeekly=MODE==='weekly', wk=d.weekly||null;
+    $('pageTitle').textContent=isWeekly?'知识星球周报（7 天）':'知识星球日报（24h）';
+    $('coverageNote').textContent=d.coverageNote||d.dataPolicy||'';
+    $('coverageCard').hidden=false;
+    if(isWeekly&&!wk){
+      $('windowLabel').textContent='7 天窗口待生成';
+      $('figures').innerHTML=[
+        fig('7 天新增','待生成','请重跑同步脚本'),
+        fig('扫描星球',c.scanned,'个'),
+        fig('可读星球',c.readable,'个'),
+        fig('无权限',c.noPermission,'个未开通 Skill')
+      ].join('');
+      $('body').innerHTML='<div class="empty">当前快照仅含 24h 日报：在终端跑一次 <code>python3 scripts/sync/zsxq-daily-sync.py</code> 即可同时产出 7 天周报。</div>';
+      $('body').hidden=false;return;
+    }
+    var items=isWeekly?(wk.items||[]):(d.items||[]);
+    var winS=isWeekly?wk.windowStart:d.windowStart, winE=isWeekly?wk.windowEnd:d.windowEnd;
+    var activeGrp=isWeekly?(wk.withItems!=null?wk.withItems:c.withWeekly):c.withToday;
+    $('windowLabel').textContent='窗口 '+fmt(winS)+' → '+fmt(winE);
+    $('figures').innerHTML=[
+      fig(isWeekly?'7 天新增':'24h 新增',items.length,'条主题'+(isWeekly&&wk.digestedCount?' · 精华 '+wk.digestedCount:'')),
+      fig('有更新星球',activeGrp,'/ 可读 '+c.readable),
+      fig('扫描星球',c.scanned,'个'),
+      fig('无权限',c.noPermission,'个未开通 Skill')
+    ].join('');
+    if(!items.length){
+      $('body').innerHTML='<div class="empty">该窗口内没有可读的新主题。见上方覆盖率说明——未开通权限的星球不计入「没更新」。</div>';
+      $('body').hidden=false;return;
+    }
+    var html='';
+    if(isWeekly&&wk.highlights&&wk.highlights.length){
+      var pills=Object.entries(wk.groupCounts||{}).slice(0,6).map(function(kv){
+        return '<span class="pill">'+esc(kv[0])+' · '+kv[1]+' 条</span>';
+      }).join('');
+      html+='<div class="cat"><div class="cat-head"><h3>★ 本周精选（精华与高互动 Top '+wk.highlights.length+'）</h3><span class="badge">精选</span></div>'
+        +(pills?'<div class="pills">'+pills+'</div>':'')
+        +wk.highlights.map(renderItem).join('')+'</div>';
+    }
+    var groups={};
+    items.forEach(function(it){(groups[it.category||'其他']=groups[it.category||'其他']||[]).push(it)});
+    var order=['AI 工作流','写作方法论','副业认知与赛道','其他'];
+    order.forEach(function(cat){
+      var list=groups[cat];if(!list||!list.length)return;
+      html+='<div class="cat"><div class="cat-head"><h3>'+esc(cat)+'</h3><span class="badge">'+list.length+' 条</span></div>';
+      list.forEach(function(it){html+=renderItem(it);});
+      html+='</div>';
+    });
+    $('body').innerHTML=html;
+    $('body').hidden=false;
+  }
+  $('btnDaily').onclick=function(){render('daily')};
+  $('btnWeekly').onclick=function(){render('weekly')};
+
+  fetch(API,FETCH_OPTS).then(function(r){
+    if(r.status===401)throw new Error('令牌失效：请从工作台内进入，或重新打开带 token 的链接');
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    return r.json();
+  }).then(function(d){
+    SNAP=d;
+    $('loading').hidden=true;
+    render(MODE);
+  }).catch(function(e){
+    $('loading').hidden=true;
+    $('body').innerHTML='<div class="err">读取失败：'+esc(e&&e.message||e)+'<br>快照由 <code>python3 scripts/sync/zsxq-daily-sync.py</code> 生成。</div>';
+    $('body').hidden=false;
+  });
+})();
+</script>
+</body>
+</html>

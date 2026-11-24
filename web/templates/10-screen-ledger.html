@@ -1,0 +1,205 @@
+  <div class="screen workspace-screen" id="screenLedger">
+  <header class="workspace-head">
+    <div><span class="workspace-eyebrow">总览 · 今日</span><h2>先推进最重要的事，再看经营证据</h2>
+      <p>行动、目标和账目使用同一份真实数据。首屏先给下一步，明细放在后面。</p></div>
+    <div class="workspace-source"><b>Notion 只读</b> + 本地草稿</div>
+  </header>
+  <section class="dailydeck" id="dailyDeck" aria-labelledby="dailyDeckTitle">
+    <div class="deckhead"><h2 id="dailyDeckTitle">今天先做这三件事</h2><span id="deckDate">—</span></div>
+    <div id="sinceLast" style="display:none"></div>
+    <div class="deckgrid">
+      <button class="deckitem" id="deckProject" onclick="setType('project')"></button>
+      <button class="deckitem" id="deckHealth" onclick="focusHealth()"></button>
+      <button class="deckitem" id="deckGoal" onclick="focusGoal()"></button>
+    </div>
+  </section>
+  <section class="card morning-card" id="morningBriefCard" aria-labelledby="morningBriefTitle">
+    <details class="usage-fold" id="morningBriefFold" open>
+      <summary><h2 id="morningBriefTitle">晨间速览 <span class="tag" id="morningBriefTag">—</span></h2></summary>
+      <div class="morning-grid" id="morningBriefGrid"></div>
+    </details>
+  </section>
+  <section class="card todaystrip" aria-label="打卡与备忘">
+    <div class="ts-streak">
+      <div class="hlab">打卡 · 连续记录</div>
+      <div class="streak" id="streak"></div>
+    </div>
+    <div class="ts-note">
+      <div class="hlab">今日备忘 <span class="tag" id="noteDate">—</span></div>
+      <textarea class="notebox slim" id="note" aria-label="今日备忘" placeholder="今天要推进的事 / 下一步…" oninput="saveNote()"></textarea>
+      <div class="ts-notebar">
+        <span class="ts-savestate" id="noteSaveState" role="status"></span>
+        <button class="btn" onclick="saveNoteManual()">保存备注</button>
+      </div>
+    </div>
+  </section>
+  <section class="card todaytimeline-card" aria-labelledby="todayTimelineTitle">
+    <details class="usage-fold">
+      <summary><h2 id="todayTimelineTitle">今日时间线 <span class="tag" id="todayTimelineTag">—</span></h2></summary>
+      <div class="timeline-list" id="todayTimeline"></div>
+    </details>
+  </section>
+
+  <section class="kpis" id="kpis"></section>
+
+  <!-- 目标带：整个工作台的目标装置。放第一屏、全宽，因为「离目标还差多少」才是它存在的理由。
+       恒为「本月」（目标是月度的），所以在标题里显式写明口径，不跟下面的分析口径切换走。
+       右上角的单位开关是**整页**显示单位（不仅这一张卡）—— 一个单位只留一个控件，
+       否则同一屏会出现两种写法、读者无从判断是不是同一个数。 -->
+  <section class="hero" id="goalHero">
+    <h2 class="heroh">月度目标 <span class="tag" id="goalTag">—</span>
+      <span class="seg" id="unitSeg">
+        <button class="segbtn" id="uYuan" onclick="setMoneyUnit('yuan')">元</button>
+        <button class="segbtn" id="uK" onclick="setMoneyUnit('k')">千元</button>
+        <button class="segbtn" id="uWan" onclick="setMoneyUnit('wan')">万元</button>
+      </span>
+      <span class="heroctx">整页金额单位 · 目标按净额计（收入 − 支出）· 恒为本月</span></h2>
+    <div class="goalPrimary">
+      <div class="heroCol goalProgressCol">
+        <div class="goal-target-row">
+          <span class="hval" id="goalAll">未设目标</span>
+        </div>
+        <div class="goalbar big"><i id="goalFill" style="width:0%"></i><u id="goalPaceMarker" style="left:0%;display:none"></u></div>
+        <div class="goalmeta"><span id="goalNow">¥0</span><span id="goalPaceTxt">—</span></div>
+        <div id="goalProj"></div>
+        <div id="goalRag" class="rag"></div>
+      </div>
+      <div class="heroCol goalActionCol">
+        <div class="hlab">怎么补上缺口</div>
+        <div id="goalAction"></div>
+      </div>
+    </div>
+    <details class="goalSettings" id="goalSettings">
+      <summary>
+        <span>调整目标与达成史</span>
+        <span class="goalSettingsHint" id="goalSettingsSummary">按需展开</span>
+      </summary>
+      <div class="goalSettingsGrid">
+        <div class="heroCol goalSetter">
+          <div class="hlab">设定月度目标</div>
+          <input id="goalRange" type="range" class="goalrange" min="0" max="100" step="1" value="0"
+                 oninput="onGoalSlide(false)" onchange="onGoalSlide(true)"
+                 aria-label="拖动设定月度目标">
+          <div class="field" style="margin-top:8px">
+            <div class="row goalsec">
+              <input id="goalInput" type="number" min="0" step="100" placeholder="如 30000" aria-label="月度目标金额"
+                     onkeydown="goalKey(event)" oninput="echoGoal()">
+              <button class="btn primary sm" onclick="setGoal()">设定</button>
+              <button class="btn ghost sm" id="goalClear" onclick="clearGoal()" style="display:none">清除</button>
+            </div>
+          </div>
+          <div class="goalecho" id="goalEcho">—</div>
+          <div class="goalpreset" id="goalPreset"></div>
+        </div>
+        <div class="heroCol goalHistoryCol">
+          <div class="hlab">最近 6 个月达成</div>
+          <!-- 达成史复用 monthlySeries()，与趋势图保持同一份月度聚合。 -->
+          <div class="goalhist" id="goalHist"></div>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <!-- 今日条：打卡 + 备忘。都是"每天要碰"的东西，提到第一屏，
+       合成一条横条而不是两张竖着堆的卡，省一行高度。 -->
+  <!-- 分析口径：收入来源 / 收益构成 / 支出构成 三张结构卡共用一个开关。
+       以前环形图自带「本月/累计」，而来源卡恒为累计 —— 读者无从判断每个数字是什么范围。 -->
+  <div class="scopebar">
+    <span class="scopek">分析口径</span>
+    <span class="seg" id="anSeg">
+      <button class="segbtn" id="anM" onclick="setAnScope('month')">本月</button>
+      <button class="segbtn" id="anD90" onclick="setAnScope('d90')">近 90 天</button>
+      <button class="segbtn on" id="anA" onclick="setAnScope('all')">累计</button>
+    </span>
+    <span class="scopehint" id="scopeHint">—</span>
+  </div>
+
+  <div class="grid">
+    <div class="leftcol">
+      <div class="card">
+        <h2>收益趋势 <span class="seg">
+          <button class="segbtn on" id="segD30" onclick="setChartMode('d30')">近 30 天</button>
+          <button class="segbtn" id="segM12" onclick="setChartMode('m12')">近 12 月</button>
+        </span></h2>
+        <svg class="chart" id="chart" viewBox="0 0 680 170" preserveAspectRatio="none"></svg>
+        <svg class="chart" id="chartM" viewBox="0 0 680 170" preserveAspectRatio="xMidYMid meet" style="display:none"></svg>
+        <div class="legend" id="chartLegend">
+          <span><i style="background:var(--pos)"></i>盈利（红）</span>
+          <span><i style="background:var(--neg)"></i>亏损（绿）</span>
+          <span><i style="background:var(--accent)"></i>当日</span>
+        </div>
+      </div>
+
+      <div class="card" id="srcCard">
+        <details class="usage-fold" id="srcFold" open>
+          <summary><h2>收入来源 <span class="tag" id="srcTag">—</span></h2></summary>
+          <div id="srcRank"></div>
+        </details>
+      </div>
+
+      <div class="card" id="ledgerCard">
+        <details class="usage-fold" id="ledgerFold" open>
+          <summary><h2>收益明细 <span class="tag" id="ledgerSrc">最近 12 笔</span></h2></summary>
+          <div class="ledbar">
+            <input id="ledQ" type="search" aria-label="搜索收益明细" placeholder="搜备注 / 分类 / 项目…" oninput="renderLedger()">
+            <select id="ledType" aria-label="按分类筛选收益" onchange="renderLedger()"></select>
+            <select id="ledRange" aria-label="按时间筛选收益" onchange="renderLedger()">
+              <option value="">全部时间</option>
+              <option value="d30">近 30 天</option>
+              <option value="d90">近 90 天</option>
+              <option value="ytd">今年</option>
+            </select>
+            <button class="btn ghost" id="ledMore" onclick="toggleLedAll()">看全部</button>
+            <button class="btn ghost" id="ledClear" aria-label="清除收益体检筛选" style="display:none" onclick="clearSrcFilter()"></button>
+          </div>
+          <div class="ledger-scroll-hint">左右滑动查看金额 →</div>
+          <div class="ledger-scroll" tabindex="0" role="region" aria-label="收益明细表，可横向滚动">
+            <table id="ledger">
+              <thead><tr><th scope="col">日期</th><th scope="col">分类</th><th scope="col">备注</th><th scope="col" class="num">金额</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="rightcol">
+      <div class="card" id="aiUsageCard">
+        <details class="usage-fold">
+          <summary><h2>AI 用量 <span class="tag" id="aiUsageTag">—</span></h2></summary>
+          <div id="aiUsageBody"></div>
+        </details>
+      </div>
+
+      <div class="card" id="healthCard">
+        <details class="usage-fold" id="healthFold">
+          <summary><h2>数据体检 <span class="tag" id="healthTag">—</span></h2></summary>
+          <div id="healthBody"></div>
+        </details>
+      </div>
+
+      <div class="card" id="donutCard">
+        <h2>收益构成 <span class="tag" id="donutTag">—</span>
+          <span class="heroctx">跟随上方分析口径</span></h2>
+        <div class="donutwrap">
+          <svg class="donut" id="donut" viewBox="0 0 120 120"></svg>
+          <div class="donutlg" id="donutLg"></div>
+        </div>
+        <div class="expense" id="expenseLine"></div>
+      </div>
+
+      <div class="card" id="expCard">
+        <h2>支出构成 <span class="tag" id="expTag">—</span></h2>
+        <div id="expBreak"></div>
+      </div>
+
+      <div class="card" id="projCard">
+        <details class="usage-fold" id="projFold" open>
+          <summary><h2>项目进度 <span class="tag" id="projTag">—</span></h2></summary>
+          <div id="projects"></div>
+        </details>
+      </div>
+    </div>
+  </div>
+  </div><!-- /screenLedger -->
+

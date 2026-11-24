@@ -1,0 +1,34 @@
+  <!-- ── 类型：写作 ──────────────────────────────────────────────────────── -->
+  <div class="screen workspace-screen" id="screenWriting" hidden>
+    <header class="workspace-head">
+      <div><span class="workspace-eyebrow">写作 · 内容</span><h2>今天写什么</h2>
+        <p>小说、公众号、Twitter 与知识星球统一进入 Obsidian 原生 Markdown；先选类型，再直接写正文。</p></div>
+      <div class="workspace-source"><b>Obsidian 创作/</b> + 旧小说项目</div>
+    </header>
+    <section class="writing-summary" aria-label="写作进度摘要">
+      <div id="wrFresh"></div>
+      <div class="statgrid" id="wrStats"></div>
+    </section>
+    <div class="grid">
+      <div class="leftcol">
+        <div id="wrStudio"></div>
+        <!-- 原创作品由 JS 渲染多张卡（当前 1 部，结构上支持多部） -->
+        <div id="wrBooks"></div>
+      </div>
+      <div class="rightcol">
+        <details class="card writing-client-card">
+          <summary>
+            <h2>客户内容 <span class="tag" id="wrClientTag">—</span></h2>
+            <span class="writing-client-hint">按需查看</span>
+          </summary>
+          <div class="nlist" id="wrClients"></div>
+        </details>
+        <details class="workspace-disclosure"><summary>数据口径</summary>
+          <div class="no-note">正文唯一真源是 Obsidian 的 Markdown 文件；工作台只通过稳定 ID 编辑已存在章节，
+            保存前做哈希冲突检测并备份。Notion 只同步项目与客户元数据，不复制正文，避免双写覆盖。</div>
+          <div class="no-note" id="wrNote">—</div>
+        </details>
+      </div>
+    </div>
+  </div>
+

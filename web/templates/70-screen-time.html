@@ -1,0 +1,152 @@
+  <div class="screen workspace-screen" id="screenTime" hidden>
+    <header class="workspace-head">
+      <div><span class="workspace-eyebrow">时间 · 专注</span><h2 id="timeFocusTitle">现在只专注一个 25 分钟</h2>
+        <p>先选择真实项目并开始计时，完成后再查看今天的专注分布。</p></div>
+      <div class="workspace-source"><b>Notion 项目</b> · 本地计时</div>
+    </header>
+    <div class="labnote"><strong>数据边界</strong><span>项目名来自 Notion 只读同步；计时状态保存在本浏览器，专注结果写入本地 data.json；只有点击「回写 Notion」才会创建「今日番茄追踪表」页面。</span></div>
+    <div class="card time-focus">
+      <div class="time-focus-split">
+        <section class="focus-pane" aria-label="番茄钟">
+          <div class="focus-toolbar">
+            <h2>番茄钟 <span class="tag" id="timerStateTag">未开始</span></h2>
+            <span class="seg" id="focusDurationSeg" aria-label="专注时长">
+              <button class="segbtn on" id="dur25" onclick="setFocusDuration(25)">25 分钟</button>
+              <button class="segbtn" id="dur45" onclick="setFocusDuration(45)">45 分钟</button>
+              <button class="segbtn" id="dur60" onclick="setFocusDuration(60)">60 分钟</button>
+            </span>
+          </div>
+          <div class="timer">
+            <div class="clock" id="clock">25:00</div>
+            <div class="tmeta"><span>当前项目</span><select id="timerProj" aria-label="计时项目"></select></div>
+            <div class="focus-status" id="focusStatus" role="status" aria-live="polite"><i class="dot"></i><span>准备好后开始</span></div>
+            <div class="acts">
+              <button class="btn primary" id="tmToggle" onclick="toggleTimer()">开始</button>
+              <button class="btn" onclick="resetTimer()">放弃并重置</button>
+            </div>
+            <div class="focus-options">
+              <label for="focusAutoNote"><input type="checkbox" id="focusAutoNote" onchange="toggleFocusAutoNote()">完成后写入今日备注</label>
+              <button class="btn ghost" id="focusNotifyBtn" type="button" onclick="toggleFocusNotifications()">浏览器提醒</button>
+            </div>
+          </div>
+          <div class="note" id="timerNote">计时结束会写入专注记录；刷新页面后从时间戳继续，不靠每秒减数。</div>
+        </section>
+        <aside class="focus-time-panel" aria-label="世界时间">
+          <div class="wc-overview" id="wcOverview" role="group" aria-label="当前时间与两个候选时区"></div>
+        </aside>
+      </div>
+    </div>
+    <div class="statgrid" id="timeStats"></div>
+    <div class="card" id="focusProjectCard">
+      <details class="time-fold" id="focusProjectFold">
+        <summary>
+          <span class="time-fold-title"><h2>按项目专注</h2><span class="tag">本地记录</span></span>
+          <span class="time-fold-brief" id="focusProjectBrief">正在读取项目…</span>
+          <span class="time-fold-action" aria-hidden="true"></span>
+        </summary>
+        <div class="time-fold-body">
+          <div id="timeBars"></div>
+          <div class="legacy-time" id="legacyTimeBars" hidden></div>
+          <div class="ledbar" style="margin-top:10px">
+            <input id="ntNm" placeholder="新增计时项目" aria-label="新增计时项目">
+            <button class="btn primary" onclick="addTimeProj()">添加本地项目</button>
+          </div>
+          <div class="note">项目优先来自 Notion「项目管理」中的进行中项目；手动新增的项目只保存在本机，并会明确标为本地。</div>
+        </div>
+      </details>
+    </div>
+    <div class="card" id="focusTodayCard">
+      <div class="focus-toolbar">
+        <h2>今日专注记录 <span class="tag" id="focusTodayTag">—</span></h2>
+        <button class="btn ghost" type="button" onclick="undoLastFocusSession()">撤销最近一条</button>
+      </div>
+      <div class="focus-list" id="focusTodayList"></div>
+      <div class="note">已完成的专注可单条回写到 Notion「今日番茄追踪表」；只有点击「回写 Notion」才会写入。</div>
+    </div>
+    <div class="card" id="focusTrendCard">
+      <div class="focus-toolbar">
+        <h2>专注趋势 <span class="tag" id="focusTrendTag">—</span></h2>
+        <span class="seg" id="focusRangeSeg">
+          <button class="segbtn" id="focus7" onclick="setFocusRange(7)">7 天</button>
+          <button class="segbtn on" id="focus14" onclick="setFocusRange(14)">14 天</button>
+          <button class="segbtn" id="focus30" onclick="setFocusRange(30)">30 天</button>
+        </span>
+      </div>
+      <div class="focus-trend">
+        <div class="focus-bars" id="focusBars"></div>
+        <div class="focus-summary" id="focusSummary"></div>
+      </div>
+    </div>
+    <div class="card" id="worldClockCard">
+      <details class="time-fold" id="worldClockFold">
+        <summary>
+          <span class="time-fold-title"><h2>世界时钟</h2><span class="tag" id="wcTag">本地设置</span></span>
+          <span class="time-fold-brief" id="wcBrief">正在读取城市状态…</span>
+          <span class="time-fold-action" aria-hidden="true"></span>
+        </summary>
+        <div class="time-fold-body">
+          <div class="wc-formatcfg">
+            <span>时间格式</span>
+            <span class="seg wc-hourseg" role="group" aria-label="时间格式">
+              <button class="segbtn" id="wcHour24" aria-pressed="true" onclick="setWorldClockHourMode(false)">24 小时</button>
+              <button class="segbtn" id="wcHour12" aria-pressed="false" onclick="setWorldClockHourMode(true)">12 小时</button>
+            </span>
+          </div>
+          <div class="wc-workcfg" id="wcWorkCfg">
+            <span>工作时间</span>
+            <span class="wc-hours">
+              <input type="time" id="wcWorkStart" value="09:00" aria-label="工作开始时间">
+              <span>—</span>
+              <input type="time" id="wcWorkEnd" value="18:00" aria-label="工作结束时间">
+            </span>
+            <span class="wc-days"><span>工作日</span>
+              <span class="wc-day-list">
+                <label for="wcDay1"><input type="checkbox" id="wcDay1" checked>一</label>
+                <label for="wcDay2"><input type="checkbox" id="wcDay2" checked>二</label>
+                <label for="wcDay3"><input type="checkbox" id="wcDay3" checked>三</label>
+                <label for="wcDay4"><input type="checkbox" id="wcDay4" checked>四</label>
+                <label for="wcDay5"><input type="checkbox" id="wcDay5" checked>五</label>
+                <label for="wcDay6"><input type="checkbox" id="wcDay6">六</label>
+                <label for="wcDay0"><input type="checkbox" id="wcDay0">日</label>
+              </span>
+            </span>
+            <button class="btn ghost" type="button" onclick="setWorldClockWork()">应用</button>
+          </div>
+          <div class="wc-candidates" id="wcCandidates">
+            <span>上方时间卡候选</span>
+            <span class="wc-candidate-slots">
+              <label for="wcCandidate1">① <select id="wcCandidate1" aria-label="选择第一个候选时区" onchange="setWorldClockCandidate(1,this.value)"></select></label>
+              <label for="wcCandidate2">② <select id="wcCandidate2" aria-label="选择第二个候选时区" onchange="setWorldClockCandidate(2,this.value)"></select></label>
+            </span>
+          </div>
+          <div class="wc-summary" id="wcSummary"></div>
+          <div class="wc-grid" id="wcRows" role="list"></div>
+          <div class="ledbar wc-toolbar" style="margin-top:10px">
+            <input class="wc-find" id="wcFind" placeholder="筛选城市或时区" aria-label="筛选世界时钟城市" oninput="renderWorldClock()">
+            <div class="wc-toolbar-actions">
+              <select id="wcSort" aria-label="世界时钟排序" onchange="setWorldClockSort(this.value)">
+                <option value="order">添加顺序</option>
+                <option value="time">按当地时间</option>
+                <option value="offset">按时差</option>
+              </select>
+              <select id="wcPick" aria-label="选择要添加的时区"></select>
+              <button class="btn primary" onclick="addWorldClock()">添加时区</button>
+              <button class="btn" onclick="resetWorldClock()">恢复默认</button>
+            </div>
+          </div>
+          <div class="note">按 IANA 时区实时换算，自动处理夏令时；筛选、排序、时差、最佳协作窗口和城市列表都只保存在本浏览器。</div>
+          <details class="wc-meet">
+            <summary>会议时间换算器</summary>
+            <div class="wc-meet-grid">
+              <label for="wcMeetDate">日期<input type="date" id="wcMeetDate"></label>
+              <label for="wcMeetTime">时间<input type="time" id="wcMeetTime" value="09:00"></label>
+              <label for="wcMeetFrom">从哪个城市<select id="wcMeetFrom"></select></label>
+              <button class="btn primary" type="button" onclick="convertMeetingTime()">换算</button>
+            </div>
+            <div class="wc-meet-out" id="wcMeetOut"><span class="note">选择城市和时间后点击换算。</span></div>
+          </details>
+        </div>
+      </details>
+    </div>
+  </div>
+

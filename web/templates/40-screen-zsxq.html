@@ -1,0 +1,132 @@
+  <!-- ── 类型：复盘 ──────────────────────────────────────────────────────── -->
+  <div class="screen workspace-screen" id="screenZsxq" hidden>
+    <div class="subnav" role="toolbar" aria-label="自媒体运营子页面">
+      <button class="segbtn" type="button" data-wb-action="set-type" data-wb-arg="content">账号概览</button>
+      <button class="segbtn on" type="button" data-wb-action="set-type" data-wb-arg="zsxq">知识星球</button>
+    </div>
+    <div class="zsxq-head">
+      <h1>知识星球</h1>
+      <span class="tag" id="zsxqScreenTag">—</span>
+      <button class="btn ghost zsxq-syncbtn" id="zsxqSyncBtn" type="button" onclick="zsxqSync()">同步数据</button>
+    </div>
+    <section class="card zdaily-card" id="zdailyCard">
+      <div class="zdaily-head">
+        <h2>星球简报 <span class="tag" id="zdailyTag">—</span></h2>
+        <div class="seg zdaily-seg" role="tablist" aria-label="星球简报周期">
+          <button class="segbtn on" id="zdailyModeDaily" type="button" role="tab" aria-selected="true" data-wb-action="zsxq-digest-mode" data-wb-arg="daily">今日 24h</button>
+          <button class="segbtn" id="zdailyModeWeekly" type="button" role="tab" aria-selected="false" data-wb-action="zsxq-digest-mode" data-wb-arg="weekly">本周 7 天</button>
+        </div>
+        <span class="zdaily-window" id="zdailyWindow">—</span>
+        <button class="btn ghost zdaily-refresh" id="zdailySyncBtn" type="button" data-wb-action="zsxq-daily-sync">刷新简报</button>
+        <a class="zdaily-open" href="/zsxq-daily.html" target="_blank" rel="noopener">独立大页 ↗</a>
+      </div>
+      <div class="zdaily-summary" id="zdailySummary" hidden></div>
+      <div id="zdailyBody"></div>
+      <div class="zdaily-foot" id="zdailyFoot"></div>
+    </section>
+    <section class="card zsxq-compose" id="zsxqCompose" hidden>
+      <div class="zsxq-compose-head">
+        <h2 id="zsxqComposeTitle">发布新帖 <span class="tag" id="zsxqComposeTarget">—</span></h2>
+        <button class="btn ghost" type="button" onclick="zsxqToggleCompose(false)">收起</button>
+      </div>
+      <div class="zsxq-targets">
+        <span class="zsxq-label">发到</span>
+        <div class="zsxq-dd" id="zsxqTargetDD">
+          <button class="btn ghost zsxq-dd-btn" id="zsxqTargetBtn" type="button"
+                  onclick="zsxqToggleTargetDD()" aria-haspopup="true" aria-expanded="false">
+            <span id="zsxqTargetSummary">—</span>
+          </button>
+          <div class="zsxq-dd-panel" id="zsxqTargetPanel" hidden></div>
+        </div>
+      </div>
+      <textarea id="zsxqText" class="zsxq-textarea" rows="4" placeholder="正文。第一行会放标签，正文本身不用重复写。"></textarea>
+      <div class="zsxq-draftrow">
+        <input id="zsxqSeed" class="zsxq-seed" type="text" placeholder="给它一个触发点，比如「今天踩了个什么坑」">
+        <button class="btn ghost" id="zsxqDraftBtn" type="button" onclick="zsxqGenDraft()">AI 续写</button>
+        <span class="no-note" id="zsxqDraftNote">写一句起因，它会按你的口吻出草稿</span>
+      </div>
+      <div class="zsxq-tagrow">
+        <span class="zsxq-label">标签</span>
+        <div class="zsxq-chips" id="zsxqTagChips"></div>
+        <button class="btn ghost zsxq-more" type="button" onclick="zsxqToggleTagPanel()">更多</button>
+        <input id="zsxqTags" class="zsxq-tags-input" type="text" placeholder="自定义">
+      </div>
+      <div class="zsxq-tagpanel" id="zsxqTagPanel" hidden>
+        <input id="zsxqTagQ" class="news-q" type="search" placeholder="搜索标签（按使用次数排序）" oninput="renderZsxqTags()">
+        <div class="zsxq-taglist" id="zsxqTagList"></div>
+      </div>
+      <div id="zsxqPreviewBox" class="zsxq-preview"></div>
+      <div class="zsxq-compose-foot">
+        <span class="zsxq-aimode">AI 声明：<b id="zsxqAiModeText">不声明</b>
+          <button class="linkbtn" type="button" onclick="zsxqToggleAiOverride()">改</button></span>
+        <select id="zsxqAiMode" class="zsxq-select" aria-label="AI 声明" hidden onchange="zsxqAiModePicked()">
+          <option value="aigc">AI 生成（aigc）</option>
+          <option value="personal_perspective">个人观点</option>
+          <option value="none">不声明</option>
+        </select>
+        <button class="btn" type="button" onclick="zsxqPreview()">预览</button>
+        <button class="btn primary" id="zsxqSend" type="button" disabled onclick="zsxqPublish()">确认发布</button>
+        <span class="no-note zsxq-sendnote" id="zsxqSendNote">先预览，确认内容无误再发布。</span>
+      </div>
+    </section>
+    <div class="grid">
+      <div class="leftcol">
+        <section class="card">
+          <h2>话题时间线
+            <button class="btn ghost zsxq-newbtn" type="button" onclick="zsxqToggleCompose(true)">发新帖</button>
+            <span class="seg">
+              <button class="segbtn on" id="zsxqSortNew" type="button" onclick="setZsxqSort('new')">最新</button>
+              <button class="segbtn" id="zsxqSortReads" type="button" onclick="setZsxqSort('reads')">阅读最高</button>
+            </span>
+          </h2>
+          <div class="zsxq-controls">
+            <input class="news-q" id="zsxqQ" type="search" placeholder="搜索话题标题 / 标签" aria-label="搜索星球话题" oninput="zsxqQuery=this.value;renderZsxqScreen()">
+            <span class="zsxq-ctrl-group">
+              <label class="zsxq-label" for="zsxqGroupSel">星球</label>
+              <select id="zsxqGroupSel" aria-label="按星球筛选" onchange="setZsxqGroup(this.value)"><option value="">全部</option></select>
+            </span>
+            <span class="zsxq-ctrl-group">
+              <span class="zsxq-label">时间</span>
+              <span class="seg" id="zsxqRangeSeg" role="group" aria-label="时间范围">
+                <button class="segbtn on" type="button" data-range="0" onclick="setZsxqRange(0)">全部</button>
+                <button class="segbtn" type="button" data-range="30" onclick="setZsxqRange(30)">30 天</button>
+                <button class="segbtn" type="button" data-range="7" onclick="setZsxqRange(7)">7 天</button>
+              </span>
+            </span>
+          </div>
+          <div class="zsxq-timeline" id="zsxqTimeline"></div>
+          <div class="zsxq-timeline-foot">
+            <span class="zsxq-page-info">
+              <button class="zsxq-page-btn" type="button" aria-label="上一页" onclick="setZsxqPageIndex(zsxqPageIndex-1)">‹</button>
+              <span class="tag" id="zsxqTimelineTag">—</span>
+              <button class="zsxq-page-btn" type="button" aria-label="下一页" onclick="setZsxqPageIndex(zsxqPageIndex+1)">›</button>
+            </span>
+            <span class="zsxq-ctrl-group">
+              <span class="zsxq-label">每页</span>
+              <span class="seg" id="zsxqPageSeg" role="group" aria-label="每页显示条数">
+                <button class="segbtn on" type="button" data-page="10" onclick="setZsxqPage(10)">10</button>
+                <button class="segbtn" type="button" data-page="20" onclick="setZsxqPage(20)">20</button>
+                <button class="segbtn" type="button" data-page="50" onclick="setZsxqPage(50)">50</button>
+                <button class="segbtn" type="button" data-page="0" onclick="setZsxqPage(0)">全部</button>
+              </span>
+            </span>
+          </div>
+        </section>
+      </div>
+      <div class="rightcol zsxq-right">
+        <section class="card">
+          <h2>数据概览<select class="zsxq-scope-sel" id="zsxqScreenMemberSel" aria-label="大盘统计星球" onchange="setZsxqMemberGroup(this.value)"></select></h2>
+          <div class="zsxq-grid" id="zsxqScreenStats"></div>
+          <div class="zsxq-foot" id="zsxqScreenNote">—</div>
+        </section>
+        <section class="card zsxq-groups-card">
+          <h2>星球清单</h2>
+          <div class="zsxq-groups-sort" id="zsxqGroupSort" role="group" aria-label="星球清单排序">
+            <button class="segbtn" type="button" data-sort="posts" onclick="setZsxqGroupSort('posts')">按条数</button>
+            <button class="segbtn" type="button" data-sort="name" onclick="setZsxqGroupSort('name')">按名称</button>
+          </div>
+          <div id="zsxqGroups"></div>
+        </section>
+      </div>
+    </div>
+  </div>

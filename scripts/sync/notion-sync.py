@@ -6,12 +6,12 @@
 工作，也不会再出现 HTTP(S)_PROXY 与系统代理重复叠加导致的 TLS 中断。
 
 数据源（全部只读，绝不写用户的 Notion）：
-  副业收入  collection://8f50f480-8449-4dcd-8b1a-7edbb68d3214
+  副业收入  collection://00000000-0000-4000-8000-000000000006
   产品支出  collection://fbd55d2c-89fc-43ce-b1e1-72877493744b
-  项目管理  collection://264b66ad-8b35-806b-bb64-000bb903657c
+  项目管理  collection://00000000-0000-4000-8000-000000000002
   贵人计划  collection://e79adb08-40f7-4dd3-b8fc-d3c647a8497e
             （2026-10-07 新增，只读；客户页从本地示例数据切到真实库）
-            （注意：不是 24db66ad-8b35-8090-937b-000b5a5ec527 ——
+            （注意：不是 00000000-0000-4000-8000-000000000005 ——
               那个库只有「项目一/项目二」两条 Notion 模板示例，字段也对不上）
 
 用法：
@@ -39,12 +39,12 @@ for _proxy_key in (
         "http_proxy", "https_proxy", "all_proxy"):
     NTN_ENV.pop(_proxy_key, None)
 
-DS_INCOME = "8f50f480-8449-4dcd-8b1a-7edbb68d3214"
+DS_INCOME = "00000000-0000-4000-8000-000000000006"
 DS_EXPENSE = "fbd55d2c-89fc-43ce-b1e1-72877493744b"
-DS_PROJECT = "264b66ad-8b35-806b-bb64-000bb903657c"
+DS_PROJECT = "00000000-0000-4000-8000-000000000002"
 DS_CLIENT = "e79adb08-40f7-4dd3-b8fc-d3c647a8497e"   # 贵人计划
 DS_FOLLOWUP = "e183b80d-b6e9-42c7-bf4c-99cad95bfd7a" # 客户跟进记录
-DS_FOCUS = "238b66ad-8b35-81bc-8fb4-000b255bc3da"   # 今日番茄追踪表（仅显式回写）
+DS_FOCUS = "00000000-0000-4000-8000-000000000001"   # 今日番茄追踪表（仅显式回写）
 
 
 # ---------- Notion 访问（经 ntn + Surge） ----------
@@ -440,7 +440,7 @@ def main():
         "name": "项目管理",
         "status": "connected",
         "note": ("只读拉取自你的 Notion「项目管理」库。原配置的 "
-                 "24db66ad-8b35-8090-937b-000b5a5ec527（「我的项目」）"
+                 "00000000-0000-4000-8000-000000000005（「我的项目」）"
                  "只有 2 条 Notion 模板示例数据、字段也对不上，已于 2026-09-29 换掉。"),
     }
     state["notionMeta"] = {
@@ -452,7 +452,7 @@ def main():
         "focusDs": DS_FOCUS, "focusDsName": "今日番茄追踪表",
         "clientSchema": client_schema,
         "projectSchema": project_schema,
-        "wrongDs": ["24db66ad-8b35-8090-937b-000b5a5ec527"],
+        "wrongDs": ["00000000-0000-4000-8000-000000000005"],
         "deprecatedDs": ["df55265b-330c-48cc-b133-c8947a323917",
                          "a57f3b1c-47d7-40b8-937e-22296d4ce2d5"],
         "syncedAt": now,
