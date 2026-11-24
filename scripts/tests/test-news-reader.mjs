@@ -170,6 +170,7 @@ console.log('被测：资讯标题进入工作台站内阅读');
         pageFont: getComputedStyle(document.body).fontFamily,
         titleWidth: Math.round(titleBox.width),
         titleHeight: Math.round(titleBox.height),
+        titleLineHeight: parseFloat(getComputedStyle(title).lineHeight),
         titleLeft: Math.round(titleBox.left),
         bodyWidth: Math.round(bodyBox.width),
         bodyLeft: Math.round(bodyBox.left),
@@ -332,8 +333,8 @@ console.log('被测：资讯标题进入工作台站内阅读');
     state.layout.titleInScroll
       && Math.abs(state.layout.titleLeft - state.layout.bodyLeft) <= 1
       && Math.abs(state.layout.titleWidth - state.layout.bodyWidth) <= 1
-      && state.layout.titleHeight >= 36,
-    `标题 ${state.layout.titleWidth}px / 正文 ${state.layout.bodyWidth}px`);
+      && state.layout.titleHeight >= state.layout.titleLineHeight - 1,
+    `标题 ${state.layout.titleWidth}×${state.layout.titleHeight}px / 正文 ${state.layout.bodyWidth}px`);
   t('桌面正文与博客实测排版一致',
     state.layout.bodyWidth >= 620 && state.layout.bodyWidth <= 630
       && state.layout.bodyFont === 16 && state.layout.bodyLine === 1.8,

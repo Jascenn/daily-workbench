@@ -12,11 +12,11 @@
 #   3) 日志约定到工作区 logs/，并做一次连通性自检。
 #
 # 用法：
-#     bash "/Users/jascen/Development/daily-workbench/scripts/tools/setup-syncserver.sh"
+#     bash "$(cd "$(dirname "$0")/../.." && pwd)/scripts/tools/setup-syncserver.sh"
 
 set -u
 LABEL="com.lingyi.workbench.syncserver"
-DIR="/Users/jascen/Development/daily-workbench"
+DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 UID_NUM=$(id -u)
 LOG_DIR="$DIR/logs"

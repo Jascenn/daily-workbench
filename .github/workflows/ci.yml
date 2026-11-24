@@ -6,9 +6,7 @@ on:
   pull_request:
 
 jobs:
-  # 兼容名 job：分支保护的必过检查仍要求「Logic tests (491 assertions)」这个历史
-  # 检查名。真正的逻辑/冒烟套件依赖本机真实数据快照（sections.json 等 gitignored
-  # 文件），只能在开发机跑（见 CONTRIBUTING）。这里只做仓库完整性的轻量哨兵。
+  # 兼容名 job：分支保护的必过检查仍要求「Logic tests (491 assertions)」这个历史检查名。
   logic-compat:
     name: Logic tests (491 assertions)
     runs-on: ubuntu-latest
@@ -18,18 +16,20 @@ jobs:
         run: |
           test -f workbench.html
           test -f app.py
+          test -f VERSION
           test -f scripts/sync/sections.py
+          test -f scripts/build-workbench.py
           grep -q "function newsReaderBlocksHTML" workbench.html
           grep -q "function openNewsReader" workbench.html
-  # 私有仓：logic / smoke 断言依赖本机真实数据快照与 Playwright，
-  # 都只能在开发者本机跑（见 CONTRIBUTING 说明），CI 只做静态检查。
+
   python:
-    name: Python compile check
+    name: Python compile & workbench build check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - run: python3 -m py_compile app.py scripts/sync/*.py scripts/tools/*.py scripts/tests/*.py
-      - run: bash -n scripts/sync-now.sh scripts/tools/*.sh scripts/diagnostics/*.sh
+      - run: python3 scripts/build-workbench.py --check --lint-css
+      - run: python3 -m py_compile app.py server/*.py scripts/build-workbench.py scripts/sync/*.py scripts/sync/social/*.py scripts/tools/*.py scripts/tests/*.py
+      - run: bash -n scripts/sync-now.sh scripts/sync/daily-sync.sh scripts/tools/*.sh scripts/diagnostics/*.sh

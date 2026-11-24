@@ -10,8 +10,14 @@
     #wb-sections-seed   类型区：sections.json    -> localStorage["wb_sections"]
     #wb-social-seed     自媒体：social.json      -> localStorage["wb_social"]
     #wb-web-seed        网站：web-presence.json -> localStorage["wb_web_presence"]
-分三个 localStorage 键而不是合成一个：来源与更新节奏都不同。
+    #wb-zsxq-daily-seed 日报：zsxq-daily.json   -> localStorage["wb_zsxq_daily"]
+分四个 localStorage 键而不是合成一个：来源与更新节奏都不同。
 ⚠️ 三份种子都要参与 --check 比对，否则漏掉一份就会把过期离线页当成最新。
+
+**微信快照（wechat.json）故意不内嵌**：它是真人对话正文，而离线页是一份可以
+被随手发出去的单个 HTML 文件。收益/自媒体那几份内嵌进来说明过"这是自己看的"，
+但私聊内容不该跟着文件一起流动。离线打开时微信页会明确说"读不到快照"，
+不会拿半张列表冒充。在线浏览过一次之后浏览器自己会有缓存，那是另一回事。
 
 用法：
     python3 scripts/sync/make-local.py            # 用 data.json + sections.json 重新生成
@@ -21,6 +27,7 @@
 每次 data.json / sections.json 变化后应重跑本脚本（每日自动化会调用）。
 """
 import argparse
+import glob
 import json
 import os
 import re
@@ -34,8 +41,12 @@ DATA = os.path.join(DIR, "data.json")
 SECTIONS = os.path.join(DIR, "sections.json")
 SOCIAL = os.path.join(DIR, "social.json")
 WEB_PRESENCE = os.path.join(DIR, "web-presence.json")
+ZSXQ_DAILY = os.path.join(DIR, "zsxq-daily.json")
+# Token-free, verified publish history used when the page is opened offline.
+ZSXQ_HISTORY = []  # 公开版不内嵌个人历史发布记录
 OUT = os.path.join(DIR, "workbench.local.html")
 BACKUP_DIR = os.path.join(DIR, "backups")
+KEEP_LOCAL_BACKUPS = 10
 
 SEED_MARK = 'id="wb-seed"'
 SEED_TMPL = (
@@ -55,10 +66,22 @@ SOC_TMPL = (
     'try{localStorage.setItem("wb_social",%s);}catch(e){}\n'
     '</script>\n'
 )
+ZSXQ_MARK = 'id="wb-zsxq-publish-history-seed"'
+ZSXQ_TMPL = (
+    '<script id="wb-zsxq-publish-history-seed">/* 离线种子：不含 token 的已核验发布记录 */\n'
+    'try{localStorage.setItem("wb_zsxq_publish_history",%s);}catch(e){}\n'
+    '</script>\n'
+)
 WEB_MARK = 'id="wb-web-seed"'
 WEB_TMPL = (
     '<script id="wb-web-seed">/* 离线种子：网站健康与博客更新快照 */\n'
     'try{localStorage.setItem("wb_web_presence",%s);}catch(e){}\n'
+    '</script>\n'
+)
+ZD_MARK = 'id="wb-zsxq-daily-seed"'
+ZD_TMPL = (
+    '<script id="wb-zsxq-daily-seed">/* 离线种子：知识星球 24h 日报只读快照 */\n'
+    'try{localStorage.setItem("wb_zsxq_daily",%s);}catch(e){}\n'
     '</script>\n'
 )
 
@@ -87,26 +110,39 @@ def embedded_social(html):
     return _grab(html, "wb-social-seed", "wb_social")
 
 
+def embedded_history(html):
+    return _grab(html, "wb-zsxq-publish-history-seed", "wb_zsxq_publish_history")
+
 def embedded_web(html):
     return _grab(html, "wb-web-seed", "wb_web_presence")
+
+
+def embedded_zdaily(html):
+    return _grab(html, "wb-zsxq-daily-seed", "wb_zsxq_daily")
 
 
 def strip_seed(html):
     html = re.sub(r'<script id="wb-seed">.*?</script>\n?', '', html, flags=re.S)
     html = re.sub(r'<script id="wb-sections-seed">.*?</script>\n?', '', html, flags=re.S)
     html = re.sub(r'<script id="wb-social-seed">.*?</script>\n?', '', html, flags=re.S)
-    return re.sub(r'<script id="wb-web-seed">.*?</script>\n?', '', html, flags=re.S)
+    html = re.sub(r'<script id="wb-zsxq-publish-history-seed">.*?</script>\n?', '', html, flags=re.S)
+    html = re.sub(r'<script id="wb-web-seed">.*?</script>\n?', '', html, flags=re.S)
+    return re.sub(r'<script id="wb-zsxq-daily-seed">.*?</script>\n?', '', html, flags=re.S)
 
 
-def build(template, data, sections, social, web):
+def build(template, data, sections, social, web, history, zdaily):
     body = strip_seed(template)
     seed = SEED_TMPL % json.dumps(data, ensure_ascii=False)
     if sections is not None:
         seed += SEC_TMPL % json.dumps(sections, ensure_ascii=False)
     if social is not None:
         seed += SOC_TMPL % json.dumps(social, ensure_ascii=False)
+    if history is not None:
+        seed += ZSXQ_TMPL % json.dumps(history, ensure_ascii=False)
     if web is not None:
         seed += WEB_TMPL % json.dumps(web, ensure_ascii=False)
+    if zdaily is not None:
+        seed += ZD_TMPL % json.dumps(zdaily, ensure_ascii=False)
     m = re.search(r'<body[^>]*>\s*\n?', body)
     if not m:
         raise SystemExit("模板里找不到 <body>，无法注入")
@@ -119,6 +155,7 @@ def main():
     ap.add_argument("--no-sections", action="store_true", help="不注入类型区种子（调试用）")
     ap.add_argument("--no-social", action="store_true", help="不注入自媒体种子（调试用）")
     ap.add_argument("--no-web", action="store_true", help="不注入网站监控种子（调试用）")
+    ap.add_argument("--no-zdaily", action="store_true", help="不注入知识星球日报种子（调试用）")
     args = ap.parse_args()
 
     for p in (SRC, DATA):
@@ -147,8 +184,14 @@ def main():
             raise SystemExit("缺少 %s —— 先跑 python3 scripts/sync/web-monitor.py" % WEB_PRESENCE)
         with open(WEB_PRESENCE, encoding="utf-8") as f:
             web = json.load(f)
+    zdaily = None
+    if not args.no_zdaily:
+        if not os.path.exists(ZSXQ_DAILY):
+            raise SystemExit("缺少 %s —— 先跑 python3 scripts/sync/zsxq-daily-sync.py" % ZSXQ_DAILY)
+        with open(ZSXQ_DAILY, encoding="utf-8") as f:
+            zdaily = json.load(f)
 
-    out = build(template, data, sections, social, web)
+    out = build(template, data, sections, social, web, ZSXQ_HISTORY, zdaily)
 
     if args.check:
         if not os.path.exists(OUT):
@@ -169,6 +212,7 @@ def main():
         diff = []
         now_d, now_s, now_social = embedded_snapshot(current), embedded_sections(current), embedded_social(current)
         now_web = embedded_web(current)
+        now_zdaily = embedded_zdaily(current)
         if now_d != data:
             if isinstance(now_d, dict):
                 keys = [k for k in sorted(set(now_d) | set(data)) if now_d.get(k) != data.get(k)]
@@ -199,6 +243,12 @@ def main():
                     now_web.get("generatedAt"), web.get("generatedAt")))
             else:
                 diff.append("离线版里找不到网站监控快照")
+        if zdaily is not None and now_zdaily != zdaily:
+            if isinstance(now_zdaily, dict):
+                diff.append("星球日报有更新（生成时间 %s → %s）" % (
+                    now_zdaily.get("generatedAt"), zdaily.get("generatedAt")))
+            else:
+                diff.append("离线版里找不到星球日报快照")
         if diff:
             print("需重新生成：" + "；".join(diff))
         else:
@@ -210,9 +260,17 @@ def main():
         dst = os.path.join(BACKUP_DIR, "workbench.local.html.%s.bak" % time.strftime("%Y%m%d-%H%M%S"))
         shutil.copy2(OUT, dst)
         print("旧版已备份 -> %s" % os.path.relpath(dst, DIR))
+        try:
+            kept = sorted(glob.glob(os.path.join(BACKUP_DIR, "workbench.local.html.*.bak")))
+            for stale in kept[:-KEEP_LOCAL_BACKUPS]:
+                os.remove(stale)
+        except OSError:
+            pass
 
-    with open(OUT, "w", encoding="utf-8") as f:
+    tmp = OUT + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         f.write(out)
+    os.replace(tmp, OUT)
     print("已生成 %s（内嵌 %d 条收益 / %d 个项目 / %d 个类型区 / %d 条自媒体内容，lastNotionSync=%s）" % (
         os.path.relpath(OUT, DIR), len(data.get("earnings", [])), len(data.get("projects", [])),
         len((sections or {}).get("sections", [])), len((social or {}).get("posts", [])), data.get("lastNotionSync")))

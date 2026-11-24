@@ -865,8 +865,8 @@ for (const theme of ['light', 'dark']) {
       agents: screen.querySelectorAll('#mediaAgent .agent-item').length
     };
   });
-  t('自媒体首屏按初始预览先给今日摘要和账号数据，网站数据默认展开，其余明细默认折叠',
-    mediaFold.focusBeforeAccounts && mediaFold.accountsOpen && mediaFold.webOpen
+  t('自媒体首屏先给今日摘要和账号数据，网站明细与其余分析默认按需展开',
+    mediaFold.focusBeforeAccounts && mediaFold.accountsOpen && !mediaFold.webOpen
       && mediaFold.pulseInsideAccounts && mediaFold.perf && mediaFold.brief
       && mediaFold.insight && mediaFold.knowledge && mediaFold.platforms === SOCIAL.todayPlan.length
       && mediaFold.agents > 0 && mediaFold.h <= 2400,

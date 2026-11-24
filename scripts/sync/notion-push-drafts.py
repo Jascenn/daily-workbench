@@ -31,7 +31,7 @@ NTN = "/usr/local/bin/ntn"
 PROXY_ENV = dict(os.environ,
                  HTTPS_PROXY="http://127.0.0.1:7890",
                  HTTP_PROXY="http://127.0.0.1:7890")
-DS_INCOME = "8f50f480-8449-4dcd-8b1a-7edbb68d3214"  # 副业收入
+DS_INCOME = "00000000-0000-4000-8000-000000000006"  # 副业收入
 
 
 def ntn_api(path, body, method="POST"):

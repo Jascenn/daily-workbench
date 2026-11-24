@@ -1,0 +1,58 @@
+  <div class="screen workspace-screen" id="screenReview" hidden>
+    <header class="workspace-head">
+      <div><span class="workspace-eyebrow">复盘 · 知识</span><h2>把过去的经验重新拿出来用</h2>
+        <p>先按主题看分布，再进入具体记录；时间未知的内容也不会被静默丢掉。</p></div>
+      <div class="workspace-source"><b>Obsidian</b> · 调试经验库</div>
+    </header>
+    <div id="rvFresh"></div>
+    <div class="statgrid" id="rvStats"></div>
+    <div class="grid">
+      <div class="leftcol">
+        <div class="card">
+          <h2>复盘记录 <span class="tag" id="rvTag">—</span></h2>
+          <div class="rv-filter">
+            <input id="rvQ" type="search" placeholder="搜索标题 / 产品 / 类型 / 状态" aria-label="搜索复盘记录"
+              oninput="setReviewFilter()">
+            <select id="rvTypeSel" aria-label="按复盘类型筛选" onchange="setReviewFilter()">
+              <option value="">全部类型</option>
+            </select>
+            <button class="btn ghost" id="rvClear" type="button" onclick="clearReviewFilter()" hidden>清除筛选</button>
+          </div>
+          <div class="nlist" id="rvItems"></div>
+        </div>
+      </div>
+      <div class="rightcol">
+        <div class="card" id="rvProjTodoCard">
+          <h2>项目复盘待办 <span class="tag" id="rvProjTodoTag">—</span></h2>
+          <div class="no-note" style="margin:0 0 8px">只列已结束但还没留下收口说明的项目；取消原因复用 Notion「备注」，不另建字段。</div>
+          <div class="closeaudit" id="rvProjTodo"></div>
+        </div>
+        <div class="card">
+          <details class="review-tool-fold">
+            <summary><h2>按类型分布 <span class="tag" id="rvGroupTag">—</span></h2>
+              <span class="review-fold-brief">查看知识分布</span></summary>
+            <div id="rvBreak"></div>
+          </details>
+        </div>
+        <div class="card" id="weeklyCard">
+          <details class="review-tool-fold">
+            <summary><h2>自动周报 <span class="tag" id="weeklyTag">—</span></h2>
+              <span class="review-fold-brief">查看本周汇总</span></summary>
+            <div class="no-note">汇总本周收益、各平台发布、站点与同步状态，生成一份 Markdown 存到 reports/。</div>
+            <pre class="weekly-pre" id="weeklyPre" hidden></pre>
+            <div class="media-actions" style="margin-top:10px">
+              <button class="btn" id="weeklyBtn" onclick="genWeekly()">生成本周周报</button>
+            </div>
+          </details>
+        </div>
+        <div class="card" id="noteHistCard">
+          <details class="usage-fold">
+            <summary><h2>备注历史 <span class="tag" id="noteHistTag">—</span></h2></summary>
+            <div class="nlist" id="noteHistList"></div>
+          </details>
+        </div>
+        <details class="workspace-disclosure"><summary>数据口径</summary><div class="no-note" id="rvNote">—</div></details>
+      </div>
+    </div>
+  </div>
+

@@ -1,0 +1,514 @@
+  /* 自媒体运营 */
+  #screenContent{--media-accent:var(--workspace-accent);--media-wash:var(--workspace-wash)}
+  [data-theme="dark"] #screenContent{--media-accent:var(--workspace-accent);--media-wash:var(--workspace-wash)}
+  #screenContent>.card,#screenContent .media-layout>.card{box-shadow:none}
+  .media-context{display:flex;align-items:center;gap:10px;margin:2px 2px 14px;color:var(--muted);font-size:var(--fs-xs);line-height:1.55}
+  .media-context-label{flex:0 0 auto;color:var(--media-accent);font-weight:750;letter-spacing:.06em}
+  .media-context-copy{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* details 默认 display:block，会把「来源明细」顶到第二行；行内化让整条横幅保持一行 */
+  .media-context-more{display:inline}
+  .media-context-more summary{display:inline;list-style:none;cursor:pointer;color:var(--media-accent)}
+  .media-context-more summary::-webkit-details-marker{display:none}
+  .media-context-more[open]{display:block}
+  .media-context-more[open] summary{display:block;margin-bottom:4px}
+  .completed-group{margin-top:10px;border-top:1px solid var(--line)}
+  .completed-group>summary{display:flex;align-items:center;justify-content:space-between;gap:14px;
+    padding:13px 2px;color:var(--muted);font-size:var(--fs-sm);font-weight:650;cursor:pointer;list-style:none}
+  .completed-group>summary::-webkit-details-marker{display:none}
+  .completed-group>summary::after{content:"＋";color:var(--muted);font-size:var(--fs-lg)}
+  .completed-group[open]>summary::after{content:"−"}
+  .completed-group>summary span{margin-left:auto;font-size:var(--fs-xs);font-weight:500}
+  .completed-group .completed-list{opacity:.82}
+  /* 同步日志折叠条：一行摘要（最近一条结果），展开后按需查看历史 */
+  .synclog-entry{display:flex;gap:10px;align-items:baseline;padding:7px 0;
+    border-top:1px solid var(--line);font-size:var(--fs-sm);line-height:1.5}
+  .synclog-entry:first-child{border-top:none}
+  .synclog-time{flex:none;color:var(--muted);font-variant-numeric:tabular-nums}
+  .synclog-line{flex:1 1 auto;min-width:0}
+  .synclog-fail{color:var(--pos)}
+  .synclog-wrap{grid-column:1/-1;width:100%;padding:2px 6px 8px}
+  /* 同步步骤明细：Linux 启动日志式 ✓/✗ 行，等宽字号、右对齐结果 */
+  .synclog-steps{margin:0 0 10px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);
+    display:grid;gap:6px}
+  .st-meta{color:var(--muted);font-size:var(--fs-xs)}
+  .synclog-step{display:grid;grid-template-columns:14px minmax(82px,auto) minmax(0,1fr) auto;
+    align-items:baseline;gap:8px;font-size:var(--fs-xs);line-height:1.6;color:var(--ink)}
+  .synclog-step.slowest{margin:0 calc(-1 * var(--space-2));padding:3px var(--space-2);
+    border-radius:var(--radius-xs);background:var(--workspace-wash);box-shadow:inset 2px 0 var(--warn)}
+  .st-mark{display:inline-block;width:14px;text-align:center}
+  .st-mark.bad{color:var(--pos);font-weight:700}
+  .st-name{color:var(--muted)}
+  .st-val{min-width:0;overflow-wrap:anywhere}
+  .st-time{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .st-time.slow{color:var(--warn);font-weight:700}
+  @media(max-width:560px){
+    .synclog-step{grid-template-columns:14px minmax(0,1fr) auto;gap:3px 8px}
+    .st-name{grid-column:2;grid-row:1}
+    .st-time{grid-column:3;grid-row:1}
+    .st-val{grid-column:2/-1;grid-row:2}
+  }
+  /* 网站卡搜索流量折叠条：摘要挤在中间，右侧留展开提示 */
+  .web-search-details>summary{padding:12px 2px;white-space:nowrap}
+  .web-search-details .ws-summary{flex:1 1 auto;min-width:0;margin:0 10px;color:var(--ink);
+    font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+  @media (max-width:760px){
+    /* 窄屏摘要行放不下域名+数字：换两行显示，避免把卡片撑出横向滚动 */
+    .web-search-details>summary{white-space:normal;flex-wrap:wrap;row-gap:2px}
+    .web-search-details .ws-summary{white-space:normal;flex-basis:100%;margin:0}
+  }
+  .media-focus{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:32px;align-items:end;
+    min-height:176px;padding:24px 28px;margin-bottom:24px;background:var(--deck-bg);color:var(--deck-fg);
+    border-radius:calc(var(--radius-lg) + 4px);overflow:hidden}
+  /* 首屏状态轨只回答三件事：日更平台是否待处理、数据是否过期、网站是否正常。
+     X / 小红书不在这里抢位置，留在下方「其他平台」折叠区。 */
+  .media-pulse{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:18px}
+  .media-pulse:empty{display:none}
+  .media-pulse-item{display:grid;grid-template-columns:8px minmax(0,1fr);gap:3px 9px;align-items:center;
+    min-width:0;padding:11px 13px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--card)}
+  .media-pulse-dot{width:8px;height:8px;border-radius:var(--radius-full);background:var(--muted)}
+  .media-pulse-item.is-ok .media-pulse-dot{background:var(--ok)}
+  .media-pulse-item.is-warn .media-pulse-dot{background:var(--warn)}
+  .media-pulse-title{min-width:0;color:var(--muted);font-size:var(--fs-xs);font-weight:700;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .media-pulse-value{grid-column:2;margin-top:1px;font-size:var(--fs-sm);font-weight:760;line-height:1.35}
+  .media-pulse-copy{grid-column:1/-1;color:var(--muted);font-size:var(--fs-xs);line-height:1.55;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .media-pulse-copy.is-data-warn{color:var(--warn);font-weight:650}
+  .media-eyebrow{display:block;margin-bottom:14px;color:var(--media-accent);font-size:var(--fs-xs);font-weight:800;letter-spacing:.14em}
+  [data-theme="light"] .media-eyebrow{color:var(--neu-200)}
+  .media-focus h2{max-width:660px;margin:0;font-size:calc(var(--fs-2xl) * 1.36);line-height:1.2;letter-spacing:-.02em}
+  .media-focus p{max-width:650px;margin:10px 0 0;color:var(--neu-200);font-size:var(--fs-sm);line-height:1.7}
+  [data-theme="dark"] .media-focus p{color:var(--neu-500)}
+  .media-focus-side{display:flex;flex-direction:column;align-items:flex-end;gap:14px}
+  .media-score{display:grid;grid-template-columns:auto auto;gap:6px 22px;align-items:end;min-width:220px;
+    padding-left:26px;border-left:1px solid rgba(255,255,255,.2)}
+  .media-score-main{grid-row:1/3;display:flex;align-items:flex-end;gap:8px}
+  .media-score-main strong{font-size:calc(var(--fs-2xl) * 2.64);line-height:.86;letter-spacing:-.07em}
+  .media-score-main span{padding-bottom:3px;color:var(--neu-200);font-size:var(--fs-xs)}
+  [data-theme="dark"] .media-score-main span{color:var(--neu-500)}
+  .media-score-fact{display:flex;justify-content:space-between;gap:14px;color:var(--neu-200);font-size:var(--fs-xs);white-space:nowrap}
+  .media-score-fact b{color:var(--deck-fg)}
+  [data-theme="dark"] .media-score-fact{color:var(--neu-500)}
+  .media-focus-action{min-height:40px;padding:8px 14px;border:1px solid rgba(255,255,255,.34);
+    border-radius:var(--radius-full);background:transparent;color:var(--deck-fg);font:inherit;
+    font-size:var(--fs-sm);font-weight:700;cursor:pointer;transition:background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease)}
+  .media-focus-action:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.62)}
+  .media-focus-action:focus-visible{outline:none;box-shadow:0 0 0 2px var(--deck-bg),0 0 0 4px var(--deck-fg)}
+  .media-focus-action:disabled{opacity:.55;cursor:default}
+  .media-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(270px,.85fr);gap:24px;align-items:start}
+  #mediaPlanLayout{margin-bottom:24px}
+  .media-account-card{margin-bottom:24px}
+  /* 折叠行同时也是触控目标：补足到 44px，手机上不再需要瞄准 24px 高的一行文字。 */
+  .media-overview-fold>summary{display:flex;align-items:center;gap:12px;min-height:44px;padding:10px 0;
+    cursor:pointer;list-style:none}
+  .media-overview-fold>summary::-webkit-details-marker{display:none}
+  .media-overview-fold>summary>.media-section-head{flex:1;min-width:0}
+  .media-overview-fold>summary::after{content:"＋";color:var(--muted);font-size:var(--fs-lg);font-weight:650;flex:none}
+  .media-overview-fold[open]>summary::after{content:"−"}
+  .media-overview-brief{color:var(--ink);font-size:var(--fs-xs);font-weight:650;white-space:nowrap}
+  .media-brief-fold>summary,.media-insight-fold>summary,.media-knowledge-fold>summary{
+    display:flex;align-items:center;gap:10px;min-height:44px;padding:10px 0;cursor:pointer;list-style:none}
+  .media-brief-fold>summary::-webkit-details-marker,
+  .media-insight-fold>summary::-webkit-details-marker,
+  .media-knowledge-fold>summary::-webkit-details-marker{display:none}
+  .media-brief-fold>summary>.media-section-head,
+  .media-insight-fold>summary>.media-section-head,
+  .media-knowledge-fold>summary>.media-section-head{flex:1;min-width:0}
+  .media-brief-caret{color:var(--media-accent);font-size:var(--fs-sm);flex:none;transition:transform var(--dur-fast) var(--ease)}
+  .media-brief-fold[open] .media-brief-caret,
+  .media-insight-fold[open] .media-brief-caret,
+  .media-knowledge-fold[open] .media-brief-caret{transform:rotate(180deg)}
+  .media-today-brief{color:var(--muted);font-size:var(--fs-xs);font-weight:650;margin-left:auto;white-space:nowrap}
+  .media-account-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--line)}
+  .media-account{min-width:0;padding:18px 18px 16px 0;border-right:1px solid var(--line)}
+  .media-account+.media-account{padding-left:18px}
+  .media-account:last-child{border-right:0;padding-right:0}
+  .media-account-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+  .media-account-name{font-weight:750}
+  .media-account-value{font-size:calc(var(--fs-2xl) * 1.28);font-weight:760;line-height:1.05;letter-spacing:-.03em}
+  .media-account-label{margin-top:4px;color:var(--muted);font-size:var(--fs-xs)}
+  .media-account-sub{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;color:var(--muted);font-size:var(--fs-xs)}
+  .media-account-foot{display:flex;justify-content:space-between;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);
+    color:var(--muted);font-size:var(--fs-xs)}
+  .media-account-foot a{color:var(--media-accent);text-decoration:none;font-weight:650}
+  .media-account.is-blocked{background:var(--media-wash);margin:-1px 0;padding:18px;border:1px solid var(--media-accent);border-radius:var(--radius-md)}
+  .media-account.is-stale{background:var(--paper-2)}
+  .media-account-issue{margin-top:8px;color:var(--media-accent);font-size:var(--fs-xs);line-height:1.55;font-weight:650}
+  .media-account-more{margin-top:8px;font-size:var(--fs-xs)}
+  .media-account-more>summary{color:var(--muted);cursor:pointer;list-style:none;font-weight:600}
+  .media-account-more>summary::-webkit-details-marker{display:none}
+  .media-account-more>summary::before{content:"› ";color:var(--muted)}
+  .media-account-more>div{margin-top:6px;color:var(--muted);line-height:1.6}
+  .media-trend{margin-top:2px;padding:18px 0 2px;border-top:1px solid var(--line)}
+  .media-trend-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
+  .media-trend-head h3{margin:0;font-size:var(--fs-base);font-weight:750}
+  .media-trend-head p{margin:5px 0 0;color:var(--muted);font-size:var(--fs-xs);line-height:1.6}
+  .media-trend-summary{display:flex;gap:18px;flex:none;text-align:right}
+  .media-trend-summary b{display:block;font-size:var(--fs-lg);font-variant-numeric:tabular-nums;line-height:1.1}
+  .media-trend-summary span{display:block;margin-top:3px;color:var(--muted);font-size:var(--fs-xs);white-space:nowrap}
+  .media-trend-chart{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-top:16px}
+  .media-trend-day{min-width:0;text-align:center}
+  .media-trend-bar{width:100%;height:78px;display:flex;align-items:flex-end;justify-content:center;padding:0 5px;
+    border-bottom:1px solid var(--line);background:repeating-linear-gradient(to top,transparent 0 25px,var(--line) 25px 26px)}
+  .media-trend-stack{display:flex;flex-direction:column-reverse;width:min(100%,30px);min-height:2px;overflow:hidden;
+    border-radius:var(--radius-xs) var(--radius-xs) 0 0;background:var(--line-strong)}
+  .media-trend-seg{display:block;min-height:2px;background:var(--media-accent)}
+  .media-trend-seg.s1{opacity:.58}
+  .media-trend-seg.s2{opacity:.32}
+  .media-trend-day.no-post .media-trend-stack{height:2px!important;opacity:.35}
+  .media-trend-date,.media-trend-value,.media-trend-read{display:block;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .media-trend-date{margin-top:6px;color:var(--muted);font-size:var(--fs-xs)}
+  .media-trend-value{margin-top:3px;font-size:var(--fs-sm);font-weight:750;font-variant-numeric:tabular-nums}
+  .media-trend-read{color:var(--muted);font-size:var(--fs-xs);font-variant-numeric:tabular-nums}
+  .media-trend-foot{display:flex;justify-content:space-between;gap:16px;margin-top:10px;color:var(--muted);font-size:var(--fs-xs);line-height:1.55}
+  .media-trend-legend{display:flex;gap:12px;flex-wrap:wrap}
+  .media-trend-legend span{display:inline-flex;align-items:center;gap:5px}
+  .media-trend-legend i{width:8px;height:8px;border-radius:var(--radius-xs);background:var(--media-accent)}
+  .media-trend-legend i.s1{opacity:.58}
+  .media-trend-legend i.s2{opacity:.32}
+  .media-trend-fold{margin-top:12px;border-top:1px solid var(--line)}
+  .media-trend-fold>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    min-height:44px;padding:10px 0;cursor:pointer;list-style:none;color:var(--ink);font-size:var(--fs-sm);font-weight:700}
+  .media-trend-fold>summary::-webkit-details-marker{display:none}
+  .media-trend-fold>summary::after{content:"＋";color:var(--muted);font-size:var(--fs-lg);font-weight:650}
+  .media-trend-fold[open]>summary::after{content:"−"}
+  .media-trend-brief{margin-left:auto;color:var(--muted);font-size:var(--fs-xs);font-weight:500}
+  .media-trend-fold .media-trend{margin-top:0;padding-top:12px;border-top:0}
+  /* 内容表现卡（Top/Bottom）：排名数字 + 一行原因，不加图标不加渐变 */
+  .media-perf-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+  .media-perf-col{border:1px solid var(--line);border-radius:var(--radius-md);padding:12px 14px;min-width:0}
+  .media-perf-col h4{margin:0 0 6px;font-size:var(--fs-xs);font-weight:700;color:var(--muted)}
+  .media-perf-item{padding:8px 0;border-top:1px solid var(--line)}
+  .media-perf-item:first-of-type{border-top:none;padding-top:0}
+  .media-perf-rank{font-size:var(--fs-xs);font-weight:700;color:var(--muted);margin-right:6px}
+  .media-perf-title{display:block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    color:var(--ink);text-decoration:none}
+  .media-perf-why{margin-top:3px;font-size:var(--fs-xs);color:var(--muted);line-height:1.55}
+  .media-completion-bar{margin-top:5px;height:4px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden}
+  .media-completion-bar i{display:block;height:100%;background:var(--media-accent)}
+  /* 节奏健康分：大数字 + 分档 chip + 逐栏目进度条，口径来自 sections.json 的 days/threshold */
+  .rhythm-score{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .rhythm-score b{font-size:var(--fs-2xl);font-weight:760}
+  .rhythm-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:var(--fs-xs)}
+  .rhythm-row .rr-name{width:3.5em;flex:none;color:var(--muted)}
+  .rhythm-row .rr-val{width:6.5em;flex:none;text-align:right;color:var(--muted)}
+  .rhythm-row .rr-bar{flex:1;height:6px;border-radius:var(--radius-xs);background:var(--paper-2);overflow:hidden}
+  .rhythm-row .rr-bar i{display:block;height:100%;border-radius:var(--radius-xs);background:var(--pri-600)}
+  .rhythm-row.rr-stale .rr-bar i{background:var(--neg)}
+  .ophealth-row{display:flex;align-items:center;gap:10px;padding:4px 0;font-size:var(--fs-xs)}
+  .ophealth-row .oh-name{width:4.5em;flex:none;color:var(--muted)}
+  .ophealth-row .rr-bar{flex:1;height:6px;border-radius:var(--radius-xs);background:var(--paper-2);overflow:hidden}
+  .ophealth-row .rr-bar i{display:block;height:100%;border-radius:var(--radius-xs);background:var(--pri-600)}
+  .ophealth-row.oh-low .rr-bar i{background:var(--neg)}
+  .ophealth-row .oh-note{width:16em;flex:none;text-align:right;color:var(--muted)}
+  .oh-issue{padding:6px 0;border-top:1px solid var(--line);font-size:var(--fs-xs);color:var(--warn)}
+  .oh-issue.oh-ok{color:var(--muted);border-top:0}
+  .weekly-pre{max-height:420px;overflow:auto;margin:10px 0 0;padding:12px 14px;border:1px solid var(--line);
+    border-radius:var(--radius-sm);background:var(--paper-2);font-size:var(--fs-xs);line-height:1.7;white-space:pre-wrap;word-break:break-word}
+  .media-web-card{margin-bottom:24px}
+  .media-web-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(260px,.75fr);gap:28px}
+  .media-web-alert{padding:14px 0;border-bottom:1px solid var(--line)}
+  .media-web-alert:last-child{border-bottom:0}
+  .media-web-alert .wt{display:flex;gap:9px;align-items:center;font-weight:740}
+  .media-web-alert .wd{margin-top:5px;color:var(--muted);font-size:var(--fs-xs);line-height:1.6}
+  .media-site-row{display:grid;grid-template-columns:minmax(100px,.7fr) minmax(0,1fr) auto;gap:14px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);font-size:var(--fs-xs)}
+  .media-site-row:last-child{border-bottom:0}
+  .media-site-row strong{font-size:var(--fs-sm)}
+  .media-site-row .site-meta{color:var(--muted)}
+  .media-blog-latest{padding:16px;border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--paper-2)}
+  .media-blog-latest .eyebrow{color:var(--media-accent);font-size:var(--fs-xs);font-weight:800;letter-spacing:.08em}
+  .media-blog-latest a{display:block;margin-top:7px;color:var(--ink);font-size:var(--fs-base);font-weight:760;text-decoration:none;line-height:1.45}
+  .media-blog-latest p{margin:8px 0 0;color:var(--muted);font-size:var(--fs-xs);line-height:1.6}
+  .media-visitor-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+  .mv-item{padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--paper-2);display:flex;flex-direction:column;gap:3px;min-width:0}
+  .mv-item b{font-size:var(--fs-base);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mv-item span{color:var(--muted);font-size:var(--fs-xs)}
+  .media-recap-head{margin:4px 0 8px;color:var(--muted);font-size:var(--fs-xs);line-height:1.6}
+  .media-recap-note{margin-top:8px;color:var(--muted);font-size:var(--fs-xs);line-height:1.6}
+  .media-traffic-note{margin-top:12px;color:var(--muted);font-size:var(--fs-xs);line-height:1.6}
+  .media-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:8px}
+  .media-section-title{display:flex;align-items:baseline;gap:10px;min-width:0;flex-wrap:wrap}
+  .media-section-title h2{margin:0}
+  .media-section-index{color:var(--media-accent);font-size:var(--fs-xs);font-weight:800;letter-spacing:.1em}
+  .media-section-meta{color:var(--muted);font-size:var(--fs-xs);white-space:nowrap}
+  /* 内容表现卡折叠：复用总览页 usage-fold 的「＋/−」样式，摘要行可点，默认展开 */
+  details.perf-fold>summary{list-style:none;cursor:pointer;margin:0;min-height:44px;display:flex;align-items:center;gap:12px}
+  details.perf-fold>summary::-webkit-details-marker{display:none}
+  details.perf-fold>summary .media-section-head{cursor:pointer}
+  details.perf-fold>summary::after{content:"＋";color:var(--muted);font-size:var(--fs-lg);font-weight:650;margin-left:auto}
+  details.perf-fold[open]>summary::after{content:"−"}
+  .media-matrix{display:block}
+  .media-platform{display:grid;grid-template-columns:112px minmax(180px,1fr) auto;gap:18px;align-items:center;
+    min-width:0;padding:17px 0;border-bottom:1px solid var(--line)}
+  .media-platform:last-child{border-bottom:0}
+  .media-platform .mh{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+  .media-platform .mn{font-size:var(--fs-base);font-weight:750}
+  .media-platform .md{margin:0;color:var(--muted);font-size:var(--fs-xs);line-height:1.6}
+  .media-actions{display:flex;justify-content:flex-end;gap:7px;flex-wrap:wrap;align-items:center}
+  .media-actions a,.media-actions button{font:inherit;font-size:var(--fs-xs);font-weight:650;border:1px solid var(--line-strong);
+    background:transparent;color:var(--ink);border-radius:var(--radius-full);padding:6px 10px;text-decoration:none;cursor:pointer;
+    transition:border-color var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease),background var(--dur-fast) var(--ease)}
+  .media-actions .media-primary{border-color:var(--media-accent);background:var(--media-accent);color:#fff}
+  [data-theme="dark"] .media-actions .media-primary{color:#141b28}
+  .media-actions .media-ghost{color:var(--muted)}
+  .media-actions a:hover,.media-actions button:hover{border-color:var(--media-accent);color:var(--media-accent)}
+  .media-actions .media-primary:hover{background:transparent;color:var(--media-accent)}
+  .media-actions a:active,.media-actions button:active{transform:translateY(1px)}
+  .media-note{margin-top:10px;color:var(--muted);font-size:var(--fs-xs);line-height:1.6}
+  .media-post{padding:16px 0}
+  .media-post .nt{font-size:var(--fs-base)}
+  .media-post .ns{margin-top:7px;line-height:1.65}
+  .media-more{border-top:1px solid var(--line)}
+  .media-more>summary,.media-connect>summary{display:flex;justify-content:space-between;gap:16px;align-items:center;
+    padding:14px 0;color:var(--muted);font-size:var(--fs-sm);font-weight:650;cursor:pointer;list-style:none}
+  .media-more>summary::-webkit-details-marker,.media-connect>summary::-webkit-details-marker{display:none}
+  .media-more>summary::after,.media-connect>summary::after{content:"＋";color:var(--media-accent);font-size:var(--fs-lg)}
+  .media-more[open]>summary::after,.media-connect[open]>summary::after{content:"−"}
+  /* 06/07 各自承载一条证据链，桌面并排但保持独立卡片，手机再单列。 */
+  .media-evidence-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(280px,.85fr);gap:24px;align-items:start;margin-top:24px}
+  .media-evidence-layout>.card{margin:0}
+  /* 发布预测是独立的复盘动作，与上方两个证据卡留出明确分隔。 */
+  #predCard{margin:24px 0 0}
+  /* 运营体检与 Jev 增强沿用上一行的双列节奏：左列承载主要证据，右列承载辅助信息。
+     这样不会出现 06/07 双列、08/09 却各铺一整行的断层。 */
+  #mediaEnhancements{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(280px,.85fr);
+    gap:24px;align-items:start;margin-top:16px}
+  #mediaEnhancements>.card{margin:0}
+  #mediaEnhancements>.card:only-child{grid-column:1/-1}
+  #mediaEnhancements:empty{display:none}
+  /* Jev 增强卡：让"插件"有自己的身份——编号 J 用媒体强调色 + 独立小徽标，
+     分数条与内容信号的原生 chip 风格区分开，避免看起来像随手贴的一行。 */
+  .media-jev-card{border-color:var(--line)}
+  .media-jev-card:hover,.media-jev-card[open]{border-color:var(--line-strong)}
+  .media-jev-card .media-section-index{display:inline-flex;align-items:center;justify-content:center;
+    width:22px;height:22px;border-radius:var(--radius-full);background:var(--media-accent);color:#fff;
+    font-size:var(--fs-xs);letter-spacing:0;align-self:center}
+  [data-theme="dark"] .media-jev-card .media-section-index{color:#141b28}
+  /* 运营体检是核心证据，不是增强插件：编号与 01–07 保持同一文字层级。 */
+  .op-health-card .media-section-index{width:auto;height:auto;border-radius:var(--radius-xs);background:none;
+    color:var(--media-accent);font-size:var(--fs-xs);letter-spacing:.1em}
+  .jev-row{padding:13px 0;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:4px 16px;align-items:baseline}
+  .jev-row:first-of-type{border-top:0;padding-top:4px}
+  .jev-row .jt{font-size:var(--fs-sm);font-weight:650;overflow-wrap:anywhere}
+  .jev-row .jscore{display:flex;align-items:center;gap:10px;justify-self:end;white-space:nowrap}
+  .jev-row .jnum{font-variant-numeric:tabular-nums;font-weight:800;font-size:var(--fs-base);color:var(--media-accent)}
+  .jev-row .jnum.low{color:var(--muted)}
+  .jev-row .jmeter{width:64px;height:6px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden}
+  .jev-row .jmeter i{display:block;height:100%;background:var(--media-accent)}
+  .jev-row .jusage{grid-column:2;color:var(--muted);font-size:var(--fs-xs);white-space:nowrap}
+  .jev-empty{padding:10px 0 4px;color:var(--muted);font-size:var(--fs-sm);line-height:1.65}
+  .media-jev-card .media-actions{margin-top:12px}
+  /* 折叠态摘要行：J 徽标 + 标题在左，"N 条 · 最高 · 最低 · 时间"在右；
+     展开箭头用 ✔ 翻转 + 媒体强调色，与站点其他 details 的 ＋/− 语义区分开。 */
+  .media-jev-card>summary{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;
+    min-height:44px;cursor:pointer;list-style:none;padding:10px 0}
+  .media-jev-card>summary::-webkit-details-marker{display:none}
+  .media-jev-title{display:flex;align-items:center;gap:10px;font-size:var(--fs-base);font-weight:750}
+  .media-jev-summ{color:var(--muted);font-size:var(--fs-xs);text-align:right;font-variant-numeric:tabular-nums}
+  .media-jev-caret{color:var(--media-accent);font-size:var(--fs-sm);transition:transform var(--dur-fast) var(--ease)}
+  .media-jev-card[open] .media-jev-caret{transform:rotate(180deg)}
+  .media-jev-body{padding:10px 0 4px;border-top:1px solid var(--line);margin-top:10px}
+  .chip.jev-chip{border-color:var(--media-accent);color:var(--media-accent);font-weight:700}
+  .knowledge-list{display:flex;flex-direction:column}
+  .knowledge-item{padding:14px 0;border-top:1px solid var(--line)}
+  .knowledge-item:first-child{padding-top:6px;border-top:0}
+  .knowledge-item a{color:var(--ink);font-weight:720;text-decoration:none;line-height:1.45}
+  .knowledge-item a:hover{color:var(--media-accent)}
+  .knowledge-item p{margin:6px 0 0;color:var(--muted);font-size:var(--fs-xs);line-height:1.6;
+    display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+  .knowledge-meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;color:var(--muted);font-size:var(--fs-xs)}
+  .agent-list{display:flex;flex-direction:column}
+  .agent-item{padding:14px 0;border-top:1px solid var(--line)}
+  .agent-item:first-child{border-top:0}
+  .agent-item.lead{margin:5px 0 8px;padding:16px;background:var(--media-wash);border:0;border-radius:var(--radius-md)}
+  .agent-item .at{font-size:var(--fs-sm);font-weight:750}
+  .agent-item.lead .at{font-size:var(--fs-base);line-height:1.45}
+  .agent-item .ad{margin-top:5px;color:var(--muted);font-size:var(--fs-xs);line-height:1.65}
+  .media-connect{margin-top:10px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .media-connect>summary{padding:17px 2px;color:var(--ink)}
+  .media-connect>summary span{margin-left:auto;color:var(--muted);font-size:var(--fs-xs);font-weight:500}
+  .media-adapter-list{padding:4px 0 14px}
+  .media-adapter{display:grid;grid-template-columns:112px minmax(0,1fr) auto;gap:18px;align-items:center;
+    padding:13px 2px;border-top:1px solid var(--line)}
+  .media-adapter:first-child{border-top:0}
+  .media-adapter-name{font-weight:700}
+  .media-adapter-copy{color:var(--muted);font-size:var(--fs-xs);line-height:1.6}
+  .insp{background:var(--bg);border:1px solid var(--line);border-radius:var(--radius-md);padding:10px 12px;margin-bottom:8px;font-size:var(--fs-sm);display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .insp .it{font-weight:600} .insp .im{font-size:var(--fs-xs);color:var(--muted);margin-top:3px}
+  .insp .tagx{font-size:var(--fs-xs);font-weight:700;color:var(--ink);background:var(--neu-100);padding:1px 7px;border-radius:var(--radius-full);margin-left:6px}
+  svg.mini{width:100%;height:120px;display:block}
+  /* Kanban 看板：按阶段分列 */
+  .kanban{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start}
+  .kcol{flex:1 1 178px;min-width:158px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius-md);padding:8px}
+  .khead{display:flex;justify-content:space-between;align-items:center;font-size:var(--fs-xs);font-weight:700;color:var(--muted);padding:2px 4px 8px;border-bottom:1px solid var(--line);margin-bottom:8px}
+  .kc{background:var(--card);border:1px solid var(--line-strong);border-radius:var(--radius-full);padding:0 8px;font-size:var(--fs-xs);color:var(--ink)}
+  .kcol .proj{margin-bottom:8px}
+  @media(min-width:761px){
+    /* 左栏只有约 650px：内容列与三个空列必须同排，空列收窄成索引，不能各自换行铺满。 */
+    .kanban .kcol.filled{flex:2.2 1 240px;min-width:220px}
+    .kanban .kcol.zero{flex:1 1 84px;min-width:76px;opacity:.76}
+  }
+  /* 当前范围只剩一个有效状态时，空列没有比较价值：直接让内容列占满看板。 */
+  .kanban.single-filled .kcol.filled{flex:1 1 100%;min-width:0}
+  .proj.conflict{border-left:3px solid var(--warn)}
+  .proj.overdue{border-left:3px solid var(--pos)}
+  /* 长期挂起的项目：虚线边框 + 降透明度，视觉上退后一档，和"刚逾期"区分开。
+     不靠颜色单独传达 —— 卡片里同时写着「长期挂起」四个字（WCAG 1.4.1）。 */
+  .proj.stale{border-style:dashed;opacity:.82}
+  /* 优先级徽标：P0 最重、P4 最轻，用同一色系的深浅而不是五种颜色（避免变成红绿灯）。 */
+  .proj .prio{display:inline-block;font-size:var(--fs-xs);font-weight:800;letter-spacing:.02em;
+    padding:1px 6px;border-radius:var(--radius-xs);vertical-align:2px;
+    background:var(--neu-100);color:var(--muted)}
+  .proj .prio-p0{background:rgba(200,41,44,.13);color:var(--pos)}
+  .proj .prio-p1{background:rgba(161,92,0,.15);color:var(--warn)}
+  .proj .prio-p2{background:var(--neu-100);color:var(--ink)}
+  .proj .projnote{font-size:var(--fs-xs);color:var(--muted);line-height:1.55;margin-top:7px;
+    display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+  .proj .srcmeta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:7px}
+  .proj .conflictchip{font-size:var(--fs-xs);font-weight:700;color:var(--warn);background:rgba(161,92,0,.14);
+    padding:1px 7px;border-radius:var(--radius-full)}
+  /* 卡片 / 行内操作（推进、删除）——无 alert/confirm，直接作用 */
+  .pacts{display:flex;gap:6px;margin-top:9px}
+  .miniact{font:inherit;font-size:var(--fs-xs);font-weight:600;border:1px solid var(--line-strong);background:var(--card);color:var(--ink);border-radius:var(--radius-sm);padding:4px 9px;cursor:pointer;transition:.15s}
+  .miniact:hover{border-color:var(--accent);color:var(--accent)}
+  .miniact.del{margin-left:auto;color:var(--muted)}
+  .miniact.del:hover{border-color:var(--pos);color:var(--pos)}
+  .crow .acts{display:flex;gap:5px;justify-content:flex-end}
+  .insp .ibody{flex:1;min-width:0}
+  .insp .acts{display:flex;gap:5px;flex:0 0 auto}
+  @media(max-width:760px){
+    .deckgrid{grid-template-columns:1fr}
+    .morepanel{position:fixed;right:16px;top:72px;left:16px;width:auto;
+      max-height:calc(100vh - 88px);overflow-y:auto}
+    .media-pulse{grid-template-columns:1fr;gap:8px;margin-bottom:14px}
+    .media-pulse-item{padding:10px 12px}
+    .media-pulse-copy{white-space:normal}
+    .media-focus{grid-template-columns:1fr;gap:24px;min-height:0;padding:22px 20px;margin-bottom:16px}
+    .media-focus h2{font-size:calc(var(--fs-xl) * 1.2)}
+    .media-focus-side{align-items:stretch;gap:14px}
+    .media-score{grid-template-columns:auto 1fr 1fr;min-width:0;padding:18px 0 0;border-left:0;border-top:1px solid rgba(255,255,255,.2)}
+    .media-score-main{grid-row:auto}
+    .media-score-main strong{font-size:calc(var(--fs-2xl) * 2.09)}
+    .media-score-fact{display:block;white-space:normal}
+    .media-score-fact b{display:block;font-size:var(--fs-sm)}
+    .media-focus-action{width:100%;min-height:44px}
+    .media-layout{grid-template-columns:1fr;gap:0}
+    .media-account-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .media-overview-fold>summary{gap:8px;padding:8px 0}
+    .media-overview-fold>summary .media-section-head{display:grid;grid-template-columns:minmax(0,1fr);gap:3px}
+    .media-overview-fold>summary .media-section-title{flex-wrap:nowrap;white-space:nowrap}
+    .media-overview-fold>summary .media-overview-brief{white-space:normal;line-height:1.45}
+    .media-overview-fold>summary .media-section-meta{display:none}
+    .media-overview-fold>summary::after{margin-left:0}
+    .media-today-brief{display:none}
+    details.perf-fold>summary{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"title more" "note more"}
+    details.perf-fold>summary .media-section-head{display:contents}
+    details.perf-fold>summary .media-section-title{grid-area:title;flex-wrap:nowrap}
+    details.perf-fold>summary .media-section-meta{grid-area:note;white-space:normal;margin-top:2px}
+    details.perf-fold>summary::after{grid-area:more;align-self:center;margin-left:0}
+    .media-brief-fold>summary .media-section-meta,
+    .media-insight-fold>summary .media-section-meta,
+    .media-knowledge-fold>summary .media-section-meta{display:none}
+    .media-trend-head{flex-direction:column;gap:12px}
+    .media-trend-summary{width:100%;justify-content:flex-start;text-align:left}
+    .media-trend-chart{gap:4px}
+    .media-trend-bar{padding:0 2px}
+    .media-trend-foot{flex-direction:column;gap:7px}
+    .media-web-grid{grid-template-columns:1fr;gap:16px}
+    .media-account:nth-child(2){border-right:0;padding-right:0}
+    .media-account:nth-child(3){padding-left:0;border-top:1px solid var(--line)}
+    .media-account:nth-child(4){border-top:1px solid var(--line)}
+    .media-evidence-layout{grid-template-columns:1fr;gap:12px;margin-top:16px}
+    #mediaEnhancements{grid-template-columns:1fr;gap:12px;margin-top:12px}
+    .media-platform{grid-template-columns:1fr;gap:8px;padding:15px 0}
+    .media-platform .mh{flex-direction:row;justify-content:space-between;align-items:center}
+    .media-actions{justify-content:flex-start;margin-top:2px}
+    .media-adapter{grid-template-columns:1fr;gap:7px}
+    .media-context-copy{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+  }
+
+  /* ── v3：默认减量，先给焦点，再允许展开证据 ─────────────────────── */
+  .banner.online.show{display:none}
+  #typeSeg .realTag,#typeSeg .localTag{display:none}
+  .metric-toggle{margin-left:auto;border:0;background:transparent;color:var(--muted);padding:6px 2px;
+    font:inherit;font-size:var(--fs-xs);font-weight:650;cursor:pointer;white-space:nowrap}
+  .metric-toggle[hidden],#metricsMenuBtn[hidden]{display:none}
+  .metric-toggle:hover{color:var(--accent)}
+  .metric-toggle:active{transform:translateY(1px)}
+  .workspace-screen>.labnote{display:none}
+
+  /* 默认只显示两项最重要的指标，完整指标由用户主动展开。 */
+  body:not(.metrics-expanded) #screenLedger>.kpis .kpi:nth-child(n+3),
+  body:not(.metrics-expanded) .workspace-screen>.statgrid .kpi:nth-child(n+3){display:none}
+  body:not(.metrics-expanded) #screenLedger>.kpis,
+  body:not(.metrics-expanded) .workspace-screen>.statgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body:not(.metrics-expanded) #screenLedger>.kpis .kpi:nth-child(2),
+  body:not(.metrics-expanded) .workspace-screen>.statgrid .kpi:nth-child(2){border-right:0}
+
+  /* 专注模式是功能，不是另一套皮肤：隐藏支持证据，只保留当前页面的行动区。 */
+  body.focus-mode .banner,
+  body.focus-mode .workspace-source,
+  body.focus-mode .workspace-screen>.fresh,
+  body.focus-mode .workspace-screen>.labnote,
+  body.focus-mode #screenLedger>.kpis,
+  body.focus-mode .workspace-screen>.statgrid,
+  body.focus-mode .writing-summary{display:none!important}
+  body.focus-mode .workspace-head{padding-top:6px}
+  body.focus-mode #screenLedger>:not(.workspace-head):not(#dailyDeck){display:none}
+  body.focus-mode #screenProject .projecttools,
+  body.focus-mode #screenProject .project-board,
+  body.focus-mode #screenClient .client-pipeline,
+  body.focus-mode #screenTime>.card:not(.time-focus),
+  body.focus-mode #screenNews .rightcol,
+  body.focus-mode #screenWriting .rightcol,
+  body.focus-mode #screenReview .rightcol,
+  body.focus-mode #screenContent .media-brief-card,
+  body.focus-mode #screenContent .media-account-card,
+  body.focus-mode #screenContent .media-web-card,
+  body.focus-mode #screenContent .media-insight-card,
+  body.focus-mode #screenContent .media-knowledge-card,
+  body.focus-mode #screenContent .media-connect,
+  body.focus-mode #screenContent #socialFresh{display:none}
+  body.focus-mode #screenProject .project-grid,
+  body.focus-mode #screenNews .grid,
+  body.focus-mode #screenWriting .grid,
+  body.focus-mode #screenReview .grid,
+  body.focus-mode #screenContent .media-layout{grid-template-columns:1fr}
+
+  /* 项目页两栏：「需要处理」常驻，看板可长可短。
+     注意这两个媒体查询必须写在顶层 —— 之前误放进 @media(max-width:560px) 块内，
+     在 390px 下永远不生效，看板与「需要处理」被硬塞成并排，项目名竖排成一字一行。 */
+  @media(min-width:981px){
+    .workspace-screen .grid.project-grid{grid-template-columns:1.6fr 1fr}
+    .workspace-screen .grid.project-grid .project-risk{position:sticky;top:16px;align-self:start}
+  }
+  @media(max-width:980px){
+    .workspace-head{grid-template-columns:1fr;gap:8px;align-items:start}
+    .workspace-source{max-width:none;text-align:left;white-space:normal;overflow-wrap:anywhere}
+    .workspace-screen .grid.project-grid{grid-template-columns:1fr}
+    .workspace-screen .grid.project-grid .project-risk{position:static;min-width:0}
+  }
+
+  @media(max-width:560px){
+    /* 主要触控目标至少 40px 高；视觉仍保持紧凑，点击区不再只有 26–36px。 */
+    .btn,.metric-toggle,.segbtn{min-height:40px}
+    .actions .btn,.media-actions a,.media-actions button,.gl-exit{min-height:40px}
+    .sync-alert{align-items:flex-start;flex-wrap:wrap;padding:11px 12px}
+    .sync-alert .btn{width:100%}
+    .ledger-scroll-hint{display:block}
+    #ledger{min-width:560px}
+    .workspace-head{grid-template-columns:1fr;gap:8px;padding:10px 2px 14px}
+    .workspace-head h2{font-size:var(--fs-xl)}
+    .workspace-source{white-space:normal;text-align:left}
+    .typehint{position:absolute;display:block;margin:-1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .metric-toggle{display:none}
+    .media-account-grid{grid-template-columns:1fr}
+    .media-account,.media-account+.media-account{padding:15px 0;border-right:0;border-top:1px solid var(--line)}
+    .media-account:first-child{border-top:0}
+    .media-trend-chart{gap:2px}
+    /* 手机上的表现标题允许两行；单行省略会把三张卡的差异一起截掉，失去比较价值。 */
+    .media-perf-title{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;
+      -webkit-line-clamp:2;overflow:hidden}
+  }
+

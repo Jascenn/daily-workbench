@@ -1,0 +1,341 @@
+  /* 资讯站内阅读：桌面端保留列表上下文，正文单独滚动；手机端只留正文。
+     排版参考周刊长文的阅读节奏：标题与正文同栏、窄而有留白的正文列、
+     轻量目录，以及不使用卡片边框切断文章。颜色仍使用工作台的纸面令牌。 */
+  #newsReaderOv{
+    /* 博客正文使用 jsDelivr 的霞鹜文楷 WebFont（1.1.0），不是依赖本机字体。
+       这里保留同一个字体家族名，确保首屏字体、回退顺序与博客一致。 */
+    --reader-font:"LXGW WenKai",-apple-system,"system-ui","Segoe UI","PingFang SC",
+      "Hiragino Sans GB","Microsoft YaHei","Helvetica Neue",Helvetica,Arial,sans-serif;
+    --reader-letter:.03em;
+    --reader-leading:1.8;
+    --reader-width:624px;
+    padding:14px;background:rgba(10,16,30,.52)}
+  #newsReaderOv[data-reader-font="fangsong"]{
+    --reader-font:"FangSong","STFangsong","FangSong_GB2312","Songti SC","STSong",
+      "Source Han Serif SC","Noto Serif CJK SC",serif;
+    --reader-letter:.02em;
+    --reader-leading:1.9}
+  #newsReaderOv[data-reader-font="weekly"]{
+    --reader-font:"TsangerJinKai02","STKaiti","KaiTi","LXGW WenKai","霞鹜文楷",serif;
+    --reader-letter:.018em;
+    --reader-leading:1.88}
+  #newsReaderOv[data-reader-font="system"]{
+    --reader-font:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    --reader-letter:0;
+    --reader-leading:1.82}
+  .reader-drawer{position:relative;width:min(1440px,calc(100vw - 28px));height:min(94dvh,1080px);
+    padding:0;display:grid;grid-template-columns:300px minmax(0,1fr);overflow:hidden;
+    background:var(--bg);border-radius:var(--radius-lg)}
+  .reader-progress{position:absolute;inset:0 0 auto;height:2px;z-index:5;pointer-events:none;background:transparent}
+  .reader-progress i{display:block;width:0;height:100%;background:var(--ink);transition:width 80ms linear}
+  .reader-sidebar{min-width:0;min-height:0;display:flex;flex-direction:column;
+    border-right:1px solid var(--line);background:var(--card)}
+  .reader-sidebar-head{flex:none;display:flex;align-items:center;justify-content:space-between;gap:14px;
+    margin:0;padding:20px 18px 15px;border-bottom:1px solid var(--line)}
+  .reader-sidebar-eyebrow{display:block;color:var(--muted);font-size:var(--fs-xs);letter-spacing:.08em}
+  .reader-sidebar-title{display:block;margin-top:3px;color:var(--ink);font-size:var(--fs-base);font-weight:720}
+  .reader-sidebar-meta{flex:none;padding:9px 18px 7px;color:var(--muted);font-size:var(--fs-xs);line-height:1.5}
+  .reader-news-list{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:4px 8px 18px}
+  .reader-news-item{width:100%;display:block;min-width:0;text-align:left;border:0;border-left:2px solid transparent;
+    border-radius:var(--radius-sm);background:transparent;color:var(--ink);font:inherit;cursor:pointer;
+    padding:11px 10px 12px;transition:background-color var(--dur-fast) var(--ease),border-color var(--dur-fast) var(--ease)}
+  .reader-news-item:hover{background:var(--bg)}
+  .reader-news-item.active{background:var(--bg);border-left-color:var(--ink)}
+  .reader-news-item:disabled{cursor:default;opacity:.55}
+  .reader-news-source{display:block;color:var(--muted);font-size:var(--fs-xs);line-height:1.4}
+  .reader-news-title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;
+    margin-top:4px;font-size:var(--fs-sm);font-weight:650;line-height:1.48;overflow-wrap:anywhere}
+  .reader-news-date{display:block;margin-top:5px;color:var(--muted);font-size:var(--fs-xs);line-height:1.4}
+  .reader-pane{min-width:0;min-height:0;display:flex;flex-direction:column;background:var(--card);
+    font-family:var(--reader-font);letter-spacing:var(--reader-letter)}
+  .reader-head{display:block;flex:none;min-height:56px;margin:0;padding:10px 28px;
+    border-bottom:1px solid var(--line);background:var(--card)}
+  .reader-head-row{display:flex;align-items:center;justify-content:space-between;gap:20px}
+  .reader-toolbar-main{display:flex;align-items:center;min-width:0;gap:10px}
+  .reader-kicker{color:var(--muted);font-size:var(--fs-xs);letter-spacing:.08em;white-space:nowrap}
+  .reader-head-actions{display:flex;align-items:center;gap:16px;flex:none}
+  /* 字体选择只保留一层控件边界。旧版在 label 和原生 select 上各画了一圈焦点，
+     Safari 聚焦时会叠成“双层黑胶囊”，既抢眼又和工具栏不协调。 */
+  .reader-font-picker{position:relative;display:inline-flex;align-items:center;height:34px;
+    color:var(--muted);font-size:var(--fs-xs);white-space:nowrap}
+  .reader-font-select{appearance:none;-webkit-appearance:none;max-width:118px;height:34px;
+    border:1px solid var(--line-strong);border-radius:var(--radius-md);outline:0!important;
+    -webkit-focus-ring-color:transparent;background:var(--bg);color:var(--ink);font:inherit;
+    font-weight:650;cursor:pointer;padding:0 27px 0 10px;text-overflow:ellipsis;
+    box-shadow:none;transition:border-color var(--dur-fast) var(--ease),
+      background-color var(--dur-fast) var(--ease)}
+  .reader-font-select:hover{border-color:var(--line-strong)}
+  .reader-font-select:focus-visible{border-color:var(--line-strong);background:var(--card);
+    box-shadow:none}
+  .reader-font-picker::after{content:"";position:absolute;right:10px;top:50%;width:6px;height:6px;
+    border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);
+    pointer-events:none;transform:translateY(-68%) rotate(45deg)}
+  .reader-doc .reader-title{margin:0;color:var(--ink);font-size:calc(var(--fs-lg)*1.5);
+    font-weight:600;line-height:1.42;letter-spacing:.015em;overflow-wrap:anywhere}
+  .reader-close,.reader-mobile-back{flex:none;min-width:38px;min-height:38px;border:1px solid var(--line);
+    border-radius:var(--radius-full);background:var(--bg);color:var(--muted);font:inherit;cursor:pointer}
+  .reader-close{font-size:var(--fs-xl);line-height:1}
+  .reader-close:hover,.reader-mobile-back:hover{color:var(--ink);border-color:var(--line-strong)}
+  .reader-mobile-back{display:none;align-items:center;gap:5px;width:auto;padding:0 12px;
+    border-radius:var(--radius-md);font-size:var(--fs-sm)}
+  .reader-meta{display:flex;align-items:center;gap:4px 8px;flex-wrap:wrap;margin-top:10px;
+    color:var(--muted);font-size:var(--fs-sm);line-height:1.7}
+  .reader-meta>span[hidden]{display:none}
+  .reader-meta>span:not([hidden])+span:not([hidden])::before{content:"·";margin-right:8px;color:var(--line-strong)}
+  .reader-original{flex:none;display:inline-flex;align-items:center;justify-content:center;
+    min-height:34px;padding:0 2px;border:0;border-radius:var(--radius-xs);background:transparent;
+    color:var(--muted);font-size:var(--fs-xs);font-weight:500;text-decoration:none;white-space:nowrap}
+  .reader-original:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+  .reader-original:focus-visible{outline:1px solid var(--line-strong);outline-offset:4px}
+  .reader-copy-btn{flex:none;min-height:30px;padding:3px 7px;border:0;border-radius:var(--radius-xs);
+    background:transparent;color:var(--muted);font:inherit;font-size:var(--fs-xs);line-height:1.4;
+    cursor:pointer;opacity:.62;transition:color var(--dur-fast) var(--ease),opacity var(--dur-fast) var(--ease),
+      background-color var(--dur-fast) var(--ease)}
+  .reader-copy-btn:hover,.reader-copy-btn:focus-visible{color:var(--ink);opacity:1;background:var(--bg)}
+  .reader-copy-btn:focus-visible{outline:1px solid var(--line-strong);outline-offset:1px}
+  .reader-copy-btn.copied{color:var(--ok);opacity:1}
+  .reader-scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:28px 40px 72px}
+  .reader-content-shell{position:relative;display:grid;grid-template-columns:minmax(0,var(--reader-width));
+    align-items:start;max-width:var(--reader-width);margin:0 auto}
+  .reader-doc{grid-area:1/1;min-width:0}
+  .reader-article-head{display:block;margin:0 0 30px;padding:0}
+  .reader-state{margin:0 0 20px;padding:12px 14px;border:1px solid var(--line);
+    border-radius:var(--radius-md);background:var(--bg);color:var(--muted);font-size:var(--fs-sm);line-height:1.7}
+  .reader-state[hidden]{display:none}
+  .reader-state.error{border-color:rgba(200,41,44,.28);background:rgba(200,41,44,.06);color:var(--pos)}
+  .reader-body{max-width:var(--reader-width);color:var(--ink);font-size:var(--fs-lg);
+    line-height:var(--reader-leading);letter-spacing:var(--reader-letter)}
+  .reader-body p{margin:1.5em 0}
+  .reader-body h2{margin:2em 0 .5em;font-size:calc(var(--fs-lg)*1.5);font-weight:600;line-height:1.3;
+    letter-spacing:.025em;scroll-margin-top:24px}
+  .reader-body h3{margin:2em 0 .5em;font-size:calc(var(--fs-lg)*1.25);font-weight:600;line-height:1.3;
+    letter-spacing:.02em;scroll-margin-top:24px}
+  .reader-fold{margin:1.5em 0}
+  .reader-fold>summary{list-style:none;cursor:pointer;color:var(--ink);font-weight:400;
+    font-size:var(--fs-lg);line-height:var(--reader-leading)}
+  .reader-fold>summary::-webkit-details-marker{display:none}
+  .reader-fold>summary::before{content:"▶";display:inline-block;margin-right:.55em;
+    color:var(--muted);font-size:var(--fs-xs);vertical-align:.12em;
+    transition:transform var(--dur-fast) var(--ease)}
+  .reader-fold[open]>summary::before{transform:rotate(90deg)}
+  .reader-fold>summary:hover{color:var(--muted)}
+  .reader-fold-body{min-width:0}
+  .reader-body blockquote{margin:1.8em 0;padding:1px 0 1px 18px;border-left:2px solid var(--line-strong);
+    color:var(--muted);line-height:1.8}
+  .reader-body a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--line-strong);
+    text-decoration-thickness:1px;text-underline-offset:.18em;overflow-wrap:anywhere}
+  .reader-body a:hover{text-decoration-color:var(--ink)}
+  .reader-body strong{font-weight:700}
+  .reader-body em{font-style:italic}
+  .reader-inline-code{padding:.12em .34em;border:1px solid var(--line);border-radius:var(--radius-xs);
+    background:var(--bg);font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    font-size:var(--fs-base);letter-spacing:0;white-space:break-spaces;overflow-wrap:anywhere}
+  .reader-code-block{margin:1.8em 0;border:1px solid var(--line);border-radius:var(--radius-sm);
+    background:var(--bg);overflow:hidden}
+  .reader-code-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    min-height:34px;padding:2px 5px 2px 14px;border-bottom:1px solid var(--line)}
+  .reader-code-block pre{margin:0;padding:16px 18px;overflow:auto;overscroll-behavior-x:contain;
+    color:var(--ink);font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    font-size:var(--fs-sm);line-height:1.68;letter-spacing:0;white-space:pre;tab-size:2}
+  .reader-code-block code{font:inherit}
+  .reader-code-lang{min-width:0;color:var(--muted);font-size:var(--fs-xs);line-height:1.4;
+    letter-spacing:.04em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .reader-quote-wrap{position:relative;margin:1.8em 0}
+  .reader-quote-wrap blockquote{margin:0;padding-right:52px}
+  .reader-quote-wrap .reader-copy-btn{position:absolute;right:0;top:0}
+  .reader-figure{margin:1.8em 0}
+  .reader-image-open{position:relative;display:block;width:100%;padding:0;border:0;
+    border-radius:var(--radius-sm);background:transparent;cursor:zoom-in}
+  .reader-image-open:focus-visible{outline:1px solid var(--line-strong);outline-offset:3px}
+  .reader-image-open::after{content:"放大";position:absolute;right:10px;bottom:10px;
+    padding:4px 8px;border-radius:var(--radius-full);background:rgba(10,16,30,.72);color:#fff;
+    font:var(--fs-xs)/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;
+    letter-spacing:0;opacity:0;transform:translateY(3px);pointer-events:none;
+    transition:opacity var(--dur-fast) var(--ease),transform var(--dur-fast) var(--ease)}
+  .reader-image-open:hover::after,.reader-image-open:focus-visible::after{opacity:1;transform:none}
+  .reader-figure img{display:block;width:100%;max-width:100%;height:auto;border:1px solid var(--line);
+    border-radius:var(--radius-sm);object-fit:contain}
+  .reader-figure figcaption{margin-top:10px;color:var(--muted);font-size:var(--fs-base);line-height:1.45;
+    letter-spacing:.02em;text-align:center;font-style:italic;overflow-wrap:anywhere}
+  .reader-body hr{height:1px;margin:2.2em 0;border:0;background:var(--line)}
+  .reader-list-item{position:relative;margin:.62em 0;padding-left:1.35em}
+  .reader-list-item::before{content:"·";position:absolute;left:.2em;color:var(--muted)}
+  .reader-list-item.ordered{padding-left:2em}
+  .reader-list-item.ordered::before{content:none}
+  .reader-list-marker{position:absolute;left:0;min-width:1.5em;color:var(--muted);
+    text-align:right;font-variant-numeric:tabular-nums}
+  /* 目录与正文共用同一网格起点，再移到右侧留白，不挤压正文。
+     窄屏直接隐藏，保证正文始终维持博客的 624px 栏宽。 */
+  .reader-toc{position:absolute;inset:0 auto auto calc(100% + 28px);width:120px;
+    align-self:start;padding:3px 0 0}
+  .reader-toc[hidden]{display:none}
+  .reader-toc b{display:block;margin-bottom:10px;color:var(--muted);
+    font-size:calc(var(--fs-xs) - 1px);font-weight:650;
+    letter-spacing:.08em}
+  .reader-toc a{display:block;padding:5px 0;color:var(--muted);font-size:var(--fs-xs);line-height:1.6;
+    text-decoration:none;overflow-wrap:anywhere}
+  .reader-toc a.level-3{padding-left:12px;font-size:calc(var(--fs-xs) - 1px)}
+  .reader-toc a:hover,.reader-toc a[aria-current="true"]{color:var(--ink);font-weight:650}
+  #readerImageOv{z-index:70;padding:0;background:rgba(10,16,30,.94)}
+  .reader-image-dialog{position:relative;width:100%;height:100dvh;display:flex;flex-direction:column;
+    color:#f6f2ea}
+  .reader-image-toolbar{position:absolute;right:16px;top:14px;z-index:3;display:flex;align-items:center;gap:4px;
+    padding:4px;border:1px solid rgba(255,255,255,.18);border-radius:var(--radius-full);
+    background:rgba(15,20,32,.78);backdrop-filter:blur(12px)}
+  .reader-image-tool{min-width:36px;min-height:36px;padding:0 9px;border:0;border-radius:var(--radius-full);
+    background:transparent;color:#f6f2ea;font:inherit;font-size:var(--fs-base);cursor:pointer}
+  .reader-image-tool:hover,.reader-image-tool:focus-visible{background:rgba(255,255,255,.12)}
+  .reader-image-tool:focus-visible{outline:1px solid rgba(255,255,255,.72);outline-offset:1px}
+  .reader-image-zoom{min-width:54px;color:#d9deea;font-size:var(--fs-xs);font-variant-numeric:tabular-nums}
+  .reader-image-stage{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;
+    padding:62px 20px 38px;scrollbar-color:rgba(255,255,255,.35) transparent}
+  .reader-image-canvas{display:flex;min-width:100%;min-height:100%}
+  .reader-image-viewer{display:block;flex:none;margin:auto;border-radius:var(--radius-xs);background:#0b101b;
+    box-shadow:0 18px 64px rgba(0,0,0,.52);cursor:zoom-in}
+  .reader-image-caption{position:absolute;left:50%;bottom:12px;z-index:2;max-width:min(760px,calc(100vw - 40px));
+    padding:7px 12px;border-radius:var(--radius-full);background:rgba(15,20,32,.78);color:#d9deea;
+    font-size:var(--fs-xs);line-height:1.5;text-align:center;transform:translateX(-50%);
+    overflow-wrap:anywhere;backdrop-filter:blur(12px)}
+  .reader-image-caption[hidden]{display:none}
+  @media(max-width:1280px){
+    .reader-drawer{grid-template-columns:286px minmax(0,1fr)}
+    .reader-toc{display:none!important}
+  }
+  @media(max-width:760px){
+    #newsReaderOv{padding:0;background:var(--card)}
+    .reader-drawer{width:100%;height:100dvh;max-height:none;display:block;border-radius:var(--radius-xs)}
+    .reader-sidebar{display:none}
+    .reader-pane{height:100%}
+    .reader-head{padding:8px 14px 8px}
+    .reader-head-row{gap:12px}
+    .reader-kicker{display:none}
+    .reader-head-actions{gap:6px;min-width:0}
+    .reader-font-picker{height:40px;max-width:122px}
+    .reader-font-select{max-width:86px;height:40px;padding-left:9px;padding-right:25px;font-size:var(--fs-xs)}
+    .reader-font-picker::after{right:9px}
+    .reader-mobile-back{display:inline-flex;margin:0 10px 0 -4px}
+    .reader-doc .reader-title{font-size:clamp(23px,6.5vw,27px);line-height:1.45}
+    .reader-article-head{margin-bottom:28px}
+    .reader-original{min-height:44px;padding:0 2px}
+    .reader-copy-btn{min-height:40px;padding:7px 8px}
+    .reader-meta{margin-top:9px;font-size:var(--fs-xs)}
+    .reader-scroll{padding:22px 18px 44px}
+    .reader-content-shell{display:block;max-width:none}
+    .reader-body{max-width:none;font-size:var(--fs-lg);line-height:var(--reader-leading)}
+    .reader-figure{margin:1.55em 0}
+    .reader-code-block pre{padding:14px;font-size:var(--fs-xs)}
+    .reader-image-toolbar{right:10px;top:10px}
+    .reader-image-tool{min-width:42px;min-height:42px}
+    .reader-image-stage{padding:64px 12px 42px}
+    .reader-toc{display:none!important}
+    .reader-close,.reader-mobile-back{min-height:44px}
+  }
+
+  /* ── 常驻提示条（替代数据类 alert）─────────────────────────────────
+     旧写法用 alert()：「保存失败：数据未写入」这种消息弹一下，点掉就没了。
+     一旦被错过，用户会以为已经存上 —— 这是账本，不能靠记忆。
+     所以做成页内常驻、可复制、显式关闭的条。 */
+  .notify{margin-bottom:14px;padding:10px 12px 10px 14px;border-radius:var(--radius-md);
+    font-size:var(--fs-sm);line-height:1.7;display:none;align-items:flex-start;gap:10px;
+    background:rgba(200,41,44,.1);color:var(--pos);border:1px solid rgba(200,41,44,.32)}
+  .notify.show{display:flex}
+  .notify.warn{background:rgba(161,92,0,.1);color:var(--warn);border-color:rgba(161,92,0,.32)}
+  .notify.info{background:var(--neu-100);color:var(--ink);border-color:var(--line-strong)}
+  .notify .ntxt{flex:1;min-width:0;white-space:pre-wrap;word-break:break-word}
+  .notify .nx{flex:none;cursor:pointer;border:none;background:none;color:inherit;
+    font:inherit;font-size:var(--fs-base);line-height:1;padding:2px 4px;opacity:.75;border-radius:var(--radius-sm)}
+  .notify .nx:hover{opacity:1}
+
+  /* ── 删除可撤销条 ────────────────────────────────────────────────
+     账本删错一笔直接影响净收益。撤销优于"弹窗确认"：不打断，而且真能救回来。
+     底色用 --toast-bg(--ink)、字色用 --toast-fg(--card)，两套主题自动互换且都高对比。 */
+  .undo{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:60;
+    display:none;align-items:center;gap:14px;max-width:min(560px,92vw);
+    background:var(--toast-bg);color:var(--toast-fg);
+    padding:10px 12px 10px 16px;border-radius:var(--radius-full);box-shadow:var(--shadow-lg);
+    font-size:var(--fs-sm)}
+  .undo.show{display:flex}
+  .undo span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .undo button{flex:none;cursor:pointer;font:inherit;font-size:var(--fs-sm);font-weight:600;
+    background:none;border:1px solid currentColor;color:inherit;
+    padding:5px 12px;border-radius:var(--radius-full);transition:opacity var(--dur-fast) var(--ease)}
+  .undo button:hover{opacity:.8}
+
+  /* 内联字段错误：表单校验不该占用全局弹窗（错误应该出现在出错的那个字段旁边） */
+  .ferr{color:var(--pos);font-size:var(--fs-xs);margin-top:4px;line-height:1.5}
+  .ferr:empty{display:none}
+  .goalecho.err{color:var(--pos)}
+  [aria-invalid="true"]{border-color:var(--pos)!important}
+
+  /* 表格可扫读：斑马纹 + 行 hover。257 行金额，靠交替底色才好纵向跟读。 */
+  tbody tr:nth-child(even) td{background:var(--zebra)}
+
+  /* 表头。改造前这张表**只有 tbody，一个 <th> 都没有** —— 4 列（日期/分类/备注/金额）
+     对读屏用户完全没有列名（WCAG 1.3.1），视觉上也全靠读者自己推断列义。
+     做成**可见**表头而不是"仅读屏可见"：这是全页信息密度最高的一块，
+     有列名能显著降低扫读成本。金额列跟 .amt 一样右对齐，否则数字跟表头对不上。 */
+  #ledger thead th{font-size:var(--fs-xs);font-weight:600;color:var(--muted);text-align:left;
+    padding:0 6px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+  #ledger thead th.num{text-align:right}
+
+  /* 跳到主内容。正文之前有 30+ 个可点元素，键盘用户每次都得按几十下 Tab 才能进账本。
+     默认移出视口、聚焦时才滑进来 —— 不占位置、不闪。 */
+  .skip{position:absolute;left:8px;top:-48px;z-index:200;background:var(--card);color:var(--ink);
+    border:1px solid var(--line-strong);border-radius:var(--radius-sm);padding:8px 12px;
+    font-size:var(--fs-sm);text-decoration:none;box-shadow:var(--shadow-md);
+    transition:top var(--dur-fast) var(--ease)}
+  .skip:focus{top:8px}
+
+  /* 模态里的 <form> 只是语义容器，不能让它带来任何外边距（UA 默认各不相同）。 */
+  #projForm,#projNotionForm,#earnForm{margin:0}
+  /* 点击目标（规则 A25）。.del/.edit 原本无 padding、高约 22px，而删除是高风险操作。
+     两个要求必须同时满足：① 命中区 44×44；② 不许撑高行 —— 账本 257 行，行高一变整页重排。
+     所以视觉尺寸保持 32px，用绝对定位的伪元素向外扩 6px 到 44×44（伪元素不参与布局）。
+     那 12px 空隙不是审美，是**必需**：改造前 ✎ 与 ✕ 在模板里是紧挨着的（${edit}${del}，中间无空白），
+     两个 32px 按钮贴在一起，其中一个还是删除。留出空隙后两边各向中间扩 6px 正好相接而不重叠；
+     照抄"inset:-12px"会让两个热区重叠 21px，结果是想删一笔却打开了编辑。
+     空隙同时把破坏性操作和它的邻居分开了。 */
+  .del,.edit{position:relative;min-width:32px;min-height:32px;display:inline-flex;
+    align-items:center;justify-content:center;border-radius:var(--radius-sm)}
+  .del::after,.edit::after{content:"";position:absolute;inset:-6px}
+
+  @media(max-width:980px){.kpis{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}
+    .goalPrimary,.goalSettingsGrid{grid-template-columns:1fr}.heroCol+.heroCol{border-left:none;padding-left:0;border-top:1px solid var(--line);padding-top:14px}
+    .goalhist{grid-template-columns:repeat(3,1fr)}
+    .todaystrip{grid-template-columns:1fr}.ts-streak{border-right:0;padding-right:0;border-bottom:1px solid var(--line);padding-bottom:10px}}
+  @media(max-width:560px){
+    .kpis{grid-template-columns:repeat(2,1fr)}
+    .card h2{flex-wrap:wrap}
+    .card h2 .seg{max-width:100%;margin-left:0;overflow-x:auto}
+    #screenNews table.mini{table-layout:fixed}
+    #screenNews table.mini th,#screenNews table.mini td{white-space:normal;overflow-wrap:anywhere}
+    /* iOS（Safari 与所有 WebView）在聚焦字号 <16px 的输入框时会**自动放大整页**，
+       而且失焦后不会缩回去 —— 填一次表单页面就一直是放大的。提到 16px（= --fs-lg）即消失（规则 R8）。
+       选择器必须跟原规则同权重才能靠"后出现"取胜：`.ledbar input` / `.field input` 都是 (0,1,1)，
+       而本块排在样式表末尾，所以同权重即覆盖。写成裸 `input` 是**不行**的（权重不够，会被 .ledbar input 压回去）。 */
+    .ledbar input,.ledbar select,.field input,.field select,.field textarea{font-size:var(--fs-lg)}
+  }
+
+  /* ── 能力查询（放在最后，靠层叠顺序覆盖前面无条件生效的 :hover / transition）──
+     做的是"把能力差异显式声明"，不是"猜某个浏览器不支持什么"。 */
+
+  /* 触屏没有真正的 hover：:hover 会"粘"在最后一次点击的元素上。
+     这里在无 hover 能力时，把纯装饰性的 hover 变化收回默认态。 */
+  @media(hover:none){
+    .btn:hover{border-color:var(--line);color:var(--ink)}
+    .btn.primary:hover{background:var(--pri-500);border-color:var(--pri-500)}
+    .btn.primary:active{background:var(--pri-600);border-color:var(--pri-600)}
+    .proj:hover{border-color:var(--line)}
+    .srcrow:not(.agg):hover{background:transparent}
+    .hrow:not(.static):hover{border-color:var(--line)}
+    .pbtn:hover{border-color:var(--line);color:var(--muted)}
+    .segbtn:hover{color:var(--muted)}
+    .del:hover,.edit:hover{color:var(--muted)}
+    tbody tr.clickable:hover td{background:transparent}
+  }
+
+  /* 无障碍动效偏好（规则 A26）：用户要求减少动态效果时，全部过渡与动画关掉。
+     本页只有 3 处 transition（.btn/.pbtn/.proj），但用通配兜住以后新增的。 */
+  @media(prefers-reduced-motion:reduce){
+    *,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}
+  }

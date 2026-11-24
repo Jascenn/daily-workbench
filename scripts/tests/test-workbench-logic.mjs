@@ -81,7 +81,7 @@ class El {
   removeAttribute(k) { delete this._attr[k]; }
   closest() { return this; }
   appendChild() { return arguments[0]; }
-  focus() {} click() {}
+  focus() {} click() {} scrollIntoView() {}
   // 页面初始化时会给 cmdInput 等元素挂事件监听；桩缺这个方法会在求值阶段直接抛错
   addEventListener() {} removeEventListener() {}
   // 自媒体页用 insertAdjacentHTML 插运营体检 / Jev 卡片；桩缺会直接抛错
@@ -176,7 +176,7 @@ const run = new Function('document', 'localStorage', 'location', 'alert', 'setIn
            CLIENT_PAGE,
            renderContent, mediaMetrics, mediaReminders, mediaStatus, cycleMediaStatus,
            mediaTrendData, renderMediaTrend, mediaEffectiveFreshness, mediaFreshnessCopy,
-           renderMediaPulse, mediaSortedPlan, mediaFocusPriority, opHealth,
+           renderMediaPulse, webPresenceStatus, mediaSortedPlan, mediaFocusPriority, opHealth,
            NEWS_PAGE,
            renderWorldClock, renderWorldClockOverview, tickWorldClock, addWorldClock, delWorldClock, resetWorldClock,
            setWorldClockHourMode, setWorldClockSort, setWorldClockCandidate, wcParts, wcStatus, wcDiff, wcFormatTime, wcBestWindow,
@@ -189,7 +189,40 @@ const run = new Function('document', 'localStorage', 'location', 'alert', 'setIn
            focusTimerRemaining, getFocusTimer: () => focusTimer,
            renderTime, renderFocusToday, renderFocusTrend, renderTimeBars, renderTodayTimeline,
            wcWorkConfig, setWorldClockWork, convertMeetingTime,
-           safeUrl, safeObsidianUrl, agoTxt, statCells, freshBar, safeMarkdownHtml };`);
+           safeUrl, safeObsidianUrl, agoTxt, statCells, freshBar, safeMarkdownHtml,
+           // 2026-11-11：微信只读快照页。setWechat 用来把夹具塞进去 ——
+           // 渲染函数读的是闭包里的 wechat，不通过它注入就只能造一个真 MCP。
+           renderWechat, wxRow, wxWhen, wxHoursLabel, renderWechatBadge,
+           wxToggleMute, wxUnmuteAll, wxMuted,
+           setWechat: v => { wechat = v; }, getWechat: () => wechat,
+           setWechatErr: v => { wechatErr = v; }, setWxView, getWxView: () => wxView,
+           renderWxAnalysis, wxAnalysisCard, wxScorePct, toggleGuest,
+           renderRadar, radarRows, radarItemScore, radarCard, radarSourceChips, setRadarAll,
+           zsxqStats, renderZsxqPanel, realProjectCard,
+           renderZsxqScreen, zsxqTimelineRows, zsxqGroupsOf, setZsxqSort,
+           setZsxqGroup, setZsxqGroupSort, setZsxqRange, zsxqGroupsInTimeline, zsxqMineGroups,
+           getZsxqGroupFilter: () => zsxqGroupFilter,
+           getZsxqRange: () => zsxqRange,
+           getZsxqGroupSort: () => zsxqGroupSort,
+           setSocial: v => { social = v; }, setZsxqQuery: v => { zsxqQuery = v; zsxqPageIndex = 1; },
+           setZsxqPage, setZsxqPageIndex, getZsxqShown: () => zsxqShown,
+           getZsxqPageIndex: () => zsxqPageIndex,
+           setZsxqMemberGroup, getZsxqMemberGroup: () => zsxqMemberGroup,
+           zsxqToggle, zsxqTopicId, zsxqRenderPreview,
+           zsxqToggleTag, zsxqCollectTags, renderZsxqTags,
+           zsxqSyncAiMode, zsxqAutoAiMode, zsxqCurrentAiMode, zsxqToggleAiOverride, zsxqApplyDraft,
+           zsxqTargetSummaryText, zsxqToggleTarget, zsxqRenderTargets,
+           setTargetOptions: v => { zsxqTargetOptions = v; },
+           setTargetSel: v => { zsxqTargetSel = v; },
+           getTargetSel: () => zsxqTargetSel,
+           setAiManual: v => { zsxqAiManual = v; }, getAiManual: () => zsxqAiManual,
+           setTagOptions: v => { zsxqTagOptions = v; zsxqTagsLoaded = true; },
+           getTagsSel: () => zsxqTagsSel, resetTagsSel: () => { zsxqTagsSel = []; },
+           setZsxqOpen: v => { zsxqOpen = v; }, getZsxqOpen: () => zsxqOpen,
+           setZsxqDetail: v => { zsxqDetail = v; },
+           getTypes: () => TYPES.map(t => t[0]), getSubpages: () => SUBPAGES,
+           setRadar: v => { radar = v; }, setRadarErr: v => { radarErr = v; },
+           getGuestWechat: () => wechat, isGuest: () => guest };`);
 
 /* 页面会注册 window 事件并使用 matchMedia；Node 的 globalThis 没有浏览器事件接口。
    用原型继承保留 setTimeout 等 Node 能力，只补页面真正调用的浏览器 API。 */
@@ -237,6 +270,10 @@ const noticeLevel = (which = 'notify') =>
 const ferr = id => el(id).querySelector('.ferr').textContent || '';
 
 await new Promise(r => setTimeout(r, 0));   // 让 boot IIFE 里的 await loadState() 落地
+// 线上首屏已改为按页面懒加载；逻辑套件仍需显式加载全部快照，覆盖三个类型区与自媒体渲染。
+await api.loadSections();
+await api.loadSocial();
+api.renderAll();
 
 const tbody = el('ledger').querySelector('tbody');
 const S = api.get();
@@ -2619,9 +2656,28 @@ console.log('\n— 29.5. 自媒体运营：真实快照 / 今日核验 / 安全�
   t('手动标记“今日不发”后，日更平台状态灯视为已处理而不是继续报警',
     !settledPulse.includes('is-warn'),
     settledPulse.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,180));
+  const settledStalePulse=api.renderMediaPulse(
+    {
+      accounts:[{platform:'公众号',asOf:'2026-03-31',connectionState:'connected'}],
+      todayPlan:[{id:'wechat',platform:'公众号',defaultStatus:'skip'},
+        {id:'zsxq',platform:'知识星球',defaultStatus:'skip'}]
+    },
+    {sites:[{state:'ok'}],alerts:[],blog:{latest:{publishedAt:'2026-10-30'}}});
+  t('“今日不发”保持已处理，账号数据过期只作为次级数据提示',
+    !settledStalePulse.includes('is-warn') && settledStalePulse.includes('is-data-warn')
+      && /过期 \d+ 天/.test(settledStalePulse),
+    settledStalePulse.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,180));
   const partialSitesPulse=api.renderMediaPulse(
     {accounts:[],todayPlan:[]},
     {sites:[{state:'ok'},{state:'warn'}],alerts:[],blog:{latest:{publishedAt:'2026-10-30'}}});
+  const slowSiteStatus=api.webPresenceStatus({sites:[{state:'ok'},{state:'slow'}],alerts:[]});
+  const downSiteStatus=api.webPresenceStatus({sites:[{state:'down'}],alerts:[]});
+  const checkingSiteStatus=api.webPresenceStatus({sites:[{state:'checking'}],alerts:[]});
+  t('网站监控摘要把 slow / down / checking 从“无异常”拆成明确状态',
+    slowSiteStatus.label==='1 个站点偏慢' && slowSiteStatus.tone==='warn'
+      && downSiteStatus.label==='1 个站点异常' && downSiteStatus.tone==='dead'
+      && checkingSiteStatus.label==='1 个站点复检中' && checkingSiteStatus.tone==='warn',
+    `${slowSiteStatus.label} / ${downSiteStatus.label} / ${checkingSiteStatus.label}`);
   t('站点只有部分正常时，状态轨显示真实比例而不是笼统写“正常”',
     partialSitesPulse.includes('1/2 正常') && !partialSitesPulse.includes('>正常<'),
     partialSitesPulse.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,180));
@@ -2731,11 +2787,11 @@ console.log('\n— 29.5. 自媒体运营：真实快照 / 今日核验 / 安全�
   const accountEnd=src.indexOf('class="card media-web-card"');
   const focusStart=src.indexOf('id="mediaFocus"');
   const pulseStart=src.indexOf('id="mediaPulse"');
-  t('自媒体按初始预览排列：今日摘要、账号数据、网站与博客，状态轨收进账号卡',
+  t('自媒体按初始预览排列：今日摘要、账号数据，网站明细按需展开',
     focusStart < accountStart && accountStart < accountEnd
       && accountStart < pulseStart && pulseStart < accountEnd
       && /class="media-overview-fold" open/.test(src.slice(accountStart,accountEnd))
-      && /class="media-overview-fold" open/.test(src.slice(accountEnd,src.indexOf('id="mediaPlanLayout"')))
+      && !/class="media-overview-fold" open/.test(src.slice(accountEnd,src.indexOf('id="mediaPlanLayout"')))
       && src.indexOf('class="card media-web-card"') < src.indexOf('id="mediaPlanLayout"')
       && src.indexOf('class="media-evidence-layout"') < src.indexOf('id="mediaEnhancements"')
       && src.indexOf('id="mediaEnhancements"') < src.indexOf('class="media-connect"')
@@ -2887,8 +2943,11 @@ console.log('\n— 31. 行动首页 + Notion 真实项目页 —');
     /项目管理/.test(el('projSourceBar').innerHTML) && /Notion 可回写/.test(el('projSourceBar').innerHTML)
       && /最近同步/.test(el('projSourceBar').innerHTML),
     el('projSourceBar').innerHTML.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
-  t('全部项目卡数 == state.projects（29），没有第二套伪项目库',
-    (board.match(/<article class="proj/g) || []).length === S.projects.length && S.projects.length === 29,
+  /* 不写死数量：项目数会随 Notion 同步变（2026-11-22 加了知识星球 4 个项目，
+     写死 29 的断言当场变红——那是数据变了，不是渲染坏了）。 */
+  t('全部项目卡数 == state.projects，没有第二套伪项目库',
+    S.projects.length > 0
+      && (board.match(/<article class="proj/g) || []).length === S.projects.length,
     `${(board.match(/<article class="proj/g) || []).length} / ${S.projects.length}`);
   api.setProjectScope('done');
   const completedN = S.projects.filter(p => p.status === '已完成').length;
@@ -3177,11 +3236,23 @@ console.log('\n— 32. 客户经营：真实字段 / 体检 / 筛选 / 详情 / 
     (el('clientList').innerHTML.match(/class="client-row"/g) || []).length === clients.length,
     `${(el('clientList').innerHTML.match(/class="client-row"/g) || []).length} / ${clients.length}`);
   api.toggleClientAll();
+  /* 真实数据会变：某次同步后可能所有客户都填了状态，"恰好有人没填"这种前提
+     不能当断言依靠（2026-11-21 真实踩到：81 个客户全部有状态，测试假失败）。
+     这里注入一个无状态高收入的合成客户，只验证渲染口径本身。 */
+  const stateForProbe = api.get();
+  stateForProbe.clients.push({
+    id: 'c-nostatus', notionId: 'probe-nostatus', name: '无状态探针', role: '贵人',
+    status: '', relationSource: '', owner: '', income: 999999, expense: 0,
+    profit: 999999, note: '', memo: '', nextFollowUp: ''
+  });
+  api.renderClient();
+  const probeShown = el('clientList').innerHTML.includes('无状态探针');
   t('客户状态未填时用资料完整度提示，不从收入伪造「已成交」',
-    clients.filter(c => !String(c.status || '').trim()).length > 0
-      && /资料 \d+\/5/.test(el('clientList').innerHTML)
+    probeShown && /资料 \d+\/5/.test(el('clientList').innerHTML)
       && !/有收入记「成交」|有收入往来.*成交/.test(el('clientSource').textContent),
-    `未标状态 ${clients.filter(c => !String(c.status || '').trim()).length}`);
+    `合成客户可见=${probeShown}`);
+  stateForProbe.clients.pop();
+  api.renderClient();
   const incompleteProbe = clients.find(c => !String(c.owner || '').trim()) || clients[0];
   const incompleteScore = api.clientProfileScore(incompleteProbe);
   t('客户资料完整度按五个关键字段现算，缺失项可用于说明',
@@ -3795,6 +3866,716 @@ console.log('\n— 35. 专注回写 Notion：前端出口 / 白名单 / 幂等�
   t('中断记录不会发往 Notion，前端直接拦下',
     pushCalls === before && el5('notify').innerHTML.includes('只有已完成的专注记录'),
     el5('notify').innerHTML);
+}
+
+
+console.log('\n— 36. 微信页：待办口径 / 语义降级 / 分类不吞数据 —');
+{
+  // 夹具覆盖四种真实情况：待回复、广告、已结束、以及**没有 category**（旧快照）。
+  // 最后一种最关键：默认方向必须是"当待办"，否则升级一次就把待办静默藏了。
+  const w = (name, cid, hours, extra) => ({
+    name, kind: 'direct', conversationId: cid, at: '2026-11-10T09:00:00+08:00',
+    from: 'peer', preview: '[语音]', hoursAgo: hours, analyzed: true, ...extra,
+  });
+  const snap = {
+    version: 1, generatedAt: '2026-11-11T00:42:00+08:00', available: true, source: 'wechat-mcp',
+    dataPolicy: '只读快照。',
+    summary: { waiting: 4, mentions: 1, scanned: 218, windowHours: 72, mentionDays: 7 },
+    accounts: [{
+      account: { id: 'aaaa', name: '凌一', ready: true },
+      semantic: { analyzed: 4, llm: 'qwen3:8b', asr: true },
+      waiting: [
+        w('Mom', 'c1', 30, { category: '待回复', want: '要求清洗风扇并检查电机',
+          action: '洗风扇并检查电机', transcript: '你把那个风扇洗下嘛' }),
+        w('纪钟', 'c2', 4.3, { category: '待回复', want: '发来一张图片', action: '查看图片内容' }),
+        w('招商银行', 'c3', 9.7, { category: '广告', want: '申卡邀请', action: '无需处理' }),
+        w('旧快照会话', 'c4', 12, {}),                      // 无 category：必须进待办
+      ],
+      mentions: [
+        { name: '原神快乐小组', conversationId: 'g1', at: '2026-11-09T09:40:00+08:00',
+          sender: '夏焱', preview: 'BLG3比1刷下T1了 @凌一', isSelf: false,
+          want: '询问比赛结果', action: '无需处理', analyzed: true },
+      ],
+      active: [
+        { name: 'Mom', kind: 'direct', conversationId: 'c1',
+          at: '2026-11-10T09:00:00+08:00', from: 'peer', preview: '[语音]' },
+        { name: '所罗门', kind: 'direct', conversationId: 'c3',
+          at: '2026-11-10T21:00:00+08:00', from: 'self', preview: 'OK' },
+      ],
+      scanned: 218,
+    }],
+  };
+  const show = (data) => { api.setWechatErr(''); api.setWechat(data); api.setType('wechat'); api.renderWechat(); };
+
+  show(snap);
+  const todoHTML = el('wxTodo').innerHTML;
+
+  t('无 category 的条目默认进待办，不会被当成广告藏起来',
+    todoHTML.includes('旧快照会话'), el('wxTodoTag').textContent);
+  t('明确判为广告的移出待办，进「不用回」区且原文仍在',
+    !todoHTML.includes('招商银行') && el('wxWait').innerHTML.includes('招商银行'));
+  t('待办按搁置时长倒序：放最久的排最前',
+    todoHTML.indexOf('Mom') < todoHTML.indexOf('纪钟'));
+  t('待办给出「对方要什么 / 我要做什么」两行，不是原始消息',
+    todoHTML.includes('要求清洗风扇并检查电机') && todoHTML.includes('洗风扇并检查电机'));
+  t('语音转写正文收进可展开的原文区，不占正文',
+    !/class="wx-todo-want"[^<]*<[^>]*>[^<]*你把那个风扇/.test(todoHTML));
+  t('搁置超过 24 小时的条目标红（.wx-todo-urgent）',
+    /wx-todo-urgent/.test(todoHTML));
+  t('KPI 与名单同源：待办 3 / 不用回 1',
+    /待办<\/div><div class="value">3</.test(el('wechatStats').innerHTML), el('wechatStats').innerHTML.slice(0, 160));
+
+  // 忽略：只影响显示，不改快照
+  const beforeJSON = JSON.stringify(api.getWechat());
+  api.wxToggleMute('c1');
+  t('「忽略」只写本机偏好，不改快照', api.wxMuted().includes('c1') && JSON.stringify(api.getWechat()) === beforeJSON);
+  show(snap);
+  t('被忽略的会话移出待办，但 KPI 注明忽略了几条',
+    !el('wxTodo').innerHTML.includes('Mom') && el('wechatStats').innerHTML.includes('已忽略 1'),
+    el('wechatStats').innerHTML.slice(0, 160));
+  api.wxUnmuteAll();
+  show(snap);
+
+  // 空态：真的没有 vs 没数据，两种文案必须不同
+  show({ ...snap, summary: { ...snap.summary, waiting: 0 },
+    accounts: [{ ...snap.accounts[0], waiting: [] }] });
+  const emptyMsg = el('wxTodo').innerHTML;
+  show({ ...snap, available: false, reason: 'MCP 不可用：Connection refused', accounts: [] });
+  const downMsg = el('wxTodo').innerHTML;
+  t('「真的没人找你」和「MCP 连不上」是两句话，不是同一个空',
+    emptyMsg !== downMsg && downMsg.includes('MCP 不可用'), `${emptyMsg.slice(0,40)} / ${downMsg.slice(0,40)}`);
+  t('MCP 不可用时角标留空，不用 0 冒充"没有新消息"', (() => {
+    api.renderWechatBadge(); return (el('tyWechatN').textContent || '') === '';
+  })());
+
+  // 语义降级：模型没跑起来时标 analyzed=false，页面提示但保留原文
+  show({ ...snap, accounts: [{ ...snap.accounts[0],
+    waiting: [w('Mom', 'c1', 30, { analyzed: false })],
+    semantic: { analyzed: 0, llm: '', asr: false } }] });
+  t('模型未就绪时条目标「未解析」并保留原文，不假装分析过',
+    el('wxTodo').innerHTML.includes('没能解析') && el('wxTodo').innerHTML.includes('[语音]'),
+    el('wxTodo').innerHTML.slice(0, 120));
+
+  // 角标
+  show(snap);
+  api.renderWechatBadge();
+  t('导航角标显示待办数（含无 category 的那条）', el('tyWechatN').textContent.trim() === '3',
+    el('tyWechatN').textContent);
+  t('搁置不足 1 小时显示「刚刚」', api.wxHoursLabel(0.2) === '刚刚', api.wxHoursLabel(0.2));
+  t('超过 1 天换算成天数', api.wxHoursLabel(30) === '1 天前', api.wxHoursLabel(30));
+}
+
+console.log('\n— 37. 微信经营层：机会探索 / 咨询分析 / 事实边界 —');
+{
+  const opportunities=[{
+    id:'o1', contact:'潜客', kind:'direct', at:'2026-11-11T10:00:00+08:00', opportunityLevel:'O2',
+    businessFit:'企业AI咨询', evidence:'对方询问企业知识库和自动化落地',
+    whyRelated:'符合企业 AI 落地咨询业务', nextAction:'询问现有流程、团队人数和上线时间',
+    missingInfo:'预算、排期', confidence:'medium', analyzed:true, sourcePreview:'我们想做一个内部知识库'
+  }];
+  const consultations=[{
+    id:'c1', contact:'学员', kind:'group', at:'2026-11-11T09:00:00+08:00', consultationType:'教学',
+    surfaceQuestion:'AI 副业怎么开始', underlyingNeed:'想找低门槛方向验证收入',
+    whyRelated:'与 AI/副业教学社群相关', nextAction:'追问时间投入和已有客户资源',
+    missingInfo:'时间、资源', suggestedReply:'先盘点已有技能和可触达客户', confidence:'high', analyzed:true,
+    sourcePreview:'我想做 AI 副业，但不知道从哪开始'
+  }];
+  api.renderWxAnalysis({opportunities, consultations, businessAnalysis:{lookbackDays:14}});
+  t('机会卡展示证据、相关性和下一步',
+    el('wxOpportunities').innerHTML.includes('符合企业 AI 落地咨询业务')
+    && el('wxOpportunities').innerHTML.includes('询问现有流程、团队人数和上线时间'));
+  t('咨询卡展示表面问题、真实需求和建议回答',
+    el('wxConsultations').innerHTML.includes('AI 副业怎么开始')
+    && el('wxConsultations').innerHTML.includes('想找低门槛方向验证收入')
+    && el('wxConsultations').innerHTML.includes('先盘点已有技能'));
+  api.setWxView('opportunity');
+  t('机会视图只显示机会面板', el('wxOpportunityPanel').hidden===false && el('wxConsultationPanel').hidden===true);
+  api.setWxView('consultation');
+  t('咨询视图只显示咨询面板', el('wxConsultationPanel').hidden===false && el('wxOpportunityPanel').hidden===true);
+  api.setWxView('action');
+  t('切回今日行动不会丢失原有待办区', el('wxActionPanel').hidden===false && el('wxTodo').innerHTML.length>0);
+  api.renderWxAnalysis({opportunities:[], consultations:[], businessAnalysis:{lookbackDays:14}});
+  t('机会/咨询空态明确说明覆盖边界', el('wxOpportunities').innerHTML.includes('未命中关键词') && el('wxConsultations').innerHTML.includes('普通闲聊'));
+}
+
+console.log('\n— 38. 访客模式微信 mock：不读真实微信、四个视图可演示 —');
+{
+  // 访客态切换只改内存里的 wechat，不应清空或读取真实快照。
+  if(api.isGuest()) api.toggleGuest();
+  api.setWechat(null);
+  api.toggleGuest();
+  const gw=api.getGuestWechat();
+  t('访客模式注入脱敏微信 mock', api.isGuest() && gw && gw.guest===true && gw.accounts.length===1);
+  t('访客 mock 同时有待办、机会、咨询、群提醒',
+    gw.accounts[0].todos.length>0 && gw.accounts[0].opportunities.length>0
+    && gw.accounts[0].consultations.length>0 && gw.accounts[0].mentions.length>0);
+  api.setWxView('opportunity'); api.renderWechat();
+  t('访客机会视图可以渲染示例卡片', el('wxOpportunities').innerHTML.includes('示例客户'));
+  api.setWxView('consultation'); api.renderWechat();
+  t('访客咨询视图可以渲染示例卡片', el('wxConsultations').innerHTML.includes('示例学员'));
+  api.toggleGuest();
+  t('退出访客恢复非访客态', api.isGuest()===false);
+}
+
+console.log('\n— 39. Jev 0-9 分制的展示口径 —');
+{
+  t('6.47/9 → 72%', api.wxScorePct(6.47) === '72%', api.wxScorePct(6.47));
+  t('0 分 → 0%，9 分 → 100%', api.wxScorePct(0) === '0%' && api.wxScorePct(9) === '100%');
+  t('越界值被夹到 0–100%', api.wxScorePct(-2) === '0%' && api.wxScorePct(12) === '100%');
+  t('非数字返回空串，不显示 NaN', api.wxScorePct(null) === '' && api.wxScorePct('abc') === '');
+  const card = api.wxAnalysisCard({
+    id:'o-pct', contact:'示例', kind:'direct', at:'2026-11-21T10:00:00+08:00',
+    opportunityLevel:'O2', businessFit:'企业AI咨询', evidence:'证据',
+    whyRelated:'相关', nextAction:'下一步', missingInfo:'预算',
+    opportunityScore:6.47, consultationScore:7.57, judgmentModel:'jev', analyzed:true
+  }, 'opportunity');
+  t('卡片显示百分比，不再显示 /9 与两位小数',
+    card.includes('机会 72%') && card.includes('咨询 84%') && !card.includes('/9'),
+    (card.match(/wx-analysis-meta[^<]*<[^>]*>[^<]{0,120}/) || [''])[0]);
+}
+
+console.log('\n— 40. 选题雷达（radar.json）—');
+{
+  const radarFixture = {
+    generatedAt: '2026-11-21T23:10:00+08:00',
+    coverage: {sourcesTotal: 5, sourcesOk: 4, sourcesFailed: 1, itemsFetched: 36,
+      itemsJudged: 12, keptForWriting: 1, judgmentModel: 'jev'},
+    sources: [
+      {id: '36kr', name: '36氪 · 24 小时热榜', status: 'ok', itemCount: 8, url: 'https://tophub.today/n/Q1Vd5Ko85R', error: ''},
+      {id: 'weibo', name: '微博热搜', status: 'unsupported', itemCount: 0, url: 'https://tophub.today/n/KqndgxeLl9', error: '页面为 JS 渲染'},
+      {id: 'hn', name: 'Hacker News', status: 'error', itemCount: 0, url: 'https://news.ycombinator.com/', error: 'timeout: timed out'}
+    ],
+    items: [
+      {title: 'DeepSeek 又崩了，这几招还能继续用', url: 'https://example.com/a', sourceName: '36氪 · 24 小时热榜',
+       relevance: 7.2, angle: 4.9, whyRelated: '企业咨询可用作成本对比素材',
+       angles: ['DeepSeek 使用避坑指南'], nextAction: '写一篇对比'},
+      {title: '某条与业务无关的噪音', url: 'https://example.com/b', sourceName: '知乎热榜',
+       relevance: 3.2, angle: 2.1, needsHuman: true}
+    ]
+  };
+  api.setRadar(radarFixture);
+  api.setRadarAll(false);
+  const writable = el('radarList').innerHTML;
+  t('可写视图只列判断过的条目，噪音不进列表',
+    writable.includes('DeepSeek') && !writable.includes('噪音'), writable.slice(0, 60));
+  t('相关度按 0-9 折成百分比', writable.includes('相关 80%') && writable.includes('可写 54%'), writable.match(/相关 \d+%/g));
+  t('三条信息都在：为什么 / 能写 / 下一步',
+    writable.includes('为什么') && writable.includes('企业咨询可用作成本对比素材')
+      && writable.includes('能写') && writable.includes('DeepSeek 使用避坑指南')
+      && writable.includes('下一步') && writable.includes('写一篇对比'));
+  t('来源可用性如实标注（可用 / 未接入 / 抓取失败）',
+    el('radarSources').innerHTML.includes('可用') && el('radarSources').innerHTML.includes('未接入')
+      && el('radarSources').innerHTML.includes('抓取失败'),
+    el('radarSources').innerHTML.slice(0, 120));
+  t('覆盖率写清来源数与判断数', /4\/5 源可用/.test(el('radarNote').textContent)
+    && /Jev 判断 12 条/.test(el('radarNote').textContent), el('radarNote').textContent);
+
+  api.setRadarAll(true);
+  const all = el('radarList').innerHTML;
+  t('全部视图包含未达线条目，并标「需人工判断」',
+    all.includes('噪音') && all.includes('需人工判断'), all.slice(0, 60));
+  t('排序按相关度优先（可写的排在噪音前）',
+    all.indexOf('DeepSeek') >= 0 && all.indexOf('DeepSeek') < all.indexOf('噪音'));
+
+  api.setRadar(null);
+  api.setRadarErr('HTTP 404');
+  api.renderRadar();
+  t('没有快照时说清怎么生成，不画空列表',
+    el('radarNote').innerHTML.includes('radar-sync.py') && el('radarNote').innerHTML.includes('HTTP 404')
+      && el('radarList').innerHTML === '', el('radarNote').innerHTML.slice(0, 80));
+}
+
+console.log('\n— 41. 知识星球数据大盘 —');
+{
+  const zsocial = {
+    accounts: [{platform: '知识星球', asOf: '2026-10-19',
+      metrics: {perGroup: {'A 星球': 2, 'B 星球': 1}, members: {'A 星球': 242, 'B 星球': 1},
+        dashboard: {'A 星球': {status: 'unsupported', reason: '免费星球没有官方运营大盘'},
+                    'B 星球': {status: 'ok', yesterdayActive: 0, avg30Active: 0.4}}}}],
+    posts: [
+      {platform: '知识星球', title: '高阅读那条', url: 'https://x/1', publishedAt: '2026-10-19T10:00:00+08:00',
+       metrics: {reads: 100, likes: 10, comments: 5}},
+      {platform: '知识星球', title: '低阅读那条', url: 'https://x/2', publishedAt: '2026-10-18T10:00:00+08:00',
+       metrics: {reads: 20, likes: 1, comments: 0}},
+      {platform: '知识星球', title: '没有指标那条', url: 'https://x/3', publishedAt: '2026-09-01T10:00:00+08:00',
+       metrics: {reads: null, likes: null, comments: null}}
+    ]
+  };
+  const st = api.zsxqStats(zsocial);
+  t('成员总数默认取主星球，不再把小星球人数加进来',
+    st.memberTotal === 242 && st.memberGroup === 'A 星球', [st.memberTotal, st.memberGroup]);
+  t('阅读总量与篇均只算有指标的条目',
+    st.readSum === 120 && st.avgRead === 60, [st.readSum, st.avgRead]);
+  t('互动率 =（赞+评）/阅读', Math.abs(st.interact - (16 / 120 * 100)) < 0.01, st.interact);
+  t('Top 排行按阅读降序，且不把缺指标的排进去',
+    st.top.length === 2 && st.top[0].title === '高阅读那条', st.top.map(x => x.title));
+  t('免费星球无大盘单独记下来', st.dashFree.length === 1 && st.dashFree[0] === 'A 星球', st.dashFree);
+  t('老快照没有 mine 标记时沿用全量，不误判成空口径',
+    st.mineKnown === false && st.groups === 2 && st.allGroups === 2, [st.mineKnown, st.groups, st.allGroups]);
+
+  // 口径：话题总数、阅读 Top5 始终全量；统计星球下拉默认=全部我的星球（成员取主星球代表）。
+  const ago1 = new Date(Date.now() - 86400000).toISOString();
+  const zsocialMine = {
+    accounts: [{platform: '知识星球', asOf: '2026-11-23', metrics: {
+      perGroup: {'我的星球': 1, '别人的星球': 1},
+      members: {'我的星球': 5, '别人的星球': 900},
+      dashboard: {'我的星球': {status: 'ok'}, '别人的星球': {status: 'unsupported'}}}}],
+    posts: [
+      {platform: '知识星球', group: '我的星球', mine: true, title: '我的那条',
+       publishedAt: ago1, metrics: {reads: 10, likes: 1, comments: 1}},
+      {platform: '知识星球', group: '别人的星球', mine: false, title: '别人的高阅读',
+       publishedAt: ago1, metrics: {reads: 1000, likes: 500, comments: 500}}
+    ]
+  };
+  const mineSt = api.zsxqStats(zsocialMine);
+  t('话题总数全量，阅读/互动/近30天只看我的星球，成员总数取指定星球',
+    mineSt.posts === 2 && mineSt.groups === 1 && mineSt.memberTotal === 5 &&
+      mineSt.memberGroup === '我的星球' &&
+      mineSt.readSum === 10 && mineSt.avgRead === 10 && mineSt.interact === 20 && mineSt.last30 === 1,
+    {posts: mineSt.posts, groups: mineSt.groups, members: mineSt.memberTotal,
+     reads: mineSt.readSum, interact: mineSt.interact, last30: mineSt.last30});
+  t('阅读最高的 5 条展示所有星球，别人的高阅读必须进榜',
+    mineSt.top.length === 2 && mineSt.top[0].title === '别人的高阅读',
+    mineSt.top.map(x => x.title));
+  t('大盘状态也只算我的星球',
+    mineSt.dashOk === 1 && mineSt.dashFree.length === 0, [mineSt.dashOk, mineSt.dashFree]);
+  t('星球清单仍列全部星球，没被大盘口径裁掉', api.zsxqGroupsOf(zsocialMine).length === 2,
+    api.zsxqGroupsOf(zsocialMine).map(g => g.name));
+  api.renderZsxqPanel(zsocialMine);
+  t('面板说明写清 Top5 是全量、其余是 mine 口径',
+    el('zsxqNote').textContent.includes('话题总数、阅读最高的 5 条为全部星球') &&
+      el('zsxqNote').textContent.includes('其余指标只看我的 1 个星球'),
+    el('zsxqNote').textContent);
+  t('Top 列表标出「全部星球」口径',
+    el('zsxqTop').innerHTML.includes('全部星球') && el('zsxqTop').innerHTML.includes('别人的高阅读'),
+    el('zsxqTop').innerHTML.slice(0, 120));
+
+  // 统计星球可自定义：默认=全部我的星球；选定后成员/阅读/篇均/互动/近30天/大盘状态
+  // 全部跟着这一个星球走，话题总数与阅读 Top5 仍是全量。
+  const pickSocial = {
+    accounts: [{platform: '知识星球', asOf: '2026-11-23', metrics: {
+      perGroup: {'主星球': 1, '次星球': 1}, members: {'主星球': 242, '次星球': 9},
+      dashboard: {'主星球': {status: 'ok'}, '次星球': {status: 'unsupported'}}}}],
+    posts: [
+      {platform: '知识星球', group: '主星球', mine: true, title: '主星球内容',
+       publishedAt: ago1, metrics: {reads: 1}},
+      {platform: '知识星球', group: '次星球', mine: true, title: '次星球内容',
+       publishedAt: ago1, metrics: {reads: 2}}
+    ]
+  };
+  api.setSocial(pickSocial);
+  api.setZsxqMemberGroup('');
+  const autoSt = api.zsxqStats(pickSocial);
+  t('默认统计口径是全部我的星球，成员取主星球代表',
+    autoSt.scopeGroup === '' && autoSt.groups === 2 && autoSt.memberTotal === 242 &&
+      autoSt.memberGroup === '主星球' && autoSt.readSum === 3 && autoSt.last30 === 2,
+    {scopeGroup: autoSt.scopeGroup, groups: autoSt.groups, members: autoSt.memberTotal,
+     reads: autoSt.readSum, last30: autoSt.last30});
+  api.setZsxqMemberGroup('次星球');
+  const oneSt = api.zsxqStats(pickSocial);
+  t('成员总数可切到别的星球，数字跟着变',
+    oneSt.memberTotal === 9 && oneSt.memberGroup === '次星球' && oneSt.scopeGroup === '次星球',
+    [oneSt.memberTotal, oneSt.memberGroup, oneSt.scopeGroup]);
+  t('改了统计星球，阅读/篇均/近30天/星球数/大盘状态全部跟着走',
+    oneSt.readSum === 2 && oneSt.avgRead === 2 && oneSt.last30 === 1 &&
+      oneSt.groups === 1 && oneSt.dashOk === 0 && oneSt.dashFree.length === 1 &&
+      oneSt.dashFree[0] === '次星球',
+    {reads: oneSt.readSum, avg: oneSt.avgRead, last30: oneSt.last30, groups: oneSt.groups,
+     dashOk: oneSt.dashOk, dashFree: oneSt.dashFree});
+  t('话题总数与阅读 Top5 不随统计星球收窄，仍是全量',
+    oneSt.posts === 2 && oneSt.top.length === 2 && oneSt.top[0].title === '次星球内容',
+    {posts: oneSt.posts, top: oneSt.top.map(x => x.title)});
+  t('下拉列出我的星球，且选中态跟着切',
+    el('zsxqMemberSel').innerHTML.includes('次星球') && el('zsxqMemberSel').value === '次星球',
+    [el('zsxqMemberSel').innerHTML.slice(0, 120), el('zsxqMemberSel').value]);
+  api.renderZsxqPanel(pickSocial);
+  t('说明里写出当前统计星球',
+    el('zsxqNote').textContent.includes('其余指标只看「次星球」'), el('zsxqNote').textContent);
+  t('成员总数卡片下标出当前星球',
+    el('zsxqStats').innerHTML.includes('仅 次星球'), el('zsxqStats').innerHTML.slice(0, 160));
+  t('页头也跟着切到该星球',
+    el('zsxqTag').textContent.includes('「次星球」'), el('zsxqTag').textContent);
+  t('其余四张卡片下标出「该星球」口径',
+    (el('zsxqStats').innerHTML.match(/该星球/g) || []).length === 4,
+    (el('zsxqStats').innerHTML.match(/该星球/g) || []).length);
+  api.setZsxqMemberGroup('');
+  t('切回默认后其余指标恢复成全部我的星球',
+    api.zsxqStats(pickSocial).readSum === 3 && api.zsxqStats(pickSocial).groups === 2,
+    [api.zsxqStats(pickSocial).readSum, api.zsxqStats(pickSocial).groups]);
+
+  api.renderZsxqPanel(zsocial);
+  const html = el('zsxqStats').innerHTML;
+  t('面板写出六个指标', (html.match(/zsxq-figure/g) || []).length === 6,
+    (html.match(/zsxq-figure/g) || []).length);
+  t('缺指标的条目不显示成 0 阅读',
+    !el('zsxqTop').innerHTML.includes('没有指标那条'), el('zsxqTop').innerHTML.slice(0, 60));
+  t('备注里说明哪个星球没有官方大盘',
+    el('zsxqNote').textContent.includes('免费星球') && el('zsxqNote').textContent.includes('A 星球'),
+    el('zsxqNote').textContent);
+  t('Top 列表带链接和阅读数', el('zsxqTop').innerHTML.includes('https://x/1')
+    && el('zsxqTop').innerHTML.includes('100'), el('zsxqTop').innerHTML.slice(0, 80));
+
+  const none = {accounts: [], posts: []};
+  api.renderZsxqPanel(none);
+  t('没有知识星球账号时给生成命令，不画空面板',
+    el('zsxqNote').textContent.includes('social-sync.py') && el('zsxqStats').innerHTML === '',
+    el('zsxqNote').textContent);
+}
+
+console.log('\n— 42. 项目卡的关联任务数 —');
+{
+  const withTasks = {id: 'p1', name: '有任务的项目', status: '进行中',
+    relatedTaskIds: ['t1', 't2', 't3', 't4', 't5'], childCount: 3};
+  const withoutTasks = {id: 'p2', name: '没有任务的项目', status: '进行中',
+    relatedTaskIds: [], childCount: 0};
+  const htmlA = api.realProjectCard(withTasks);
+  const htmlB = api.realProjectCard(withoutTasks);
+  t('有任务时显示「5 个关联任务」', /5 个关联任务/.test(htmlA), htmlA.slice(0, 120));
+  t('没有任务时不显示 0 个任务', !/关联任务/.test(htmlB), htmlB.slice(0, 120));
+}
+
+console.log('\n— 43. 知识星球独立一屏 —');
+{
+  const socialFixture = {
+    accounts: [{platform: '知识星球', asOf: '2026-11-22',
+      metrics: {perGroup: {'主星球': 2, '碎屑星球': 1},
+        groupIds: {'主星球': '111', '碎屑星球': '222'},
+        members: {'主星球': 242, '碎屑星球': 1},
+        dashboard: {'主星球': {status: 'unsupported', reason: '免费星球'},
+                    '碎屑星球': {status: 'ok', yesterdayActive: 0, avg30Active: 0.4}}}}],
+    posts: [
+      {platform: '知识星球', title: '较新的一条', url: 'https://x/a', publishedAt: '2026-11-20T10:00:00+08:00',
+       metrics: {reads: 20, likes: 2, comments: 1}},
+      {platform: '知识星球', title: '很早但阅读高', url: 'https://x/b', publishedAt: '2026-08-01T10:00:00+08:00',
+       metrics: {reads: 90, likes: 9, comments: 3}},
+      {platform: '小红书', title: '别的平台', url: 'https://x/c', publishedAt: '2026-11-21T10:00:00+08:00',
+       metrics: {reads: 999}}
+    ]
+  };
+  api.setSocial(socialFixture);
+  api.setZsxqQuery('');
+  api.setZsxqSort('new');
+  api.renderZsxqScreen();
+
+  t('只渲染知识星球的内容，不混别的平台',
+    !el('zsxqTimeline').innerHTML.includes('别的平台'), el('zsxqTimeline').innerHTML.slice(0, 60));
+  t('默认按时间倒序',
+    api.zsxqTimelineRows(socialFixture).map(p => p.title).join(',') === '较新的一条,很早但阅读高',
+    api.zsxqTimelineRows(socialFixture).map(p => p.title));
+  t('可切到阅读排序',
+    (api.setZsxqSort('reads'), api.zsxqTimelineRows(socialFixture).map(p => p.title).join(',') === '很早但阅读高,较新的一条'),
+    api.zsxqTimelineRows(socialFixture).map(p => p.title));
+  t('切到「阅读最高」后按钮高亮跟着换',
+    el('zsxqSortReads').classList.contains('on') && !el('zsxqSortNew').classList.contains('on'),
+    el('zsxqSortReads').className || '(no classList)');
+  api.setZsxqSort('new');
+  t('切回「最新」后高亮也回来',
+    el('zsxqSortNew').classList.contains('on') && !el('zsxqSortReads').classList.contains('on'),
+    el('zsxqSortNew').className || '(no classList)');
+
+  t('星球清单带条数、成员数与大盘状态',
+    api.zsxqGroupsOf(socialFixture).map(g => g.name + ':' + g.posts).join(',') === '主星球:2,碎屑星球:1',
+    api.zsxqGroupsOf(socialFixture));
+  t('星球清单渲染进页面',
+    el('zsxqGroups').innerHTML.includes('主星球') && el('zsxqGroups').innerHTML.includes('242'),
+    el('zsxqGroups').innerHTML.slice(0, 80));
+  t('免费星球在清单里写明官方无大盘',
+    el('zsxqGroups').innerHTML.includes('官方无大盘'), el('zsxqGroups').innerHTML.slice(0, 120));
+  t('星球清单每行能点进对应星球首页',
+    el('zsxqGroups').innerHTML.includes('https://wx.zsxq.com/group/111')
+      && el('zsxqGroups').innerHTML.includes('target="_blank"'),
+    el('zsxqGroups').innerHTML.slice(0, 200));
+
+  api.setZsxqQuery('阅读高');
+  api.renderZsxqScreen();
+  t('搜索按标题过滤', el('zsxqTimeline').innerHTML.includes('很早但阅读高')
+    && !el('zsxqTimeline').innerHTML.includes('较新的一条'), el('zsxqTimeline').innerHTML.slice(0, 60));
+
+  api.setZsxqQuery('不存在的关键词');
+  api.renderZsxqScreen();
+  t('搜不到时给出提示而不是空白',
+    el('zsxqTimeline').innerHTML.includes('没有匹配'), el('zsxqTimeline').innerHTML.slice(0, 60));
+
+  // 分页：默认 20 条，可再展开
+  const rowCount = () => (el("zsxqTimeline").innerHTML.match(/class="zsxq-tl-row"/g) || []).length;
+  const many = {accounts: socialFixture.accounts, posts: Array.from({length: 30}, (_, i) => ({
+    platform: '知识星球', title: '话题' + i, url: 'https://x/' + i,
+    publishedAt: '2026-11-' + String(10 + (i % 10)).padStart(2, '0') + 'T10:00:00+08:00',
+    metrics: {reads: i, likes: 0, comments: 0}, excerpt: '这是第' + i + '条的正文摘要。'
+  }))};
+  api.setSocial(many);
+  api.setZsxqQuery("");
+  api.setZsxqSort("new");
+  t('时间线默认只铺 10 条，不一次拉满',
+    rowCount() === 10, rowCount());
+  t('页末同时给出页数、每页条数和总数',
+    (el("zsxqTimelineTag") || {}).textContent === "第 1 / 3 页 · 每页 10 条 · 共 30 条",
+    (el("zsxqTimelineTag") || {}).textContent);
+  const orderedTitles = api.zsxqTimelineRows(many).map(p => p.title);
+  api.setZsxqPageIndex(2);
+  t('翻到第 2 页只显示该页 10 条',
+    api.getZsxqPageIndex() === 2 && rowCount() === 10 &&
+      el("zsxqTimeline").innerHTML.includes(orderedTitles[10]) &&
+      !el("zsxqTimeline").innerHTML.includes(orderedTitles[0]),
+    [api.getZsxqPageIndex(), rowCount(), el("zsxqTimelineTag").textContent]);
+  api.setZsxqPage(50);
+  t('切每页条数时回到第 1 页，且能铺满 30 条',
+    api.getZsxqPageIndex() === 1 && rowCount() === 30, rowCount());
+  api.setZsxqPage(0);
+  t('选「全部」时不受上限限制，只有一页',
+    rowCount() === 30 && el("zsxqTimelineTag").textContent === "第 1 / 1 页 · 每页 全部 · 共 30 条",
+    el("zsxqTimelineTag").textContent);
+  t('显示出正文摘要，而不是只有标题',
+    el("zsxqTimeline").innerHTML.includes("正文摘要"), el("zsxqTimeline").innerHTML.slice(0, 120));
+  api.setZsxqPage(20);
+  t('切回 20 条，页数跟着变成 2 页',
+    rowCount() === 20 && el("zsxqTimelineTag").textContent === "第 1 / 2 页 · 每页 20 条 · 共 30 条",
+    el("zsxqTimelineTag").textContent);
+  api.setZsxqPage(10);
+
+  // 自己的星球 = 无标题短文 + 标签；别人星球保持标题+摘要
+  const mixed = {accounts: socialFixture.accounts, posts: [
+    {platform:'知识星球', group:'我的碎屑', mine:true, tags:['AI','碎屑'],
+     title:'这句话其实是正文首句', excerpt:'这句话其实是正文首句。后面还有正文。',
+     url:'https://x/mine', publishedAt:'2026-11-22T10:00:00+08:00', metrics:{reads:1,likes:0,comments:0}},
+    {platform:'知识星球', group:'别人的星球', mine:false,
+     title:'别人星球的正经标题', excerpt:'别人星球的正文摘要',
+     url:'https://x/other', publishedAt:'2026-11-21T10:00:00+08:00', metrics:{reads:2,likes:0,comments:0}}
+  ]};
+  api.setSocial(mixed);
+  api.setZsxqQuery("");
+  api.renderZsxqScreen();
+  const zhtml = el('zsxqTimeline').innerHTML;
+  t('自己的星球渲染短文卡片而非标题行',
+    zhtml.includes('zsxq-tl-note') && !zhtml.includes('别人星球的正经标题zsxq-tl-note'), zhtml.slice(0, 200));
+  t('自己的星球显示标签胶囊',
+    zhtml.includes('zsxq-tl-tag') && zhtml.includes('#AI') && zhtml.includes('#碎屑'), zhtml.slice(0, 200));
+  const otherRow = (zhtml.split('href="https://x/other"')[1] || '').split('</a>')[0];
+  t('别人的星球仍是标题+摘要，不套短文格式',
+    otherRow.includes('别人星球的正经标题') && otherRow.includes('zsxq-tl-excerpt')
+      && !otherRow.includes('zsxq-tl-tag') && !otherRow.includes('zsxq-tl-note'),
+    otherRow.slice(0, 240) || zhtml.slice(0, 240));
+  api.setZsxqQuery('碎屑');
+  t('标签可被搜索到',
+    api.zsxqTimelineRows(mixed).length === 1 && api.zsxqTimelineRows(mixed)[0].mine === true,
+    api.zsxqTimelineRows(mixed).map(p => p.title));
+  api.setZsxqQuery('');
+  api.setSocial(many);
+  api.setZsxqPage(10);
+
+  // ── 星球标识 / 筛选 / 标签格式 / 清单置顶排序 ──────────────────
+  api.setSocial(mixed);
+  api.setZsxqQuery('');
+  api.renderZsxqScreen();
+  const zh2 = el('zsxqTimeline').innerHTML;
+  t('时间线每条都标来源星球',
+    (zh2.match(/class="zsxq-tl-group"/g) || []).length === 2, zh2.slice(0, 220));
+  t('自己的星球挂「我的」角标，别人星球不挂',
+    zh2.includes('zsxq-mine-badge') &&
+      ((zh2.split('href="https://x/other"')[1] || '').includes('zsxq-mine-badge') === false),
+    zh2.slice(0, 220));
+  t('标签在正文之后、正文上方不再有标签行',
+    zh2.indexOf('zsxq-tl-note') < zh2.indexOf('zsxq-tl-tags') &&
+      zh2.includes('zsxq-tl-tags-label'), zh2.slice(0, 260));
+
+  // 星球筛选：只列有内容的星球；选中后只显示该星球；再点取消
+  const opts = (el('zsxqGroupSel').innerHTML.match(/<option\b/g) || []).length;
+  t('星球下拉只列有内容的星球（全部+2）', opts === 3, el('zsxqGroupSel').innerHTML);
+  api.setZsxqGroup('别人的星球');
+  t('按星球筛选后只剩该星球', api.getZsxqGroupFilter() === '别人的星球' &&
+    api.zsxqTimelineRows(mixed).length === 1 &&
+    api.zsxqTimelineRows(mixed)[0].group === '别人的星球',
+    api.zsxqTimelineRows(mixed).map(p => p.group));
+  api.setZsxqGroup('别人的星球');
+  t('再点同一星球取消筛选', api.getZsxqGroupFilter() === '' &&
+    api.zsxqTimelineRows(mixed).length === 2, api.getZsxqGroupFilter());
+
+  // 时间范围筛选：用相对当前日期的夹具，避免测试随时间失效。
+  const daysAgo = d => new Date(Date.now() - d * 86400000).toISOString();
+  const dated = {accounts: socialFixture.accounts, posts: [
+    {platform:'知识星球', group:'近期星球', title:'三天前', publishedAt:daysAgo(3), metrics:{reads:1}},
+    {platform:'知识星球', group:'旧星球', title:'两个月前', publishedAt:daysAgo(60), metrics:{reads:1}},
+  ]};
+  api.setSocial(dated);
+  api.setZsxqRange(7);
+  t('时间筛选 7 天只剩近期内容', api.getZsxqRange() === 7 &&
+    api.zsxqTimelineRows(dated).length === 1 &&
+    api.zsxqTimelineRows(dated)[0].title === '三天前',
+    api.zsxqTimelineRows(dated).map(p => p.title));
+  api.setZsxqRange(30);
+  t('时间筛选 30 天仍排除两个月前', api.getZsxqRange() === 30 &&
+    api.zsxqTimelineRows(dated).length === 1, api.getZsxqRange());
+  api.setZsxqRange(30);
+  t('再点同一档回到全部', api.getZsxqRange() === 0 &&
+    api.zsxqTimelineRows(dated).length === 2, api.getZsxqRange());
+  api.setZsxqRange(0);
+  api.setSocial(mixed);
+
+  // 清单排序 / 我的星球固定置顶：用 accounts.perGroup 与 post.group 自洽的夹具，
+  // 否则 mine 由 post 推导时匹配不到 perGroup 的键，测的就不是置顶逻辑了。
+  const groupFixture = {
+    accounts: [{platform: '知识星球', metrics: {
+      perGroup: {'B星球': 2, 'A我的星球': 1}, members: {}, dashboard: {}}},],
+    posts: [
+      {platform:'知识星球', group:'A我的星球', mine:true, title:'x', publishedAt:'2026-11-22T10:00:00+08:00', metrics:{reads:1}},
+      {platform:'知识星球', group:'B星球', mine:false, title:'y', publishedAt:'2026-11-21T10:00:00+08:00', metrics:{reads:1}},
+      {platform:'知识星球', group:'B星球', mine:false, title:'z', publishedAt:'2026-11-20T10:00:00+08:00', metrics:{reads:1}},
+    ]};
+  api.setSocial(groupFixture);
+  api.setZsxqGroupSort('name');
+  t('清单排序可切到按名称', api.getZsxqGroupSort() === 'name' &&
+    localStorage.getItem('zsxqGroupView').includes('"sort":"name"'),
+    localStorage.getItem('zsxqGroupView'));
+  // 我的星球固定置顶：按条数排时 A我的星球(1条) 仍排在 B星球(2条) 前面，
+  // 证明置顶不依赖开关、也不受排序方式影响。
+  api.setZsxqGroupSort('posts');
+  t('我的星球固定置顶（按条数排仍排最前）',
+    api.getZsxqGroupSort() === 'posts' &&
+      api.zsxqGroupsOf(groupFixture)[0].mine === true &&
+      api.zsxqGroupsOf(groupFixture)[0].name === 'A我的星球',
+    api.zsxqGroupsOf(groupFixture).map(g => g.name + ':' + g.mine + ':' + g.posts));
+  t('排序偏好持久化且不含已删除的置顶开关字段',
+    localStorage.getItem('zsxqGroupView').includes('"sort":"posts"') &&
+      !localStorage.getItem('zsxqGroupView').includes('pinMine'),
+    localStorage.getItem('zsxqGroupView'));
+  api.setSocial(many);
+  api.setZsxqPage(10);
+
+  // 展开全文（只读）
+  api.setZsxqPage(10);
+  api.setZsxqOpen(null);
+  api.setZsxqDetail({});
+  const firstId = api.zsxqTopicId({url: "https://x/9"});
+  t('从 URL 取出 topic id', firstId === "9", firstId);
+  t('未展开时不渲染全文块',
+    !el("zsxqTimeline").innerHTML.includes("zsxq-full"), el("zsxqTimeline").innerHTML.slice(0, 60));
+  api.setZsxqOpen(firstId);
+  api.setZsxqDetail({[firstId]: {text: "这是完整正文，结尾落在句号上。"}});
+  api.renderZsxqScreen();
+  t('展开后渲染完整正文',
+    el("zsxqTimeline").innerHTML.includes("这是完整正文，结尾落在句号上。"),
+    el("zsxqTimeline").innerHTML.slice(0, 80));
+  t('展开后按钮变「收起」',
+    el("zsxqTimeline").innerHTML.includes("收起"), el("zsxqTimeline").innerHTML.slice(0, 120));
+  api.setZsxqDetail({[firstId]: {error: "读取超时（45s）"}});
+  api.renderZsxqScreen();
+  t('读取失败时显示真实原因，不显示空白',
+    el("zsxqTimeline").innerHTML.includes("读取超时"), el("zsxqTimeline").innerHTML.slice(0, 100));
+  api.setZsxqOpen(null);
+  api.setZsxqDetail({});
+
+  // 发帖预览渲染（不触发真实发布）
+  api.zsxqRenderPreview({groupName: "测试星球", aiMode: "aigc", chars: 30,
+    finalText: '<e type="hashtag" hid="1" title="%23AI%23" /> <e type="hashtag" hid="2" title="%23bot%23" />\n正文内容',
+    warnings: ["正文太短（少于 20 字）"]});
+  t('预览显示目标星球、模型与字数',
+    el("zsxqPreviewBox").innerHTML.includes("测试星球") && el("zsxqPreviewBox").innerHTML.includes("30 字"),
+    el("zsxqPreviewBox").innerHTML.slice(0, 100));
+  const previewVisible = el("zsxqPreviewBox").innerHTML.split("zsxq-raw")[0];  // 源码区之前的部分
+  t('预览把标签渲染成胶囊，正文区不出现富文本标记',
+    (previewVisible.match(/zsxq-ptag/g) || []).length === 2
+      && !previewVisible.includes("&lt;e ") && !previewVisible.includes("<e "),
+    previewVisible.slice(0, 160));
+  t('原始标记收在「查看源码」里',
+    el("zsxqPreviewBox").innerHTML.includes("查看源码")
+      && el("zsxqPreviewBox").innerHTML.includes("&lt;e "),
+    el("zsxqPreviewBox").innerHTML.slice(-80));
+  t('预览正文只保留正文部分，不含标签行',
+    el("zsxqPreviewBox").innerHTML.includes("正文内容")
+      && !el("zsxqPreviewBox").innerHTML.includes("#AI #bot"),
+    el("zsxqPreviewBox").innerHTML.slice(0, 160));
+  t('警告会显示出来，不静默吞掉',
+    el("zsxqPreviewBox").innerHTML.includes("正文太短"), el("zsxqPreviewBox").innerHTML.slice(0, 160));
+
+  // 标签快捷选择
+  api.setTagOptions([{name: "AI", count: 48}, {name: "碎屑", count: 500},
+                     {name: "踩坑记录", count: 31}]);
+  api.resetTagsSel();
+  api.renderZsxqTags();
+  t('置顶标签（AI / 碎屑 / bot）排在最前，顺序固定',
+    ((h) => h.indexOf("#AI") < h.indexOf("#碎屑") && h.indexOf("#碎屑") < h.indexOf("#bot"))(
+      el("zsxqTagChips").innerHTML),
+    el("zsxqTagChips").innerHTML.slice(0, 120));
+  t('接口没返回 bot 也要显示（AI 声明靠它）',
+    el("zsxqTagChips").innerHTML.includes("#bot"),
+    el("zsxqTagChips").innerHTML.slice(0, 120));
+  t('置顶之后的标签仍按使用次数排',
+    ((h) => h.indexOf("踩坑记录") > h.indexOf("#bot"))(el("zsxqTagChips").innerHTML),
+    el("zsxqTagChips").innerHTML.slice(0, 160));
+  api.zsxqToggleTag("AI");
+  t('点标签后进入已选状态', api.getTagsSel().join(",") === "AI", api.getTagsSel());
+  t('已选标签带移除标记', el("zsxqTagChips").innerHTML.includes("✕"), el("zsxqTagChips").innerHTML.slice(0, 60));
+  api.zsxqToggleTag("AI");
+  t('再点一次取消选择', api.getTagsSel().length === 0, api.getTagsSel());
+  api.zsxqToggleTag("碎屑");
+  el("zsxqTags").value = "自定义A,自定义B";
+  t('自定义标签与已选标签合并去重',
+    api.zsxqCollectTags().join(",") === "碎屑,自定义A,自定义B", api.zsxqCollectTags());
+  el("zsxqTags").value = "碎屑";
+  // 目标星球：下拉多选，摘要说人话，至少保留一个
+  api.setTargetOptions([{groupId:'1',groupName:'主星球'},{groupId:'2',groupName:'碎屑星球'}]);
+  api.setTargetSel(['1']);
+  t('单选时摘要显示星球名', api.zsxqTargetSummaryText() === '主星球', api.zsxqTargetSummaryText());
+  api.setTargetSel(['1','2']);
+  t('多选时摘要说清是几个',
+    api.zsxqTargetSummaryText() === '2 个星球：主星球、碎屑星球', api.zsxqTargetSummaryText());
+  api.setTargetSel(['1']);
+  api.zsxqToggleTarget('1');   // 取消唯一一个
+  t('取消最后一个时兜底保留一个',
+    api.getTargetSel().length === 1 && api.getTargetSel()[0] === '1', api.getTargetSel());
+
+  // AI 续写：只填正文框，自动带 #bot，人工确认才发
+  api.resetTagsSel(); api.setAiManual(false); api.renderZsxqTags();
+  api.zsxqApplyDraft("最近试了个新东西，先说结论。");
+  t('续写把草稿填进正文框',
+    el("zsxqText").value.includes("最近试了个新东西"), el("zsxqText").value);
+  t('续写自动勾上 #bot', api.getTagsSel().includes("bot"), api.getTagsSel().join(","));
+  t('勾上 #bot 后声明自动变 aigc',
+    api.zsxqCurrentAiMode() === "aigc", api.zsxqCurrentAiMode());
+  t('续写只填草稿，不自动触发预览',
+    el("zsxqDraftNote").textContent.includes("草稿已填"), el("zsxqDraftNote").textContent);
+
+  // AI 声明：默认由标签自动推断，不再每次手动选
+  api.resetTagsSel(); api.setAiManual(false); api.renderZsxqTags();
+  t('没有 #bot 标签时 AI 声明自动为「不声明」',
+    api.zsxqCurrentAiMode() === "none", api.zsxqCurrentAiMode());
+  api.zsxqToggleTag("bot");
+  t('选了 #bot 就自动变 aigc',
+    api.zsxqCurrentAiMode() === "aigc", api.zsxqCurrentAiMode());
+  t('声明文案跟着变',
+    el("zsxqAiModeText").textContent.includes("aigc"), el("zsxqAiModeText").textContent);
+  api.zsxqToggleTag("bot");   // 取消 bot
+  t('取消 #bot 后回到不声明',
+    api.zsxqCurrentAiMode() === "none", api.zsxqCurrentAiMode());
+  api.setAiManual(true); el("zsxqAiMode").value = "personal_perspective";
+  api.renderZsxqTags();
+  t('手动选过一次后不再被标签覆盖',
+    api.zsxqCurrentAiMode() === "personal_perspective", api.zsxqCurrentAiMode());
+
+  t('自定义里重复已选标签时不重复',
+    api.zsxqCollectTags().filter(x => x === "碎屑").length === 1, api.zsxqCollectTags());
+  api.resetTagsSel();
+  el("zsxqTags").value = "";
+
+  // 二级菜单：知识星球不该占顶级标签
+  t('顶级导航里没有 zsxq（它是二级页）',
+    !api.getTypes().includes("zsxq"), api.getTypes());
+  t('zsxq 登记为 content 的子页',
+    api.getSubpages().zsxq && api.getSubpages().zsxq.parent === "content", api.getSubpages());
+  api.setType("content");
+  api.setType("zsxq");
+  t('进入子页时只显示子页屏幕',
+    el("screenContent").hidden === true && el("screenZsxq").hidden === false,
+    [el("screenContent").hidden, el("screenZsxq").hidden]);
+  t('顶部高亮的是父级「自媒体运营」',
+    el("tyContent").classList.contains("on") && !el("tyLedger").classList.contains("on"),
+    [el("tyContent").className, el("tyLedger").className]);
+
+  api.setSocial({accounts: [], posts: []});
+  api.setZsxqQuery('');
+  api.renderZsxqScreen();
+  t('没有星球账号时给生成命令',
+    el('zsxqScreenNote').textContent.includes('social-sync.py'), el('zsxqScreenNote').textContent);
 }
 
 console.log(`\n结果：${pass} 通过 / ${fail} 失败`);
