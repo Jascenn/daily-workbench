@@ -23,7 +23,7 @@ jobs:
           grep -q "function openNewsReader" workbench.html
 
   python:
-    name: Python compile & workbench build check
+    name: Python compile check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
