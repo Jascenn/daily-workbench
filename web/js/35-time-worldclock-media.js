@@ -71,22 +71,335 @@ function wxRow(item,opts){
     (item.mentionBasis?`<div class="wx-preview" style="grid-column:1/-1;margin-top:-2px">${item.mentionVerified===true?"已核验群成员":"文本命中 · 待核验群成员"}</div>`:"")+
   `</div>`;
 }
-let wxView=localStorage.getItem("wb_wx_view")||"action";
+let wxView=localStorage.getItem("wb_wx_view")||"brief";
 function setWxView(view, scroll=true){
-  wxView=["action","opportunity","consultation","mentions"].includes(view)?view:"action";
+  wxView=["brief","action","opportunity","consultation","mentions"].includes(view)?view:"brief";
   try{localStorage.setItem("wb_wx_view",wxView);}catch(e){}
   document.querySelectorAll("#wxSubnav [data-wxview]").forEach(b=>{
     const on=b.dataset.wxview===wxView;
     b.classList.toggle("on",on); b.setAttribute("aria-selected",on?"true":"false");
   });
   const panels={
+    brief:["wxBriefPanel"],
     action:["wxActionPanel","wxActionSecondary","wxActivePanel"],
     opportunity:["wxOpportunityPanel"],
     consultation:["wxConsultationPanel"],
     mentions:["wxMentionPanel"]
   };
-  ["wxActionPanel","wxActionSecondary","wxActivePanel","wxOpportunityPanel","wxConsultationPanel","wxMentionPanel"].forEach(id=>{const el=$(id);if(el)el.hidden=!panels[wxView]?.includes(id);});
-  if(scroll && wxView!=="action") document.querySelector("#screenWechat")?.scrollIntoView({block:"start",behavior:"smooth"});
+  ["wxBriefPanel","wxActionPanel","wxActionSecondary","wxActivePanel","wxOpportunityPanel","wxConsultationPanel","wxMentionPanel"].forEach(id=>{const el=$(id);if(el)el.hidden=!panels[wxView]?.includes(id);});
+  if(scroll && wxView!=="brief") document.querySelector("#screenWechat")?.scrollIntoView({block:"start",behavior:"smooth"});
+}
+/* ── 批奏折状态机（按会话/条目 ID + 最新消息时间存本机；新消息自动重浮） ── */
+const WX_TRIAGE_KEY="wb_wx_triage";
+let wxBriefType="all";
+let wxBriefStateFilter="pending";
+let wxBriefCache=[];
+let wxReplyCurrent=null;
+let wxReplyTone="pro";
+let wxReplyDrafts={pro:"",warm:"",short:""};
+
+function wxTriageMap(){
+  try{ return JSON.parse(localStorage.getItem(WX_TRIAGE_KEY)||"{}")||{}; }catch(e){ return {}; }
+}
+function wxSaveTriageMap(m){
+  try{ localStorage.setItem(WX_TRIAGE_KEY, JSON.stringify(m)); }catch(e){}
+}
+function wxBriefEffectiveState(item){
+  const rec=wxTriageMap()[item.id];
+  if(!rec || !rec.state || rec.state==="pending") return {state:"pending", reopened:false};
+  const curTs=item.at?Date.parse(item.at):0;
+  const savedTs=rec.at?Date.parse(rec.at):0;
+  // 一旦快照里的最新消息时间晚于当时标记时的时间，自动重新浮出为待批
+  if(curTs && savedTs && curTs>savedTs) return {state:"pending", reopened:true};
+  return {state:rec.state, reopened:false};
+}
+function wxSetBriefState(id, state){
+  const item=wxBriefCache.find(x=>x.id===id);
+  const m=wxTriageMap();
+  if(state==="pending"){
+    delete m[id];
+  }else{
+    m[id]={state, at:item?.at||"", updatedAt:new Date().toISOString()};
+  }
+  wxSaveTriageMap(m);
+  renderWxBrief();
+  const label=state==="done"?"已标为已处理（有新消息自动重浮）":(state==="read"?"已标为已阅":"已恢复为待批");
+  notify(label,"info");
+}
+function wxSetBriefType(t){ wxBriefType=t||"all"; renderWxBrief(); }
+function wxSetBriefStateFilter(s){ wxBriefStateFilter=s||"pending"; renderWxBrief(); }
+
+function wxCollectBriefItems(snap){
+  if(!snap || snap.available===false) return [];
+  const muted=wxMuted();
+  const isRest=x=>x.category==="广告"||x.category==="已结束";
+  const out=[];
+  const seen=new Set();
+  const pushUnique=(obj)=>{
+    if(!obj || !obj.id || seen.has(obj.id)) return;
+    seen.add(obj.id);
+    out.push(obj);
+  };
+  (snap.accounts||[]).forEach(a=>{
+    const acc=a.account?.name||"";
+    (a.waiting||[]).forEach(x=>{
+      if(isRest(x) || muted.includes(x.conversationId)) return;
+      const hours=Number(x.hoursAgo)||0;
+      const raw=[x.preview, x.transcript?("语音转写："+x.transcript):""].filter(Boolean).join("\n\n");
+      pushUnique({
+        id:"todo:"+(x.conversationId||x.name),
+        conversationId:x.conversationId||"",
+        type:"todo", typeLabel:"待办",
+        name:x.name||"未命名", kind:x.kind==="group"?"群":"私聊", account:acc,
+        at:x.at||"", ageText:wxHoursLabel(hours), urgent:hours>=24,
+        want:x.want||x.preview||"待核对原文",
+        action:x.action||"打开原文确认后回复",
+        prevSummary:x.prevSummary||"", latestDelta:x.latestDelta||"",
+        hasProgress:!!x.hasProgress,
+        suggestedReply:x.suggestedReply||"",
+        raw:raw||x.preview||"",
+        sortScore: (hours>=24?1000:0) + (x.hasProgress?200:0) + Math.min(hours,500)
+      });
+    });
+    (a.opportunities||[]).forEach(x=>{
+      const lvl=x.opportunityLevel||"O1";
+      pushUnique({
+        id:"opp:"+(x.id||x.contact),
+        conversationId:x.conversationId||"",
+        type:"opportunity", typeLabel:"机会 "+lvl,
+        name:x.contact||"未命名", kind:x.kind==="group"?"群":"私聊", account:acc,
+        at:x.at||"", ageText:wxWhen(x.at), urgent:lvl==="O3",
+        want:x.evidence||x.whyRelated||"潜在业务机会",
+        action:x.nextAction||"补充询问具体需求与排期",
+        prevSummary:x.prevSummary||"", latestDelta:x.latestDelta||"",
+        hasProgress:!!x.hasProgress,
+        suggestedReply:x.suggestedReply||"",
+        raw:x.sourcePreview||x.evidence||"",
+        sortScore:(lvl==="O3"?900:(lvl==="O2"?450:150))
+      });
+    });
+    (a.consultations||[]).forEach(x=>{
+      pushUnique({
+        id:"con:"+(x.id||x.contact),
+        conversationId:x.conversationId||"",
+        type:"consultation", typeLabel:"咨询",
+        name:x.contact||"未命名", kind:x.kind==="group"?"群":"私聊", account:acc,
+        at:x.at||"", ageText:wxWhen(x.at), urgent:false,
+        want:x.surfaceQuestion||x.underlyingNeed||x.evidence||"明确咨询",
+        action:x.nextAction||"结合真实需求给出建议或追问",
+        prevSummary:x.prevSummary||"", latestDelta:x.latestDelta||"",
+        hasProgress:!!x.hasProgress,
+        suggestedReply:x.suggestedReply||"",
+        raw:x.sourcePreview||x.surfaceQuestion||"",
+        sortScore:320
+      });
+    });
+    (a.mentions||[]).forEach(x=>{
+      pushUnique({
+        id:"men:"+(x.conversationId||x.name)+":"+(x.at||""),
+        conversationId:x.conversationId||"",
+        type:"mention", typeLabel:"群 @ 我",
+        name:x.name||"未命名群", kind:"群", account:acc,
+        at:x.at||"", ageText:wxWhen(x.at), urgent:false,
+        want:(x.sender?x.sender+"：":"")+(x.want||x.preview||"群内提及你"),
+        action:x.action||"查看群内上下文决定是否回应",
+        prevSummary:x.prevSummary||"", latestDelta:x.latestDelta||"",
+        hasProgress:!!x.hasProgress,
+        suggestedReply:"",
+        raw:(x.sender?"发送者："+x.sender+"\n":"")+(x.preview||""),
+        sortScore:280
+      });
+    });
+    (a.learningTopics||[]).forEach(x=>{
+      pushUnique({
+        id:"learn:"+(x.id||x.conversationId||x.name),
+        conversationId:x.conversationId||"",
+        type:"learning", typeLabel:"群选题",
+        name:x.name||"白名单群", kind:"群", account:acc,
+        at:x.at||"", ageText:wxWhen(x.at), urgent:false,
+        want:x.summary||x.title||"群内高价值讨论",
+        action:x.action||"可沉淀为星球帖或公众号选题",
+        prevSummary:x.prevSummary||"", latestDelta:x.latestDelta||"",
+        hasProgress:!!x.hasProgress,
+        suggestedReply:"",
+        canTopic:true,
+        title:x.title||"",
+        raw:x.sourcePreview||x.summary||"",
+        sortScore:240 + (x.hasProgress?120:0)
+      });
+    });
+  });
+  out.sort((a,b)=>(b.sortScore-a.sortScore)||String(b.at).localeCompare(String(a.at)));
+  return out;
+}
+
+function wxLocalDraftsFor(item){
+  const base=item.suggestedReply||"";
+  const act=item.action||"了解下具体情况再回复你";
+  const who=item.name||"你";
+  return {
+    pro: base || `收到，关于「${(item.want||"").slice(0,28)}」这边我先确认一下细节，${act}，有进展第一时间同步您。`,
+    warm: base ? `${base} 有什么补充随时跟我说～` : `收到啦！我这边先帮你看下，${act}，晚点给你消息～`,
+    short: base ? base.slice(0,60) : `收到，${act}。`
+  };
+}
+
+function wxRenderReplyTones(){
+  const box=$("wxReplyTones"), ta=$("wxReplyText");
+  if(!box || !ta) return;
+  const tones=[["pro","专业利落"],["warm","温和体贴"],["short","简短确认"]];
+  box.innerHTML=tones.map(([k,l])=>
+    `<button class="wx-brief-tab${wxReplyTone===k?" on":""}" type="button" role="tab" aria-selected="${wxReplyTone===k?"true":"false"}" onclick="wxPickReplyTone('${k}')">${l}</button>`
+  ).join("");
+  ta.value=wxReplyDrafts[wxReplyTone]||"";
+}
+function wxPickReplyTone(t){
+  wxReplyTone=["pro","warm","short"].includes(t)?t:"pro";
+  wxRenderReplyTones();
+}
+async function wxOpenReplyModal(id){
+  const item=wxBriefCache.find(x=>x.id===id);
+  if(!item) return;
+  wxReplyCurrent=item;
+  wxReplyTone="pro";
+  wxReplyDrafts=wxLocalDraftsFor(item);
+  const title=$("wxReplyTitle"), status=$("wxReplyStatus");
+  if(title) title.textContent="回应草稿 · "+item.name;
+  if(status) status.textContent="只读边界 · 不写微信";
+  wxRenderReplyTones();
+  openOv("wxReplyOv");
+  // 在线且非访客时，尝试用本地模型按三口吻润色（只读、零副作用）
+  if(SERVED && !guest){
+    if(status) status.textContent="正在用本地模型润色三口吻…（已先给出基础草稿）";
+    try{
+      const r=await fetch("/api/wechat/reply-draft",{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          contact:item.name, kind:item.kind, type:item.typeLabel,
+          want:item.want, action:item.action, raw:item.raw.slice(0,800),
+          suggestedReply:item.suggestedReply||""
+        })
+      });
+      const j=await r.json().catch(()=>({}));
+      if(r.ok && j.ok && j.drafts && wxReplyCurrent && wxReplyCurrent.id===item.id){
+        wxReplyDrafts={
+          pro:j.drafts.pro||wxReplyDrafts.pro,
+          warm:j.drafts.warm||wxReplyDrafts.warm,
+          short:j.drafts.short||wxReplyDrafts.short
+        };
+        wxRenderReplyTones();
+        if(status) status.textContent=(j.source==="ollama"?`已由本地 ${j.model||"模型"} 生成`:"已用本地规则生成")+" · 仅复制不发微信";
+      }else if(status){
+        status.textContent="只读边界 · 已使用本地结构化草稿";
+      }
+    }catch(e){
+      if(status) status.textContent="只读边界 · 已使用本地结构化草稿";
+    }
+  }
+}
+function wxCopyBriefReply(markDone){
+  const ta=$("wxReplyText");
+  const text=(ta&&ta.value)||"";
+  try{ navigator.clipboard?.writeText(text); }catch(e){}
+  if(markDone && wxReplyCurrent) wxSetBriefState(wxReplyCurrent.id,"done");
+  closeOv("wxReplyOv");
+  notify(markDone?"草稿已复制并标为已处理（不会自动发送）。":"草稿已复制到剪贴板（仅复制，不会自动发送）。","info");
+}
+function wxOpenRawModal(id){
+  const item=wxBriefCache.find(x=>x.id===id);
+  if(!item) return;
+  const title=$("wxRawTitle"), body=$("wxRawBody");
+  if(title) title.textContent="原文核对 · "+item.name;
+  if(body) body.textContent=item.raw||"这条快照没有附带原始正文。";
+  openOv("wxRawOv");
+}
+function wxSendBriefToTopic(id){
+  const item=wxBriefCache.find(x=>x.id===id);
+  if(!item) return;
+  const text=`【微信群选题】${item.title||item.want}\n来源：${item.name}\n切入角度：${item.action}\n原话摘录：${(item.raw||"").slice(0,200)}`;
+  try{ navigator.clipboard?.writeText(text); }catch(e){}
+  notify("选题素材已复制到剪贴板，可直接粘贴到写作或星球草稿。","info");
+}
+
+function renderWxBrief(){
+  const grid=$("wxBriefGrid"), tf=$("wxBriefTypeFilters"), sf=$("wxBriefStateFilters"), prog=$("wxBriefProgress"), subCnt=$("wxBriefCount");
+  if(!grid) return;
+  wxBriefCache=wxCollectBriefItems(wechat);
+  const enriched=wxBriefCache.map(item=>{
+    const st=wxBriefEffectiveState(item);
+    return {...item, _state:st.state, _reopened:st.reopened};
+  });
+  const total=enriched.length;
+  const pendingCnt=enriched.filter(x=>x._state==="pending").length;
+  const doneCnt=total-pendingCnt;
+  const pct=total?Math.round(doneCnt/total*100):0;
+
+  if(subCnt) subCnt.textContent=pendingCnt?String(pendingCnt):"";
+  if(prog) prog.innerHTML=`<span>已批 ${doneCnt}/${total}</span><span class="wx-brief-prog-bar"><i style="width:${pct}%"></i></span>`;
+
+  const matchState=(x)=>{
+    if(wxBriefStateFilter==="all") return true;
+    if(wxBriefStateFilter==="pending") return x._state==="pending";
+    return x._state==="read"||x._state==="done";
+  };
+  const typeMeta=[["all","全部"],["todo","待办"],["opportunity","机会"],["consultation","咨询"],["mention","群 @ 我"],["learning","群选题"]];
+  if(tf){
+    tf.innerHTML=typeMeta.map(([k,label])=>{
+      const cnt=enriched.filter(x=>(k==="all"||x.type===k)&&matchState(x)).length;
+      if(k==="learning" && !enriched.some(x=>x.type==="learning")) return "";
+      return `<button class="wx-brief-tab${wxBriefType===k?" on":""}" type="button" role="tab" aria-selected="${wxBriefType===k?"true":"false"}" onclick="wxSetBriefType('${k}')">${label}<span>${cnt}</span></button>`;
+    }).join("");
+  }
+  const stateMeta=[["pending","待批"],["all","全部"],["done","已办"]];
+  if(sf){
+    sf.innerHTML=stateMeta.map(([k,label])=>
+      `<button class="wx-state-btn${wxBriefStateFilter===k?" on":""}" type="button" onclick="wxSetBriefStateFilter('${k}')">${label}</button>`
+    ).join("");
+  }
+
+  const shown=enriched.filter(x=>(wxBriefType==="all"||x.type===wxBriefType)&&matchState(x));
+  if(!total){
+    grid.innerHTML=`<div class="wx-empty" style="grid-column:1/-1;border-top:0">当前微信快照里没有需要批阅的待办、机会或群提醒。</div>`;
+    return;
+  }
+  if(!shown.length){
+    grid.innerHTML=`<div class="wx-empty" style="grid-column:1/-1;border-top:0">当前筛选下没有批件。可以切到「全部」或「已办」回看历史批阅记录。</div>`;
+    return;
+  }
+  grid.innerHTML=shown.map(x=>{
+    const cls=["wx-brief-item", x._state==="done"?"done":(x._state==="read"?"read":(x.urgent?"urgent":""))].filter(Boolean).join(" ");
+    const hasDelta=(x.prevSummary && x.latestDelta) || x._reopened;
+    const factHtml=(x.prevSummary && x.latestDelta)
+      ? `<div class="wx-brief-line"><span>进展</span><div class="wx-diff-inline">${esc(x.prevSummary)} → <b>${esc(x.latestDelta)}</b></div></div>`
+      : `<div class="wx-brief-line"><span>对方要</span><div>${esc(x.want)}</div></div>`;
+    const idArg=esc(x.id).replace(/'/g,"\\'");
+    return `<article class="${cls}">`+
+      `<div class="wx-brief-head">`+
+        `<div class="wx-brief-who">`+
+          `<span class="wx-kind">${esc(x.kind)}</span>`+
+          `<b>${esc(x.name)}</b>`+
+          `<span class="wx-brief-type">${esc(x.typeLabel)}</span>`+
+          (hasDelta && x._state==="pending"?`<span class="wx-delta-dot">新进展</span>`:"")+
+          (x._state==="read"?`<span class="wx-brief-type">· 已阅</span>`:"")+
+          (x._state==="done"?`<span class="wx-brief-type">· 已处理</span>`:"")+
+        `</div>`+
+        `<span class="wx-todo-age${x.urgent&&x._state==="pending"?" bad":""}">${esc(x.ageText)}</span>`+
+      `</div>`+
+      factHtml+
+      `<div class="wx-brief-line do"><span>你要做</span><div>${esc(x.action)}</div></div>`+
+      `<div class="wx-brief-foot">`+
+        `<div class="wx-links">`+
+          `<button class="wx-link primary" type="button" onclick="wxOpenReplyModal('${idArg}')">回应草稿</button>`+
+          `<button class="wx-link" type="button" onclick="wxOpenRawModal('${idArg}')">看原文</button>`+
+          (x.canTopic?`<button class="wx-link ok" type="button" onclick="wxSendBriefToTopic('${idArg}')">送入选题</button>`:"")+
+        `</div>`+
+        `<div class="wx-links">`+
+          (x._state!=="read"?`<button class="wx-link" type="button" onclick="wxSetBriefState('${idArg}','read')">已阅</button>`:"")+
+          (x._state!=="done"?`<button class="wx-link" type="button" onclick="wxSetBriefState('${idArg}','done')">已处理</button>`:`<button class="wx-link" type="button" onclick="wxSetBriefState('${idArg}','pending')">撤销</button>`)+
+        `</div>`+
+      `</div>`+
+    `</article>`;
+  }).join("");
 }
 const WX_BUSINESS_STATES=["待核对","已确认","跟进中","待报价","已成交","暂不跟进"];
 function wxBusinessState(id){
@@ -181,6 +494,9 @@ function renderWechat(){
     src.textContent="—";
     stats.innerHTML="";
     if(todoBox) todoBox.innerHTML=`<div class="wx-empty">${esc(msg)}</div>`;
+    const briefBox=$("wxBriefGrid");
+    if(briefBox) briefBox.innerHTML=`<div class="wx-empty" style="grid-column:1/-1;border-top:0">${esc(msg)}</div>`;
+    const briefCnt=$("wxBriefCount"); if(briefCnt) briefCnt.textContent="";
     waitBox.innerHTML=`<div class="wx-empty">—</div>`;
     mentionBox.innerHTML=`<div class="wx-empty">—</div>`;
     activeBox.innerHTML="";
@@ -201,6 +517,7 @@ function renderWechat(){
   const opportunities=[], consultations=[];
   accounts.forEach(a=>{(a.opportunities||[]).forEach(x=>opportunities.push({...x,account:a.account?.name}));(a.consultations||[]).forEach(x=>consultations.push({...x,account:a.account?.name}));});
   renderWxAnalysis({opportunities,consultations,mentionsCount:accounts.reduce((n,a)=>n+(a.mentions||[]).length,0),businessAnalysis:accounts[0].businessAnalysis||{},eventCoverage:accounts[0].eventCoverage||{},mcp:wechat.mcp||{}});
+  renderWxBrief();
   renderWxSubnav();
 
   if(note){

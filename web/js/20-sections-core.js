@@ -198,7 +198,7 @@ const GUEST_WECHAT={
     semantic:{analyzed:5,llm:"demo",asr:true},
     businessAnalysis:{candidates:4,analyzed:4,lookbackDays:14,terms:["咨询","项目","报价","合作"]},
     waiting:[
-      {name:"示例客户",kind:"direct",conversationId:"demo-wait-1",at:gIsoAgo(2),from:"peer",preview:"我们想把客服流程接入 AI",hoursAgo:2,category:"待回复",want:"咨询客服自动化落地",action:"询问现有流程和上线时间",analyzed:true,account:"示例账号"},
+      {name:"示例客户",kind:"direct",conversationId:"demo-wait-1",at:gIsoAgo(2),from:"peer",preview:"我们想把客服流程接入 AI",hoursAgo:2,category:"待回复",want:"咨询客服自动化落地",action:"询问现有流程和上线时间",prevSummary:"上周初步咨询过客服自动化可行性",latestDelta:"明确想把现有客服流程接入 AI 并评估周期",hasProgress:true,analyzed:true,account:"示例账号"},
       {name:"示例学员",kind:"direct",conversationId:"demo-wait-2",at:gIsoAgo(8),from:"peer",preview:"AI 副业应该怎么开始？",hoursAgo:8,category:"待回复",want:"寻找低门槛副业方向",action:"追问时间投入和已有资源",analyzed:true,account:"示例账号"},
       {name:"示例广告号",kind:"direct",conversationId:"demo-wait-3",at:gIsoAgo(5),from:"peer",preview:"限时课程优惠，点击报名",hoursAgo:5,category:"广告",want:"推广课程",action:"无需处理",analyzed:true,account:"示例账号"}
     ],
@@ -217,6 +217,17 @@ const GUEST_WECHAT={
     consultations:[{
       id:"demo-con-1",account:"示例账号",contact:"示例学员",kind:"direct",at:gIsoAgo(8),consultationType:"教学",confidence:"high",needsReview:true,analyzed:true,
       surfaceQuestion:"AI 副业应该怎么开始？",underlyingNeed:"想找低门槛方向验证收入",evidence:"对方询问 AI 副业的开始方式",sourcePreview:"AI 副业应该怎么开始？",whyRelated:"与 AI/副业教学社群相关",nextAction:"追问时间投入和已有客户资源",missingInfo:"时间、技能、客户资源",suggestedReply:"先盘点已有技能和可触达客户，再选一个具体服务场景"
+    }],
+    learningTopics:[{
+      id:"demo-learn-1",conversationId:"demo-group-learn-1",name:"示例 AI 实战交流群",kind:"group",at:gIsoAgo(3),
+      title:"群友共推「增量 Diff + 只读草稿」微信批奏折工作流",
+      summary:"多位群友分享实测经验：避免 AI 自动代发，改为本地生成三口吻草稿并按最新时间自动重浮。",
+      prevSummary:"昨日讨论微信 MCP 稳定性",
+      latestDelta:"今日形成「增量 Diff + 只读草稿」共识",
+      hasProgress:true,
+      action:"整理成一期星球实战帖或公众号短文",
+      sourcePreview:"群友A：别让 AI 自动回微信，做成只读草稿+三口吻复制最稳妥。",
+      analyzed:true
     }],
     active:[
       {name:"示例客户",kind:"direct",conversationId:"demo-wait-1",at:gIsoAgo(2),from:"peer",preview:"我们想把客服流程接入 AI"},

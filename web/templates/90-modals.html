@@ -334,6 +334,41 @@
   </div>
 </div>
 
+<!-- ── 微信批奏折：只读回应草稿与原文核对弹窗 ── -->
+<div class="ov" id="wxReplyOv" aria-hidden="true">
+  <div class="modal wx-modal" role="dialog" aria-modal="true" aria-labelledby="wxReplyTitle">
+    <div class="wx-modal-head">
+      <h3 id="wxReplyTitle">回应草稿</h3>
+      <button class="wx-link" type="button" onclick="closeOv('wxReplyOv')">关闭</button>
+    </div>
+    <div class="wx-modal-sub" id="wxReplySub">本地生成三口吻草稿 · 可现场微调（仅复制，绝不自动发送微信）</div>
+    <div class="wx-brief-tabs wx-tone-tabs" id="wxReplyTones" role="tablist" aria-label="回应口吻"></div>
+    <textarea class="wx-reply-input" id="wxReplyText" rows="5" aria-label="回应草稿内容"></textarea>
+    <div class="wx-modal-foot">
+      <span class="wx-modal-tip" id="wxReplyStatus">只读边界 · 不写微信</span>
+      <div class="wx-modal-btns">
+        <button class="btn" type="button" onclick="wxCopyBriefReply(false)">仅复制</button>
+        <button class="btn primary" type="button" onclick="wxCopyBriefReply(true)">复制并标已处理</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="ov" id="wxRawOv" aria-hidden="true">
+  <div class="modal wx-modal" role="dialog" aria-modal="true" aria-labelledby="wxRawTitle">
+    <div class="wx-modal-head">
+      <h3 id="wxRawTitle">原文核对</h3>
+      <button class="wx-link" type="button" onclick="closeOv('wxRawOv')">关闭</button>
+    </div>
+    <div class="wx-modal-sub" id="wxRawSub">模型判断仅供参考，以下为快照里的原始消息与语音转写</div>
+    <div class="wx-raw-body wx-raw-modal-body" id="wxRawBody"></div>
+    <div class="wx-modal-foot">
+      <span class="wx-modal-tip">数据源：wechat.json 只读快照</span>
+      <button class="btn primary" type="button" onclick="closeOv('wxRawOv')">关闭</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── 命令面板：Cmd/Ctrl+K 呼出，跳页签 / 搜索账目 / 直达动作 ── -->
 <div class="ov cmd-ov" id="cmdOv" role="dialog" aria-modal="true" aria-label="命令面板">
   <div class="cmd-panel">

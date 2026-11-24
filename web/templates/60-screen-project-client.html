@@ -129,13 +129,24 @@
     </header>
     <div class="labnote" id="wechatNote" style="display:none"></div>
     <div class="wx-subnav" id="wxSubnav" role="tablist" aria-label="微信工作区">
-      <button class="segbtn on" type="button" role="tab" aria-selected="true" data-wxview="action" onclick="setWxView('action')">今日行动</button>
+      <button class="segbtn on" type="button" role="tab" aria-selected="true" data-wxview="brief" onclick="setWxView('brief')">批奏折 <span class="wx-subcount" id="wxBriefCount"></span></button>
+      <button class="segbtn" type="button" role="tab" aria-selected="false" data-wxview="action" onclick="setWxView('action')">今日行动</button>
       <button class="segbtn" type="button" role="tab" aria-selected="false" data-wxview="opportunity" onclick="setWxView('opportunity')">机会探索 <span class="wx-subcount" id="wxOpportunityCount"></span></button>
       <button class="segbtn" type="button" role="tab" aria-selected="false" data-wxview="consultation" onclick="setWxView('consultation')">咨询分析 <span class="wx-subcount" id="wxConsultationCount"></span></button>
       <button class="segbtn" type="button" role="tab" aria-selected="false" data-wxview="mentions" onclick="setWxView('mentions')">群提醒 <span class="wx-subcount" id="wxMentionCount"></span></button>
     </div>
     <div class="statgrid" id="wechatStats"></div>
     <div class="wx-coverage" id="wxCoverage">经营分析覆盖范围读取中…</div>
+    <section class="card wx-panel wx-brief-panel" id="wxBriefPanel">
+      <div class="wx-brief-toolbar">
+        <div class="wx-brief-tabs" id="wxBriefTypeFilters" role="tablist" aria-label="批件类型"></div>
+        <div class="wx-brief-right">
+          <div class="wx-brief-states" id="wxBriefStateFilters" role="group" aria-label="批件状态"></div>
+          <span class="wx-brief-prog" id="wxBriefProgress"></span>
+        </div>
+      </div>
+      <div class="wx-brief-grid" id="wxBriefGrid"></div>
+    </section>
     <section class="card wx-panel wx-analysis-panel" id="wxOpportunityPanel" hidden>
       <div class="wx-panel-head"><h2>机会探索 <span class="tag" id="wxOpportunityTag">—</span></h2><span class="wx-panel-meta">只展示有证据的业务信号 · 判定需要核对</span></div>
       <div id="wxOpportunities"></div>

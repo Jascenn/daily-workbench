@@ -197,6 +197,8 @@ const run = new Function('document', 'localStorage', 'location', 'alert', 'setIn
            setWechat: v => { wechat = v; }, getWechat: () => wechat,
            setWechatErr: v => { wechatErr = v; }, setWxView, getWxView: () => wxView,
            renderWxAnalysis, wxAnalysisCard, wxScorePct, toggleGuest,
+           renderWxBrief, wxCollectBriefItems, wxSetBriefState, wxSetBriefType,
+           wxSetBriefStateFilter, wxBriefEffectiveState, wxOpenReplyModal, wxPickReplyTone,
            renderRadar, radarRows, radarItemScore, radarCard, radarSourceChips, setRadarAll,
            zsxqStats, renderZsxqPanel, realProjectCard,
            renderZsxqScreen, zsxqTimelineRows, zsxqGroupsOf, setZsxqSort,
@@ -4576,6 +4578,74 @@ console.log('\n— 43. 知识星球独立一屏 —');
   api.renderZsxqScreen();
   t('没有星球账号时给生成命令',
     el('zsxqScreenNote').textContent.includes('social-sync.py'), el('zsxqScreenNote').textContent);
+}
+
+console.log('\n— 微信批奏折（统一归并 / 进展 Diff / 状态重浮 / 三口吻草稿） —');
+{
+  const briefSnap = {
+    version: 1, generatedAt: '2026-11-24T21:40:00+08:00', available: true, source: 'wechat-mcp',
+    summary: { waiting: 2, mentions: 1, opportunities: 1, consultations: 0, learningTopics: 1, scanned: 20, windowHours: 72, mentionDays: 7 },
+    accounts: [{
+      account: { id: 'acc1', name: '凌一', ready: true },
+      semantic: { analyzed: 3, llm: 'qwen3:8b', asr: true },
+      waiting: [
+        { name: '陈总', kind: 'direct', conversationId: 'bc1', at: '2026-11-24T10:00:00+08:00', hoursAgo: 26, category: '待回复',
+          want: '确认 2 台 4090 与周四演示', action: '回复周四 15:00 档期', preview: '周四三点方便吗',
+          prevSummary: '上周询问部署方案', latestDelta: '已批 2 台 4090 约周四演示', hasProgress: true, analyzed: true },
+        { name: '某广告号', kind: 'direct', conversationId: 'bc_ad', at: '2026-11-24T11:00:00+08:00', hoursAgo: 2, category: '广告',
+          want: '推销', action: '无需处理', preview: '限时优惠', analyzed: true },
+      ],
+      opportunities: [
+        { id: 'bo1', contact: '林总', kind: 'direct', at: '2026-11-24T16:00:00+08:00', opportunityLevel: 'O3',
+          evidence: '询问电商客服工作流定制', nextAction: '追问日均咨询量', sourcePreview: '想问怎么收费', analyzed: true },
+      ],
+      consultations: [],
+      mentions: [],
+      learningTopics: [
+        { id: 'bl1', conversationId: 'bg1', name: 'AI 独立开发者群', kind: 'group', at: '2026-11-24T18:00:00+08:00',
+          title: '增量 Diff + 只读草稿工作流', summary: '群友共推只读草稿避免自动代发风险',
+          action: '整理为星球实战帖', sourcePreview: '别让 AI 自动回微信', analyzed: true },
+      ],
+      active: [], scanned: 20,
+    }],
+  };
+  api.setWechatErr('');
+  api.setWechat(briefSnap);
+  api.setType('wechat');
+  api.setWxView('brief');
+  api.wxSetBriefType('all');
+  api.wxSetBriefStateFilter('pending');
+  api.renderWechat();
+
+  const items = api.wxCollectBriefItems(briefSnap);
+  t('批奏折归并待办/机会/群选题且自动过滤广告',
+    items.length === 3 && !items.some(x => x.name === '某广告号'), items.map(x => x.name));
+  const gridHtml = el('wxBriefGrid').innerHTML;
+  t('有增量 Diff 的条目渲染「旧摘要 → 最新进展」与新进展绿点',
+    gridHtml.includes('上周询问部署方案') && gridHtml.includes('已批 2 台 4090') && gridHtml.includes('新进展'));
+  t('白名单群选题卡渲染「送入选题」入口',
+    gridHtml.includes('AI 独立开发者群') && gridHtml.includes('送入选题'));
+
+  // 标记已处理 → 移出「待批」视图
+  api.wxSetBriefState('todo:bc1', 'done');
+  t('标为已处理后从「待批」移出，进度更新为 1/3',
+    !el('wxBriefGrid').innerHTML.includes('陈总') && el('wxBriefProgress').innerHTML.includes('1/3'),
+    el('wxBriefProgress').innerHTML);
+
+  // 新消息时间戳晚于已处理时间 → 自动重浮
+  const newerItem = { id: 'todo:bc1', at: '2026-11-24T22:30:00+08:00' };
+  const st = api.wxBriefEffectiveState(newerItem);
+  t('对方发来更新消息时，已处理条目自动重浮为待批',
+    st.state === 'pending' && st.reopened === true, st);
+
+  // 恢复状态并验证三口吻草稿弹窗
+  api.wxSetBriefState('todo:bc1', 'pending');
+  api.wxOpenReplyModal('todo:bc1');
+  const proText = el('wxReplyText').value;
+  api.wxPickReplyTone('short');
+  const shortText = el('wxReplyText').value;
+  t('回应草稿弹窗支持切换口吻且内容随口吻变化',
+    proText.length > 0 && shortText.length > 0 && proText !== shortText, [proText, shortText]);
 }
 
 console.log(`\n结果：${pass} 通过 / ${fail} 失败`);

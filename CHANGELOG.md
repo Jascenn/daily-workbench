@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-24
+
+### 微信「批奏折」统一流、只读回应草稿与白名单群选题
+- **微信页「批奏折」视图（V2 发丝线精简风格）**：
+  - 在 `#wxSubnav` 新增「批奏折」入口并保留原有「今日行动 / 机会探索 / 咨询分析 / 群提醒」四个子视图，统一归并待办、商机、咨询、群 `@我` 与白名单群选题（自动过滤广告）。
+  - 单层白卡 + 宽屏双列发丝线网格 + 单行「类型 × 状态」筛选与批阅进度；按 `会话ID + 最新消息时间` 存 `localStorage`，对方发来更新消息自动重浮并标「新进展」。
+- **只读三口吻回应草稿**：
+  - 新增 `#wxReplyOv` 回应草稿弹窗与 `#wxRawOv` 原文核对弹窗，支持「专业利落 / 温和体贴 / 简短确认」三口吻切换与现场微调复制；激活 `POST /api/wechat/reply-draft`（本地 Ollama 润色、离线规则降级，严格只读绝不自动发微信）。
+- **跨轮次进展 Diff 与白名单群聊选题**：
+  - 新增 `scripts/sync/wechat_brief.py` 并挂接至 `scripts/sync/wechat-sync.py`：通过 `~/.config/daily-workbench/wechat-topic-state.json` 比对上轮摘要输出 `prevSummary / latestDelta / hasProgress`；支持可选白名单配置 `~/.config/daily-workbench/wechat-groups.json` 抽取高价值群聊选题 `learningTopics`。
+  - 补齐 `scripts/tests/test-wechat-brief.py` 与前端逻辑测试（814/814 双端全绿）。
+
 ## [1.1.0] - 2026-11-24
 
 ### 工作台系统性重构、安全加固与知识星球简报双视图
@@ -88,7 +100,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Push the daily radar digest to a configured WeChat group (default `<your-chatroom-id>@chatroom`): sends only when there are writable items **and** the text changed since the last send, so the group does not receive the same digest daily. The idempotency key is derived from `conversation_id + text` because the MCP rejects a reused key with different content (`idempotency_conflict`). The digest header carries the date only — an hour/minute stamp would make every run look like new content and defeat the dedupe. `submitted` means accepted, not delivered; failures are never auto-retried. `--dry-run` shows what would be sent without touching Reminders, notifications or WeChat.
+- Push the daily radar digest to a configured WeChat group (default `2755945645@chatroom`): sends only when there are writable items **and** the text changed since the last send, so the group does not receive the same digest daily. The idempotency key is derived from `conversation_id + text` because the MCP rejects a reused key with different content (`idempotency_conflict`). The digest header carries the date only — an hour/minute stamp would make every run look like new content and defeat the dedupe. `submitted` means accepted, not delivered; failures are never auto-retried. `--dry-run` shows what would be sent without touching Reminders, notifications or WeChat.
 - Add a daily radar digest at 09:00 (`com.lingyi.workbench.radardigest`): pick the top 3 judged-and-writable items and write them to a dated Reminder in the 工作台 list plus a desktop notification. Items marked `needsHuman` or un-analyzed never enter the digest, an empty day says so instead of inventing picks, and re-running the same day updates that day's reminder instead of stacking duplicates. WeChat delivery deliberately stays off — the WeChat layer is read-only (write endpoints return 501) until that is explicitly enabled.
 - Cache radar judgments and angles for 24 hours (`radar-cache.json`, pruned at 7 days) and schedule the radar every 2 hours via `com.lingyi.workbench.radar`. A run now costs ~14 s when the hot list has not changed instead of re-asking Jev for the same 12 titles every time — measured 31 s → 14 s. Cache hits are reported as `coverage.judgmentsFromCache` so a cached verdict is never mistaken for a fresh one.
 - Add 选题雷达 (`radar.json`): fetch 36氪 / IT之家 / 知乎热榜 / Hacker News, score each item with Jev for **business relevance** and **write value** (0–9), then draft "why it matters / what angle / next step" with the local model. Sources report `ok` / `empty` / `unsupported` / `error` individually — 微博热搜 is JS-rendered so it is marked unsupported rather than silently returning 0 items. Items Jev could not judge keep `analyzed: false` instead of looking scored, and angles that merely restate the headline are dropped by a character-overlap guard. Served at `/radar.json` (same bearer token) and shown as a card on the news screen; `sync-now.sh` runs it as a non-fatal step.

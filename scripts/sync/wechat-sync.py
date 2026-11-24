@@ -33,6 +33,7 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import wechat_brief
 import wechat_semantic as sem
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -781,6 +782,15 @@ def build_account_snapshot(client: MCP, account: dict) -> dict:
     # 待办 = 模型判为待回复的。广告和已结束留在快照里但不进待办清单。
     todos = [r for r in waiting if r.get("category") == "待回复"]
 
+    # 白名单高价值群聊选题（仅在配置了 ~/.config/daily-workbench/wechat-groups.json 时生效）
+    llm_model = sem.OLLAMA_MODEL if sem.llm_ready() else ""
+    learning_topics = wechat_brief.collect_learning_topics(
+        client, base, listed, now,
+        text_preview_fn=_text_preview,
+        fingerprint_fn=_fingerprint,
+        llm_model=llm_model,
+    )
+
     return {
         "account": {
             "id": _fingerprint(aid),
@@ -794,6 +804,7 @@ def build_account_snapshot(client: MCP, account: dict) -> dict:
         "todos": todos,
         "opportunities": opportunities,
         "consultations": consultations,
+        "learningTopics": learning_topics,
         "businessAnalysis": business_meta,
         "eventCoverage": event_coverage,
         "active": active[:40],
@@ -874,12 +885,15 @@ def main() -> int:
                 "error": f"{type(exc).__name__}: {str(exc)[:120]}",
             })
 
+    progressed = wechat_brief.apply_progress_diff(results)
     snapshot["accounts"] = results
     snapshot["summary"] = {
         "waiting": sum(len(r.get("waiting") or []) for r in results),
         "mentions": sum(len(r.get("mentions") or []) for r in results),
         "opportunities": sum(len(r.get("opportunities") or []) for r in results),
         "consultations": sum(len(r.get("consultations") or []) for r in results),
+        "learningTopics": sum(len(r.get("learningTopics") or []) for r in results),
+        "progressed": progressed,
         "scanned": sum(r.get("scanned") or 0 for r in results),
         "windowHours": WAIT_WINDOW_HOURS,
         "mentionDays": MENTION_DAYS,

@@ -8,9 +8,11 @@ import datetime
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import time
+import urllib.request
 from urllib.parse import parse_qs, urlparse
 
 from server.runtime import cfg as _cfg
@@ -18,6 +20,63 @@ from server.runtime import cfg as _cfg
 _SOCIAL_SINGLE_LOCK = {"running": False}
 _ZSXQ_DAILY_LOCK = {"running": False}
 _SOCIAL_SINGLE_TARGETS = {"x", "xhs", "wechat_mp", "zsxq", "kb"}
+
+
+def _fallback_wechat_reply_drafts(body: dict) -> dict:
+    """无模型或离线时的结构化三口吻兜底草稿（严格只读，零副作用）。"""
+    want = str(body.get("want") or "").strip()[:40]
+    action = str(body.get("action") or "确认细节后再回复你").strip()[:80]
+    base = str(body.get("suggestedReply") or "").strip()
+    return {
+        "pro": base or f"收到，关于「{want or '刚才提到的事'}」我先核对一下细节，{action}，有进展第一时间同步您。",
+        "warm": (f"{base} 有什么补充随时跟我说～" if base else f"收到啦！我这边先帮你看下，{action}，晚点给你消息～"),
+        "short": (base[:60] if base else f"收到，{action}。"),
+    }
+
+
+def _generate_wechat_reply_drafts(body: dict) -> tuple[dict, str, str]:
+    """只读生成微信回应三口吻草稿：优先调用本地 Ollama，不可用时自动降级。"""
+    fallback = _fallback_wechat_reply_drafts(body)
+    if os.environ.get("WECHAT_REPLY_LLM_DISABLE") == "1":
+        return fallback, "fallback", ""
+    model = os.environ.get("WECHAT_LLM_MODEL", "qwen3:8b").strip() or "qwen3:8b"
+    url = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434/api/chat").strip()
+    prompt = (
+        "你是用户的个人微信回复草稿助手。请严格只输出一个 JSON 对象，键名必须是 pro、warm、short，"
+        "分别对应：pro（专业利落）、warm（温和体贴）、short（简短确认）。每条不超过 90 字，口语自然，不编造未提及的报价或承诺。\n"
+        f"联系人：{str(body.get('contact') or '')[:40]}（{str(body.get('kind') or '私聊')[:10]} · {str(body.get('type') or '')[:16]}）\n"
+        f"对方诉求：{str(body.get('want') or '')[:160]}\n"
+        f"建议行动：{str(body.get('action') or '')[:160]}\n"
+        f"原话摘录：{str(body.get('raw') or '')[:400]}"
+    )
+    payload = json.dumps({
+        "model": model,
+        "stream": False,
+        "think": False,
+        "messages": [{"role": "user", "content": prompt}],
+        "options": {"temperature": 0.4, "num_predict": 320},
+    }).encode("utf-8")
+    try:
+        req = urllib.request.Request(
+            url, data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode("utf-8", errors="replace"))
+        content = str(((data.get("message") or {}).get("content")) or "")
+        content = re.sub(r"<think>.*?</think>", "", content, flags=re.S).strip()
+        m = re.search(r"\{.*\}", content, flags=re.S)
+        parsed = json.loads(m.group(0)) if m else {}
+        if isinstance(parsed, dict) and any(str(parsed.get(k) or "").strip() for k in ("pro", "warm", "short")):
+            return {
+                "pro": str(parsed.get("pro") or "").strip() or fallback["pro"],
+                "warm": str(parsed.get("warm") or "").strip() or fallback["warm"],
+                "short": str(parsed.get("short") or "").strip() or fallback["short"],
+            }, "ollama", model
+    except Exception:
+        pass
+    return fallback, "fallback", model
 
 
 def handle_post(self):
@@ -89,9 +148,8 @@ def handle_post(self):
         self._send(403, {"error": "bad host"})
         return
     p = urlparse(self.path).path
-    if p in ("/api/wechat/action", "/api/wechat/reply-draft"):
-        # 这是接口预留，不执行任何副作用。前端目前使用 localStorage 保存状态，
-        # 客户端可以先按这个契约开发，未来再接真实写入能力。
+    if p == "/api/wechat/action":
+        # 微信写操作保持预留，不执行任何外部副作用。
         if not self._authorized():
             self._send(401, {"error": "unauthorized"})
             return
@@ -102,6 +160,28 @@ def handle_post(self):
             "error": "微信经营写入能力尚未启用",
             "hint": "当前只允许本地显示状态；不会发送微信，也不会写入 Notion。",
             "endpoint": p,
+        })
+        return
+    if p == "/api/wechat/reply-draft":
+        # 严格只读的回应草稿生成器：仅返回三口吻文本供前端复制，绝不发送微信。
+        if not self._authorized():
+            self._send(401, {"error": "unauthorized"})
+            return
+        try:
+            body = self._read_json_body(32 * 1024)
+        except ValueError as e:
+            self._send(400, {"ok": False, "error": str(e)})
+            return
+        if not isinstance(body, dict):
+            self._send(400, {"ok": False, "error": "body must be a JSON object"})
+            return
+        drafts, source, model = _generate_wechat_reply_drafts(body)
+        self._send(200, {
+            "ok": True,
+            "readOnly": True,
+            "source": source,
+            "model": model,
+            "drafts": drafts,
         })
         return
     if p == "/api/zsxq/daily-sync":
