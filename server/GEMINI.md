@@ -12,7 +12,7 @@
 - `notion.py`：项目/客户/专注记录显式白名单映射、关系搜索缓存与本地原子回写
 - `sync.py`：一键同步进程组执行与超时回收、分阶段耗时/失败标记解析、同步日志与 Jev 代理调用
 - `zsxq.py`：知识星球 CLI 路径解析、话题详情缓存、标签选项、AI 草稿续写、预览校验、两步发布与单源同步
-- `routes_post.py`：承载全部 `POST /api/*` 写操作路由分发（`handle_post`），含锁保护、防重与白名单校验
+- `routes_post.py`：承载全部 `POST /api/*` 路由分发（`handle_post`），含锁保护、防重、白名单校验与只读 `/api/wechat/reply-draft` 三口吻草稿生成
 
 ## 架构约定
 
