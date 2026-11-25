@@ -521,11 +521,14 @@
   .pill.notion{background:var(--neu-100);color:var(--ink)}
   .no-note{font-size:var(--fs-xs);color:var(--muted);line-height:1.6}
 
-  /* modal */
-  .ov{position:fixed;inset:0;background:rgba(10,16,30,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:18px}
-  .ov.show{display:flex}
+  /* modal：克制 160ms 淡入与微缩放动效，尊重系统减弱动态设置 */
+  @keyframes wbOvIn{from{opacity:0}to{opacity:1}}
+  @keyframes wbModalIn{from{opacity:0;transform:translateY(6px) scale(.985)}to{opacity:1;transform:none}}
+  .ov{position:fixed;inset:0;background:rgba(10,16,30,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:18px;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+  .ov.show{display:flex;animation:wbOvIn 160ms var(--ease) both}
   .modal-open{overflow:hidden}
-  .modal{background:var(--card);border-radius:var(--radius-lg);padding:20px;border:none;width:min(440px,100%);box-shadow:var(--shadow-lg)}
+  .modal{background:var(--card);border-radius:var(--radius-lg);padding:20px;border:1px solid var(--line);width:min(440px,100%);box-shadow:var(--shadow-lg)}
+  .ov.show .modal{animation:wbModalIn 160ms var(--ease) both}
   .modal h3{margin:0 0 14px;font-size:var(--fs-lg)}
   .field{margin-bottom:11px}
   .field label,.field .field-label{display:block;font-size:var(--fs-xs);color:var(--muted);margin-bottom:4px}
@@ -535,16 +538,22 @@
   .modal .row{display:flex;gap:10px}
   .modal .row .field{flex:1}
   .modal .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
-  /* 总览页晨间速览：聚合微信待办 / 选题雷达 / 星球简报，默认可折叠，专注模式下自动隐藏 */
-  .morning-card{margin-bottom:16px}
-  .morning-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
-  .morning-col{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--bg);min-width:0}
+  /* 总览页晨间速览：零套娃 3 列发丝线排版，聚合微信待办 / 选题雷达 / 星球简报 */
+  .morning-card{margin-bottom:14px}
+  .morning-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+  .morning-col{display:flex;flex-direction:column;gap:6px;padding:2px 16px;border-right:1px solid var(--line);min-width:0}
+  .morning-col:first-child{padding-left:2px}
+  .morning-col:last-child{padding-right:2px;border-right:0}
   .morning-col-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
-  .morning-col-title{font-size:var(--fs-sm);font-weight:700;color:var(--ink)}
+  .morning-col-title{font-size:var(--fs-xs);font-weight:700;color:var(--muted);letter-spacing:.02em}
   .morning-col-link{border:0;background:none;padding:0;color:var(--accent);font:inherit;font-size:var(--fs-xs);cursor:pointer;text-decoration:none}
   .morning-col-link:hover{text-decoration:underline}
-  .morning-col-list{display:flex;flex-direction:column;gap:4px;font-size:var(--fs-xs);color:var(--muted);line-height:1.55}
+  .morning-col-list{display:flex;flex-direction:column;gap:5px;font-size:var(--fs-sm);color:var(--muted);line-height:1.5}
   .morning-col-row{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
   .morning-col-row b{font-weight:600}
-  @media(max-width:980px){.morning-grid{grid-template-columns:1fr}}
+  @media(max-width:980px){
+    .morning-grid{grid-template-columns:1fr;gap:12px}
+    .morning-col{padding:10px 0 0;border-right:0;border-top:1px solid var(--line)}
+    .morning-col:first-child{padding-top:0;border-top:0}
+  }
 

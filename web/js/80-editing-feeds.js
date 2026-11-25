@@ -530,6 +530,30 @@ function openOv(id){
   setTimeout(()=>{if(o.classList.contains("show")) focusModalStart(o);},0);
 }
 function openFeedManage(){ renderFeedManage(); openOv("feedManageOv"); }
+async function refreshAllFeeds(btn){
+  if(guest){ notify("访客模式不刷新真实订阅源。","warn"); return; }
+  if(!SERVED){ notify("刷新订阅需要本地同步服务（请用 127.0.0.1:8787 打开）。","warn"); return; }
+  const b=btn||$("newsRefreshBtn");
+  const old=b?b.textContent:"刷新订阅";
+  if(b){ b.disabled=true; b.textContent="刷新中…"; }
+  try{
+    const r=await fetch("/api/feeds/refresh",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({all:true})
+    });
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok || !j.ok) throw new Error(j.error||("HTTP "+r.status));
+    await loadSections();
+    renderSections();
+    renderTypeBar();
+    const tail=j.failed?`（${j.failed} 个源失败）`:"";
+    notify(`已刷新 ${j.refreshed||0} 个订阅源，新增 ${j.added||0} 条内容${tail}`,"info");
+  }catch(e){
+    notify("刷新订阅失败："+e.message,"err");
+  }finally{
+    if(b){ b.disabled=false; b.textContent=old; }
+  }
+}
 
 /* ---------- 数据来源弹窗 ----------
    把"每个信息源怎么管理"从口头解释变成页面里的一等公民：

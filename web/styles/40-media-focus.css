@@ -431,7 +431,7 @@
   /* ── v3：默认减量，先给焦点，再允许展开证据 ─────────────────────── */
   .banner.online.show{display:none}
   #typeSeg .realTag,#typeSeg .localTag{display:none}
-  .metric-toggle{margin-left:auto;border:0;background:transparent;color:var(--muted);padding:6px 2px;
+  .metric-toggle{border:0;background:transparent;color:var(--muted);padding:6px 2px;
     font:inherit;font-size:var(--fs-xs);font-weight:650;cursor:pointer;white-space:nowrap}
   .metric-toggle[hidden],#metricsMenuBtn[hidden]{display:none}
   .metric-toggle:hover{color:var(--accent)}

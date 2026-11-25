@@ -745,6 +745,142 @@ function renderZsxqDaily(){
   if(foot) foot.textContent=[zsxqDaily.coverageNote||zsxqDaily.dataPolicy||"", zsxqDailyNote].filter(Boolean).join(" · ");
 }
 
+/* ── 星球简报站内详版弹窗（在线/离线通用，免跳新标签页） ── */
+let zsxqDigestCat="全部";
+let zsxqDigestGroup="";
+let zsxqDigestQuery="";
+
+function openZsxqDigestModal(){
+  zsxqDigestCat="全部";
+  zsxqDigestGroup="";
+  zsxqDigestQuery="";
+  const inp=$("zdailyModalSearch"); if(inp) inp.value="";
+  renderZsxqDigestModal();
+  openOv("zsxqDigestOv");
+}
+function setZsxqDigestModalMode(mode){
+  setZsxqDigestMode(mode);
+  zsxqDigestCat="全部";
+  zsxqDigestGroup="";
+  renderZsxqDigestModal();
+}
+function setZsxqDigestCat(cat){ zsxqDigestCat=cat||"全部"; renderZsxqDigestModal(); }
+function setZsxqDigestGroup(g){ zsxqDigestGroup=g||""; renderZsxqDigestModal(); }
+function setZsxqDigestQuery(q){ zsxqDigestQuery=String(q||"").trim().toLowerCase(); renderZsxqDigestModal(); }
+
+function renderZsxqDigestModal(){
+  const body=$("zdailyModalBody"), tag=$("zdailyModalTag"), win=$("zdailyModalWindow"),
+        catsBox=$("zdailyModalCats"), grpSel=$("zdailyModalGroup"), foot=$("zdailyModalFoot"),
+        ext=$("zdailyModalExt");
+  if(!body) return;
+  const bDaily=$("zdailyModalDaily"), bWeekly=$("zdailyModalWeekly");
+  if(bDaily){ bDaily.classList.toggle("on",zsxqDigestMode==="daily"); bDaily.setAttribute("aria-selected",String(zsxqDigestMode==="daily")); }
+  if(bWeekly){ bWeekly.classList.toggle("on",zsxqDigestMode==="weekly"); bWeekly.setAttribute("aria-selected",String(zsxqDigestMode==="weekly")); }
+  if(ext) ext.hidden=!SERVED;
+
+  if(guest){
+    if(tag) tag.textContent="访客模式";
+    if(win) win.textContent="脱敏演示 · 不读本机星球简报";
+    if(catsBox) catsBox.innerHTML="";
+    if(grpSel) grpSel.innerHTML=`<option value="">全部星球</option>`;
+    body.innerHTML=`<div class="zdaily-empty">访客模式下不加载个人知识星球日报/周报快照。</div>`;
+    if(foot) foot.textContent="";
+    return;
+  }
+  if(!zsxqDaily){
+    if(tag) tag.textContent="未生成";
+    if(win) win.textContent="暂无简报快照";
+    if(catsBox) catsBox.innerHTML="";
+    if(grpSel) grpSel.innerHTML=`<option value="">全部星球</option>`;
+    body.innerHTML=`<div class="zdaily-empty">${esc(zsxqDailyErr||"还没有知识星球简报快照：先跑 python3 scripts/sync/zsxq-daily-sync.py。")}</div>`;
+    if(foot) foot.textContent="";
+    return;
+  }
+  const fmtWin=iso=>String(iso||"").replace("T"," ").slice(5,16)||"未知";
+  const isWeekly=zsxqDigestMode==="weekly";
+  const wk=zsxqDaily.weekly||null;
+  if(isWeekly && !wk){
+    if(tag) tag.textContent="待生成周报";
+    if(win) win.textContent="过去 7 天滚动窗口";
+    if(catsBox) catsBox.innerHTML="";
+    body.innerHTML=`<div class="zdaily-empty">当前快照仅含 24h 日报，点击「刷新简报」或运行 <code>python3 scripts/sync/zsxq-daily-sync.py</code> 即可生成 7 天周报。</div>`;
+    if(foot) foot.textContent=[zsxqDaily.coverageNote||zsxqDaily.dataPolicy||"", zsxqDailyNote].filter(Boolean).join(" · ");
+    return;
+  }
+  const rawItems=isWeekly?(Array.isArray(wk.items)?wk.items:[]):(Array.isArray(zsxqDaily.items)?zsxqDaily.items:[]);
+  const ordered=isWeekly && Array.isArray(wk.highlights) && wk.highlights.length
+    ? [...wk.highlights, ...rawItems.filter(it=>!wk.highlights.some(h=>h.id===it.id))]
+    : rawItems;
+  const winStart=isWeekly?wk.windowStart:zsxqDaily.windowStart;
+  const winEnd=isWeekly?wk.windowEnd:zsxqDaily.windowEnd;
+  if(tag) tag.textContent=isWeekly
+    ? `本周 7 天 · 共 ${ordered.length} 条${wk.digestedCount?` · 精华 ${wk.digestedCount}`:""}`
+    : `今日 24h · 共 ${ordered.length} 条`;
+  if(win) win.textContent=`窗口 ${fmtWin(winStart)} → ${fmtWin(winEnd)} · 生成于 ${String(zsxqDaily.generatedAt||"").replace("T"," ").slice(0,16)}`;
+
+  // 分类统计按钮
+  const catCounts={};
+  ordered.forEach(it=>{ const c=it.category||"其他"; catCounts[c]=(catCounts[c]||0)+1; });
+  if(catsBox){
+    const cats=[["全部",ordered.length], ...Object.entries(catCounts).sort((a,b)=>b[1]-a[1])];
+    catsBox.innerHTML=cats.map(([c,n])=>{
+      const arg=esc(c).replace(/'/g,"\\'");
+      return `<button class="zdaily-catbtn${zsxqDigestCat===c?" on":""}" type="button" onclick="setZsxqDigestCat('${arg}')">${esc(c)} ${n}</button>`;
+    }).join("");
+  }
+  // 星球下拉
+  const grpCounts={};
+  ordered.forEach(it=>{ if(it.group) grpCounts[it.group]=(grpCounts[it.group]||0)+1; });
+  if(grpSel){
+    const opts=[`<option value="">全部星球 (${Object.keys(grpCounts).length})</option>`]
+      .concat(Object.entries(grpCounts).sort((a,b)=>b[1]-a[1]).map(([g,n])=>
+        `<option value="${esc(g)}"${zsxqDigestGroup===g?" selected":""}>${esc(g)} (${n})</option>`
+      ));
+    grpSel.innerHTML=opts.join("");
+  }
+
+  const filtered=ordered.filter(it=>{
+    if(zsxqDigestCat!=="全部" && (it.category||"其他")!==zsxqDigestCat) return false;
+    if(zsxqDigestGroup && it.group!==zsxqDigestGroup) return false;
+    if(zsxqDigestQuery){
+      const hay=[it.title,it.summary,it.excerpt,it.preview,it.group,it.author,it.category].join(" ").toLowerCase();
+      if(!hay.includes(zsxqDigestQuery)) return false;
+    }
+    return true;
+  });
+
+  if(!filtered.length){
+    body.innerHTML=`<div class="zdaily-empty">当前筛选条件下没有匹配的简报条目。</div>`;
+  }else{
+    body.innerHTML=filtered.map(it=>{
+      const href=safeUrl(it.url||it.mobileUrl||"");
+      const title=esc(it.title||"无标题");
+      const star=it.digested?`<span class="zdaily-star" title="精华">★ </span>`:"";
+      const link=href?`<a href="${href}" target="_blank" rel="noopener">${star}${title} ↗</a>`:`${star}${title}`;
+      const m=it.metrics||{};
+      const stats=[];
+      if(m.reads!=null) stats.push(`阅 ${m.reads}`);
+      if(m.likes) stats.push(`赞 ${m.likes}`);
+      if(m.comments) stats.push(`评 ${m.comments}`);
+      const excerpt=String(it.summary||it.excerpt||it.preview||"").trim();
+      return `<article class="zdaily-mitem">`+
+        `<div class="zdaily-mitem-top">`+
+          `<div class="zdaily-mitem-title">${link}</div>`+
+          `<span class="zdaily-cat">${esc(it.category||"其他")}</span>`+
+        `</div>`+
+        `<div class="zdaily-mitem-sub">`+
+          (it.group?`<span class="tag">${esc(it.group)}</span>`:"")+
+          (it.author?`<span>${esc(it.author)}</span>`:"")+
+          (it.publishedAt?`<span>${esc(fmtWin(it.publishedAt))}</span>`:"")+
+          (stats.length?`<span>${esc(stats.join(" · "))}</span>`:"")+
+        `</div>`+
+        (excerpt?`<div class="zdaily-mitem-excerpt">${esc(excerpt.slice(0,260))}${excerpt.length>260?"…":""}</div>`:"")+
+      `</article>`;
+    }).join("");
+  }
+  if(foot) foot.textContent=[zsxqDaily.coverageNote||zsxqDaily.dataPolicy||"", zsxqDailyNote].filter(Boolean).join(" · ");
+}
+
 function renderZsxqScreen(){
   renderZsxqDaily();
   const tag=$("zsxqScreenTag"), note=$("zsxqScreenNote"), statsBox=$("zsxqScreenStats");

@@ -33,6 +33,7 @@ if(typeof document!=="undefined"&&typeof document.addEventListener==="function"&
     const arg=el.getAttribute("data-wb-arg")||"";
     if(act==="set-type" && typeof setType==="function") setType(arg);
     else if(act==="zsxq-digest-mode" && typeof setZsxqDigestMode==="function") setZsxqDigestMode(arg);
+    else if(act==="open-zsxq-digest" && typeof openZsxqDigestModal==="function") openZsxqDigestModal();
     else if(act==="zsxq-daily-sync" && typeof syncZsxqDaily==="function") syncZsxqDaily(el);
     else if(act==="social-sync" && typeof syncSocialPlatform==="function") syncSocialPlatform(arg,el);
   });

@@ -70,6 +70,9 @@
       <button class="segbtn"    id="tyReview"  type="button" tabindex="-1" aria-pressed="false" aria-controls="screenReview"  onclick="setType('review')">复盘</button>
     </span>
     <span class="typehint" id="typeHint">—</span>
-    <button class="metric-toggle" id="metricBtn" onclick="toggleMetrics()" aria-expanded="false">展开指标</button>
+    <span class="typebar-tools">
+      <button class="metric-toggle" id="metricBtn" onclick="toggleMetrics()" aria-expanded="false">展开指标</button>
+      <button class="cmd-trigger" type="button" onclick="openCmd()" title="打开命令面板 (⌘K / Ctrl+K)">快速跳转 <kbd>⌘K</kbd></button>
+    </span>
   </nav>
 
