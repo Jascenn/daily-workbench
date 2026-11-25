@@ -1,8 +1,8 @@
-/* 知识星球数据大盘 */
-.zsxq-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:var(--space-3);margin:var(--space-3) 0}
-.zsxq-figure{background:var(--bg);border:1px solid var(--line);border-radius:var(--radius-md);padding:var(--space-3)}
+/* 知识星球数据大盘：发丝线指标矩阵，告别白卡里套圆角灰盒 */
+.zsxq-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0;margin:var(--space-3) 0;border-top:1px solid var(--line)}
+.zsxq-figure{background:transparent;border:0;border-bottom:1px solid var(--line);border-right:1px solid var(--line);border-radius:var(--radius-xs);padding:11px 12px}
 .zsxq-figure span{display:block;font-size:var(--fs-xs);color:var(--muted)}
-.zsxq-figure b{display:block;font-size:var(--fs-xl);line-height:1.3;margin-top:2px}
+.zsxq-figure b{display:block;font-size:var(--fs-xl);line-height:1.3;margin-top:2px;letter-spacing:-.02em}
 .zsxq-figure em{display:block;font-size:var(--fs-xs);color:var(--muted);font-style:normal;margin-top:2px;overflow-wrap:anywhere}
 .zsxq-scope-sel{max-width:190px;height:28px;margin-left:8px;padding:0 6px;border:1px solid var(--line-strong);
   border-radius:var(--radius-sm);background:var(--card);color:var(--muted);font:inherit;font-size:var(--fs-xs);vertical-align:middle}
@@ -36,9 +36,10 @@
 .zdaily-pill{font-size:var(--fs-xs);color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:var(--radius-full);padding:1px 8px}
 .zdaily-star{color:var(--warn);font-size:var(--fs-xs);margin-right:4px}
 .zdaily-meta{font-size:var(--fs-xs);color:var(--muted);margin-left:6px;white-space:nowrap}
-.zdaily-item{display:flex;gap:var(--space-2);align-items:baseline;padding:6px 0;border-top:1px solid var(--line);font-size:var(--fs-sm);line-height:1.45}
-.zdaily-item:first-child{border-top:0;padding-top:0}
-.zdaily-cat{flex:0 0 auto;font-size:var(--fs-xs);color:var(--accent);background:var(--neu-50);border-radius:var(--radius-sm);padding:1px 6px;white-space:nowrap}
+.zdaily-item{display:flex;gap:10px;align-items:baseline;padding:7px 6px;border-top:1px solid var(--line);border-radius:var(--radius-xs);font-size:var(--fs-sm);line-height:1.5;transition:background-color var(--dur-fast) var(--ease)}
+.zdaily-item:first-child{border-top:0}
+.zdaily-item:hover{background:var(--bg)}
+.zdaily-cat{flex:0 0 68px;text-align:center;font-size:var(--fs-xs);color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:var(--radius-xs);padding:1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .zdaily-item a{color:inherit;text-decoration:none}
 .zdaily-item a:hover{color:var(--accent);text-decoration:underline}
 .zdaily-more{margin-top:var(--space-2)}
@@ -51,13 +52,14 @@
 .zsxq-group-name{font-weight:600;font-size:var(--fs-sm)}
 .zsxq-group-meta{font-size:var(--fs-xs);color:var(--muted);margin-top:2px}
 .zsxq-timeline{margin-top:var(--space-2)}
-.zsxq-tl-row{display:block;padding:var(--space-2) 0;border-top:1px solid var(--line);text-decoration:none;color:inherit}
-.zsxq-tl-row:first-child{border-top:0;padding-top:0}
+.zsxq-tl-row{display:block;padding:11px 6px;border-top:1px solid var(--line);border-radius:var(--radius-xs);text-decoration:none;color:inherit;transition:background-color var(--dur-fast) var(--ease)}
+.zsxq-tl-row:first-child{border-top:0}
+.zsxq-tl-row:hover{background:var(--bg)}
 .zsxq-tl-row:hover .zsxq-tl-title{text-decoration:underline}
 .zsxq-tl-head{display:flex;gap:var(--space-2);align-items:baseline}
 .zsxq-tl-date{font-size:var(--fs-xs);color:var(--muted);white-space:nowrap}
-.zsxq-tl-title{font-size:var(--fs-sm);line-height:1.45;flex:1}
-.zsxq-tl-meta{font-size:var(--fs-xs);color:var(--muted);margin-top:3px}
+.zsxq-tl-title{font-size:var(--fs-sm);font-weight:600;line-height:1.5;flex:1}
+.zsxq-tl-meta{font-size:var(--fs-xs);color:var(--muted);margin-top:5px}
 
 /* 二级菜单（自媒体运营 → 知识星球） */
 .subnav{display:flex;gap:var(--space-2);margin:var(--space-2) 0 var(--space-3)}
@@ -96,12 +98,13 @@
 .zsxq-groups-sort .segbtn{padding:3px 9px;min-height:26px;font-size:var(--fs-xs)}
 .zsxq-groups-sort .segbtn.on{background:var(--accent);border-color:var(--accent);color:#fff}
 [data-theme="dark"] .zsxq-groups-sort .segbtn.on{color:#141b28}
-/* 右栏变窄后指标卡两列排，别把数字挤成两行 */
-.rightcol .zsxq-grid{grid-template-columns:1fr 1fr;gap:var(--space-2)}
+/* 右栏变窄后指标卡两列发丝线矩阵排布，偶数列去掉右边框 */
+.rightcol .zsxq-grid{grid-template-columns:1fr 1fr;gap:0}
+.rightcol .zsxq-figure:nth-child(even){border-right:0}
 .rightcol .zsxq-figure b{font-size:var(--fs-lg)}
 
-/* 左栏很长：让右栏在滚动时停住，避免"右边短一截"的割裂感 */
-.zsxq-right{position:sticky;top:var(--space-4);align-self:start}
+/* 左栏很长：让右栏在滚动时停住，且避开顶部吸顶导航条 */
+.zsxq-right{position:sticky;top:58px;align-self:start}
 @media (max-width:900px){.zsxq-right{position:static}}
 
 /* 分页控件：默认 .seg 用 --bg 底，在卡片上几乎看不见，这里换成实底 + 主色选中 */
@@ -190,3 +193,31 @@
 .zsxq-dd-row label{cursor:pointer;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .zsxq-dd-row:hover{background:var(--bg)}
 .zsxq-dd-note{font-size:var(--fs-xs);color:var(--muted);padding:6px 6px 2px;border-top:1px solid var(--line);margin-top:4px}
+
+/* ── 星球简报站内详版弹窗 ── */
+.zdaily-modal{max-width:860px;width:min(860px,94vw);max-height:86vh;display:flex;flex-direction:column;gap:10px}
+.zdaily-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.zdaily-modal-titlebox{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.zdaily-modal-titlebox h3{margin:0;font-size:var(--fs-lg)}
+.zdaily-modal-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.zdaily-ext{font-size:var(--fs-xs);color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+.zdaily-ext:hover{color:var(--ink)}
+.zdaily-modal-meta{font-size:var(--fs-xs);color:var(--muted)}
+.zdaily-modal-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.zdaily-modal-cats{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.zdaily-catbtn{font:inherit;font-size:var(--fs-xs);font-weight:600;color:var(--muted);background:transparent;border:0;border-radius:var(--radius-sm);padding:3px 8px;cursor:pointer}
+.zdaily-catbtn:hover{color:var(--ink);background:var(--paper-2)}
+.zdaily-catbtn.on{color:var(--ink);background:var(--paper-2)}
+.zdaily-modal-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.zdaily-modal-controls select,.zdaily-modal-controls input{font:inherit;font-size:var(--fs-xs);color:var(--ink);background:var(--bg);border:1px solid var(--line-strong);border-radius:var(--radius-sm);padding:4px 8px}
+.zdaily-modal-controls input{width:180px}
+.zdaily-modal-list{overflow:auto;flex:1;min-height:180px;padding-right:4px}
+.zdaily-mitem{padding:12px 2px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:5px}
+.zdaily-mitem:last-child{border-bottom:0}
+.zdaily-mitem-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.zdaily-mitem-title{font-size:var(--fs-base);font-weight:600;line-height:1.45;color:var(--ink)}
+.zdaily-mitem-title a{color:inherit;text-decoration:none}
+.zdaily-mitem-title a:hover{text-decoration:underline}
+.zdaily-mitem-sub{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:var(--fs-xs);color:var(--muted)}
+.zdaily-mitem-excerpt{font-size:var(--fs-sm);color:var(--muted);line-height:1.6;white-space:pre-line}
+.zdaily-modal-foot{font-size:var(--fs-xs);color:var(--muted);padding-top:8px;border-top:1px solid var(--line);line-height:1.55}

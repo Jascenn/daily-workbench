@@ -1056,6 +1056,26 @@ def handle_post(self):
             return
         if p == "/api/feeds/refresh":
             url = str(obj.get("url") or "").strip()
+            if not url and obj.get("all"):
+                # 批量刷新全部未暂停订阅源，单源失败不阻断其余源
+                subs = [s for s in (d.get("subscriptions") or []) if not s.get("paused") and str(s.get("url") or "").startswith(("http://", "https://"))]
+                refreshed, added, failed = 0, 0, 0
+                for s in subs:
+                    su = str(s.get("url") or "").strip()
+                    try:
+                        res = _feed_refresh(d, su)
+                        refreshed += 1
+                        added += int(res.get("added") or 0)
+                    except Exception as e:  # noqa: BLE001
+                        failed += 1
+                        s["lastAttemptAt"] = int(time.time() * 1000)
+                        s["lastErrorAt"] = int(time.time() * 1000)
+                        s["errorCount"] = int(s.get("errorCount") or 0) + 1
+                        s["error"] = str(e)[:300]
+                _rss_write(d)
+                _regen_sections()
+                self._send(200, {"ok": True, "refreshed": refreshed, "added": added, "failed": failed, "total": len(subs)})
+                return
             if not url.startswith(("http://", "https://")):
                 self._send(400, {"error": "url must start with http(s)://"})
                 return

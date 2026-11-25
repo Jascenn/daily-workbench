@@ -529,11 +529,14 @@
   .pill.notion{background:var(--neu-100);color:var(--ink)}
   .no-note{font-size:var(--fs-xs);color:var(--muted);line-height:1.6}
 
-  /* modal */
-  .ov{position:fixed;inset:0;background:rgba(10,16,30,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:18px}
-  .ov.show{display:flex}
+  /* modal：克制 160ms 淡入与微缩放动效，尊重系统减弱动态设置 */
+  @keyframes wbOvIn{from{opacity:0}to{opacity:1}}
+  @keyframes wbModalIn{from{opacity:0;transform:translateY(6px) scale(.985)}to{opacity:1;transform:none}}
+  .ov{position:fixed;inset:0;background:rgba(10,16,30,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:18px;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+  .ov.show{display:flex;animation:wbOvIn 160ms var(--ease) both}
   .modal-open{overflow:hidden}
-  .modal{background:var(--card);border-radius:var(--radius-lg);padding:20px;border:none;width:min(440px,100%);box-shadow:var(--shadow-lg)}
+  .modal{background:var(--card);border-radius:var(--radius-lg);padding:20px;border:1px solid var(--line);width:min(440px,100%);box-shadow:var(--shadow-lg)}
+  .ov.show .modal{animation:wbModalIn 160ms var(--ease) both}
   .modal h3{margin:0 0 14px;font-size:var(--fs-lg)}
   .field{margin-bottom:11px}
   .field label,.field .field-label{display:block;font-size:var(--fs-xs);color:var(--muted);margin-bottom:4px}
@@ -543,18 +546,24 @@
   .modal .row{display:flex;gap:10px}
   .modal .row .field{flex:1}
   .modal .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
-  /* 总览页晨间速览：聚合微信待办 / 选题雷达 / 星球简报，默认可折叠，专注模式下自动隐藏 */
-  .morning-card{margin-bottom:16px}
-  .morning-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
-  .morning-col{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--bg);min-width:0}
+  /* 总览页晨间速览：零套娃 3 列发丝线排版，聚合微信待办 / 选题雷达 / 星球简报 */
+  .morning-card{margin-bottom:14px}
+  .morning-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+  .morning-col{display:flex;flex-direction:column;gap:6px;padding:2px 16px;border-right:1px solid var(--line);min-width:0}
+  .morning-col:first-child{padding-left:2px}
+  .morning-col:last-child{padding-right:2px;border-right:0}
   .morning-col-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
-  .morning-col-title{font-size:var(--fs-sm);font-weight:700;color:var(--ink)}
+  .morning-col-title{font-size:var(--fs-xs);font-weight:700;color:var(--muted);letter-spacing:.02em}
   .morning-col-link{border:0;background:none;padding:0;color:var(--accent);font:inherit;font-size:var(--fs-xs);cursor:pointer;text-decoration:none}
   .morning-col-link:hover{text-decoration:underline}
-  .morning-col-list{display:flex;flex-direction:column;gap:4px;font-size:var(--fs-xs);color:var(--muted);line-height:1.55}
+  .morning-col-list{display:flex;flex-direction:column;gap:5px;font-size:var(--fs-sm);color:var(--muted);line-height:1.5}
   .morning-col-row{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
   .morning-col-row b{font-weight:600}
-  @media(max-width:980px){.morning-grid{grid-template-columns:1fr}}
+  @media(max-width:980px){
+    .morning-grid{grid-template-columns:1fr;gap:12px}
+    .morning-col{padding:10px 0 0;border-right:0;border-top:1px solid var(--line)}
+    .morning-col:first-child{padding-top:0;border-top:0}
+  }
 
   /* 资讯站内阅读：桌面端保留列表上下文，正文单独滚动；手机端只留正文。
      排版参考周刊长文的阅读节奏：标题与正文同栏、窄而有留白的正文列、
@@ -901,9 +910,17 @@
      背景：工作台原先 100% 是记账，凌一要的是**并列的其它类型**（写作/资讯…）。
      这里把"一个类型"实现成一个 screen，切换器复用页面原有的 .seg/.segbtn ——
      一个概念只留一种控件外观，新区也不另起一套视觉（全部复用既有令牌与 .card/.kpi/.tag）。 */
-  .typebar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 14px;padding:8px 0;
-    position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line)}
+  .typebar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 12px;padding:8px 0;
+    position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
   .typebar .seg{margin-left:0}          /* .seg 自带 margin-left（原是给卡片标题用的），这一处不需要 */
+  .typebar-tools{margin-left:auto;display:inline-flex;align-items:center;gap:10px;flex:none}
+  .cmd-trigger{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;
+    border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--card);color:var(--muted);
+    font:inherit;font-size:var(--fs-xs);cursor:pointer;white-space:nowrap;transition:border-color var(--dur-fast) var(--ease)}
+  .cmd-trigger:hover{border-color:var(--line-strong);color:var(--ink)}
+  .cmd-trigger kbd{font:inherit;font-size:var(--fs-xs);padding:0 4px;border-radius:var(--radius-xs);background:var(--paper-2);color:var(--ink)}
+  @media(max-width:900px){.cmd-trigger{display:none}}
   .typehint{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;font-size:var(--fs-xs);color:var(--muted)}
   .typehint b{color:var(--ink)}
   .typehint.warn{color:var(--warn)}
@@ -913,9 +930,9 @@
   .screen[hidden]{display:none}
 
   /* 多页面统一骨架：参考“每页一个页头”的结构，但保留工作台自己的数据语义。 */
-  .workspace-head{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,auto);gap:24px;align-items:center;
-    padding:12px 2px 16px;margin-bottom:2px}
-  .workspace-eyebrow{display:block;margin-bottom:8px;color:var(--workspace-accent);font-size:var(--fs-xs);
+  .workspace-head{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,auto);gap:20px;align-items:center;
+    padding:8px 2px 12px;margin-bottom:2px}
+  .workspace-eyebrow{display:block;margin-bottom:4px;color:var(--workspace-accent);font-size:var(--fs-xs);
     font-weight:800;letter-spacing:.08em}
   .workspace-head h2{margin:0;font-size:calc(var(--fs-2xl) * 1.08);line-height:1.25}
   .workspace-head p{display:none;max-width:64ch;margin:7px 0 0;color:var(--muted);font-size:var(--fs-sm);line-height:1.7}
@@ -948,12 +965,13 @@
   .workspace-disclosure[open]>summary::after{content:"−"}
   .workspace-disclosure .no-note{padding:0 2px 16px;max-width:72ch}
 
-  /* AI 用量折叠卡：总量常显在标题行，明细收进 details，避免长尾信息压过经营证据 */
-  details.usage-fold>summary{list-style:none;cursor:pointer;margin:0;display:flex;align-items:center;gap:10px}
+  /* 折叠卡统一对齐：左侧标题与标签紧邻，右侧留白后放极简旋转指示符 */
+  details.usage-fold>summary{list-style:none;cursor:pointer;margin:0;display:flex;align-items:center;gap:12px}
   details.usage-fold>summary::-webkit-details-marker{display:none}
-  details.usage-fold>summary h2{display:flex;justify-content:space-between;align-items:center;width:100%}
-  details.usage-fold>summary::after{content:"＋";color:var(--muted);font-size:var(--fs-lg);font-weight:650;flex:0 0 auto;line-height:1}
-  details.usage-fold[open]>summary::after{content:"−"}
+  details.usage-fold>summary h2{display:flex;align-items:center;gap:8px;width:100%;margin:0}
+  details.usage-fold>summary h2 .tag{margin-left:auto}
+  details.usage-fold>summary::after{content:"▾";color:var(--muted);font-size:var(--fs-sm);flex:0 0 auto;line-height:1;transition:transform var(--dur-fast) var(--ease)}
+  details.usage-fold:not([open])>summary::after{transform:rotate(-90deg)}
 
   .workspace-screen .risk{border-left-width:1px}
   .workspace-screen .proj.conflict,.workspace-screen .proj.overdue{border-left-width:1px}
@@ -1038,6 +1056,7 @@
   .news-risk-actions .btn{padding:5px 9px;font-size:var(--fs-xs)}
   .news-command>#newsFresh .fresh{margin:0;padding:9px 16px;border:0;border-top:1px solid var(--line);
     border-left:0;border-radius:var(--radius-xs);background:var(--workspace-wash);box-shadow:none;gap:7px}
+  .news-command>#newsFresh .fresh-secnote{margin:0;padding:7px 16px;border-top:1px solid var(--line);background:var(--bg)}
   .news-command>#newsFresh .fresh .fnote{flex:1 1 300px;line-height:1.45}
   .news-focus-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
     padding:12px 2px 9px;border-bottom:1px solid var(--line)}
@@ -1223,6 +1242,8 @@
     background:var(--card);box-shadow:var(--shadow-sm);overflow:hidden}
   .writing-summary #wrFresh .fresh{margin:0;padding:9px 16px;border:0;border-bottom:1px solid var(--line);
     border-left:0;border-radius:var(--radius-xs);background:var(--workspace-wash);box-shadow:none}
+  .fresh-secnote{margin:-6px 0 12px}
+  .writing-summary #wrFresh .fresh-secnote{margin:0;padding:7px 16px;border-bottom:1px solid var(--line);background:var(--bg)}
   .writing-summary .statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
     gap:0;margin:0;border:0}
   .writing-summary .kpi{min-width:0;padding:12px 16px;background:transparent;border:0;
@@ -2480,7 +2501,7 @@
   /* ── v3：默认减量，先给焦点，再允许展开证据 ─────────────────────── */
   .banner.online.show{display:none}
   #typeSeg .realTag,#typeSeg .localTag{display:none}
-  .metric-toggle{margin-left:auto;border:0;background:transparent;color:var(--muted);padding:6px 2px;
+  .metric-toggle{border:0;background:transparent;color:var(--muted);padding:6px 2px;
     font:inherit;font-size:var(--fs-xs);font-weight:650;cursor:pointer;white-space:nowrap}
   .metric-toggle[hidden],#metricsMenuBtn[hidden]{display:none}
   .metric-toggle:hover{color:var(--accent)}
@@ -2719,11 +2740,11 @@
 .radar-src.warn{opacity:.6}
 .radar-src.bad{color:var(--pos)}
 
-/* 知识星球数据大盘 */
-.zsxq-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:var(--space-3);margin:var(--space-3) 0}
-.zsxq-figure{background:var(--bg);border:1px solid var(--line);border-radius:var(--radius-md);padding:var(--space-3)}
+/* 知识星球数据大盘：发丝线指标矩阵，告别白卡里套圆角灰盒 */
+.zsxq-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0;margin:var(--space-3) 0;border-top:1px solid var(--line)}
+.zsxq-figure{background:transparent;border:0;border-bottom:1px solid var(--line);border-right:1px solid var(--line);border-radius:var(--radius-xs);padding:11px 12px}
 .zsxq-figure span{display:block;font-size:var(--fs-xs);color:var(--muted)}
-.zsxq-figure b{display:block;font-size:var(--fs-xl);line-height:1.3;margin-top:2px}
+.zsxq-figure b{display:block;font-size:var(--fs-xl);line-height:1.3;margin-top:2px;letter-spacing:-.02em}
 .zsxq-figure em{display:block;font-size:var(--fs-xs);color:var(--muted);font-style:normal;margin-top:2px;overflow-wrap:anywhere}
 .zsxq-scope-sel{max-width:190px;height:28px;margin-left:8px;padding:0 6px;border:1px solid var(--line-strong);
   border-radius:var(--radius-sm);background:var(--card);color:var(--muted);font:inherit;font-size:var(--fs-xs);vertical-align:middle}
@@ -2757,9 +2778,10 @@
 .zdaily-pill{font-size:var(--fs-xs);color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:var(--radius-full);padding:1px 8px}
 .zdaily-star{color:var(--warn);font-size:var(--fs-xs);margin-right:4px}
 .zdaily-meta{font-size:var(--fs-xs);color:var(--muted);margin-left:6px;white-space:nowrap}
-.zdaily-item{display:flex;gap:var(--space-2);align-items:baseline;padding:6px 0;border-top:1px solid var(--line);font-size:var(--fs-sm);line-height:1.45}
-.zdaily-item:first-child{border-top:0;padding-top:0}
-.zdaily-cat{flex:0 0 auto;font-size:var(--fs-xs);color:var(--accent);background:var(--neu-50);border-radius:var(--radius-sm);padding:1px 6px;white-space:nowrap}
+.zdaily-item{display:flex;gap:10px;align-items:baseline;padding:7px 6px;border-top:1px solid var(--line);border-radius:var(--radius-xs);font-size:var(--fs-sm);line-height:1.5;transition:background-color var(--dur-fast) var(--ease)}
+.zdaily-item:first-child{border-top:0}
+.zdaily-item:hover{background:var(--bg)}
+.zdaily-cat{flex:0 0 68px;text-align:center;font-size:var(--fs-xs);color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:var(--radius-xs);padding:1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .zdaily-item a{color:inherit;text-decoration:none}
 .zdaily-item a:hover{color:var(--accent);text-decoration:underline}
 .zdaily-more{margin-top:var(--space-2)}
@@ -2772,13 +2794,14 @@
 .zsxq-group-name{font-weight:600;font-size:var(--fs-sm)}
 .zsxq-group-meta{font-size:var(--fs-xs);color:var(--muted);margin-top:2px}
 .zsxq-timeline{margin-top:var(--space-2)}
-.zsxq-tl-row{display:block;padding:var(--space-2) 0;border-top:1px solid var(--line);text-decoration:none;color:inherit}
-.zsxq-tl-row:first-child{border-top:0;padding-top:0}
+.zsxq-tl-row{display:block;padding:11px 6px;border-top:1px solid var(--line);border-radius:var(--radius-xs);text-decoration:none;color:inherit;transition:background-color var(--dur-fast) var(--ease)}
+.zsxq-tl-row:first-child{border-top:0}
+.zsxq-tl-row:hover{background:var(--bg)}
 .zsxq-tl-row:hover .zsxq-tl-title{text-decoration:underline}
 .zsxq-tl-head{display:flex;gap:var(--space-2);align-items:baseline}
 .zsxq-tl-date{font-size:var(--fs-xs);color:var(--muted);white-space:nowrap}
-.zsxq-tl-title{font-size:var(--fs-sm);line-height:1.45;flex:1}
-.zsxq-tl-meta{font-size:var(--fs-xs);color:var(--muted);margin-top:3px}
+.zsxq-tl-title{font-size:var(--fs-sm);font-weight:600;line-height:1.5;flex:1}
+.zsxq-tl-meta{font-size:var(--fs-xs);color:var(--muted);margin-top:5px}
 
 /* 二级菜单（自媒体运营 → 知识星球） */
 .subnav{display:flex;gap:var(--space-2);margin:var(--space-2) 0 var(--space-3)}
@@ -2817,12 +2840,13 @@
 .zsxq-groups-sort .segbtn{padding:3px 9px;min-height:26px;font-size:var(--fs-xs)}
 .zsxq-groups-sort .segbtn.on{background:var(--accent);border-color:var(--accent);color:#fff}
 [data-theme="dark"] .zsxq-groups-sort .segbtn.on{color:#141b28}
-/* 右栏变窄后指标卡两列排，别把数字挤成两行 */
-.rightcol .zsxq-grid{grid-template-columns:1fr 1fr;gap:var(--space-2)}
+/* 右栏变窄后指标卡两列发丝线矩阵排布，偶数列去掉右边框 */
+.rightcol .zsxq-grid{grid-template-columns:1fr 1fr;gap:0}
+.rightcol .zsxq-figure:nth-child(even){border-right:0}
 .rightcol .zsxq-figure b{font-size:var(--fs-lg)}
 
-/* 左栏很长：让右栏在滚动时停住，避免"右边短一截"的割裂感 */
-.zsxq-right{position:sticky;top:var(--space-4);align-self:start}
+/* 左栏很长：让右栏在滚动时停住，且避开顶部吸顶导航条 */
+.zsxq-right{position:sticky;top:58px;align-self:start}
 @media (max-width:900px){.zsxq-right{position:static}}
 
 /* 分页控件：默认 .seg 用 --bg 底，在卡片上几乎看不见，这里换成实底 + 主色选中 */
@@ -2911,6 +2935,34 @@
 .zsxq-dd-row label{cursor:pointer;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .zsxq-dd-row:hover{background:var(--bg)}
 .zsxq-dd-note{font-size:var(--fs-xs);color:var(--muted);padding:6px 6px 2px;border-top:1px solid var(--line);margin-top:4px}
+
+/* ── 星球简报站内详版弹窗 ── */
+.zdaily-modal{max-width:860px;width:min(860px,94vw);max-height:86vh;display:flex;flex-direction:column;gap:10px}
+.zdaily-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.zdaily-modal-titlebox{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.zdaily-modal-titlebox h3{margin:0;font-size:var(--fs-lg)}
+.zdaily-modal-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.zdaily-ext{font-size:var(--fs-xs);color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+.zdaily-ext:hover{color:var(--ink)}
+.zdaily-modal-meta{font-size:var(--fs-xs);color:var(--muted)}
+.zdaily-modal-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.zdaily-modal-cats{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.zdaily-catbtn{font:inherit;font-size:var(--fs-xs);font-weight:600;color:var(--muted);background:transparent;border:0;border-radius:var(--radius-sm);padding:3px 8px;cursor:pointer}
+.zdaily-catbtn:hover{color:var(--ink);background:var(--paper-2)}
+.zdaily-catbtn.on{color:var(--ink);background:var(--paper-2)}
+.zdaily-modal-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.zdaily-modal-controls select,.zdaily-modal-controls input{font:inherit;font-size:var(--fs-xs);color:var(--ink);background:var(--bg);border:1px solid var(--line-strong);border-radius:var(--radius-sm);padding:4px 8px}
+.zdaily-modal-controls input{width:180px}
+.zdaily-modal-list{overflow:auto;flex:1;min-height:180px;padding-right:4px}
+.zdaily-mitem{padding:12px 2px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:5px}
+.zdaily-mitem:last-child{border-bottom:0}
+.zdaily-mitem-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.zdaily-mitem-title{font-size:var(--fs-base);font-weight:600;line-height:1.45;color:var(--ink)}
+.zdaily-mitem-title a{color:inherit;text-decoration:none}
+.zdaily-mitem-title a:hover{text-decoration:underline}
+.zdaily-mitem-sub{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:var(--fs-xs);color:var(--muted)}
+.zdaily-mitem-excerpt{font-size:var(--fs-sm);color:var(--muted);line-height:1.6;white-space:pre-line}
+.zdaily-modal-foot{font-size:var(--fs-xs);color:var(--muted);padding-top:8px;border-top:1px solid var(--line);line-height:1.55}
 </style>
 </head>
 <body>
@@ -2923,7 +2975,7 @@
   </div>
   <header>
     <div>
-      <h1 class="brand" title="Daily Workbench v1.2.0"><span class="brand-word">LingYi</span><span class="brand-sep" aria-hidden="true"></span><span>每日工作台</span></h1>
+      <h1 class="brand" title="Daily Workbench v1.2.1"><span class="brand-word">LingYi</span><span class="brand-sep" aria-hidden="true"></span><span>每日工作台</span></h1>
       <div class="who" id="who">—</div>
       <div class="todayline" id="todayLine">—</div>
     </div>
@@ -2947,7 +2999,7 @@
         <button class="btn ghost wide2" onclick="toggleSyncLog()" id="syncLogBtn">同步日志 · <span id="syncLogHint">查看</span></button>
         <div class="synclog-wrap" id="syncLogWrap" hidden><div id="syncLogList">还没有同步记录</div></div>
         <div class="morepanel-note" id="notionNote"></div>
-        <div class="morepanel-note" id="appVersionNote">Daily Workbench v1.2.0</div>
+        <div class="morepanel-note" id="appVersionNote">Daily Workbench v1.2.1</div>
       </div>
       </details>
       <input id="imp" type="file" accept="application/json" aria-label="导入 JSON 备份" style="display:none" onchange="importJSON(event)">
@@ -2986,7 +3038,10 @@
       <button class="segbtn"    id="tyReview"  type="button" tabindex="-1" aria-pressed="false" aria-controls="screenReview"  onclick="setType('review')">复盘</button>
     </span>
     <span class="typehint" id="typeHint">—</span>
-    <button class="metric-toggle" id="metricBtn" onclick="toggleMetrics()" aria-expanded="false">展开指标</button>
+    <span class="typebar-tools">
+      <button class="metric-toggle" id="metricBtn" onclick="toggleMetrics()" aria-expanded="false">展开指标</button>
+      <button class="cmd-trigger" type="button" onclick="openCmd()" title="打开命令面板 (⌘K / Ctrl+K)">快速跳转 <kbd>⌘K</kbd></button>
+    </span>
   </nav>
 
   <div class="screen workspace-screen" id="screenLedger">
@@ -3017,7 +3072,7 @@
     </div>
     <div class="ts-note">
       <div class="hlab">今日备忘 <span class="tag" id="noteDate">—</span></div>
-      <textarea class="notebox slim" id="note" aria-label="今日备忘" placeholder="今天要推进的事 / 下一步…" oninput="saveNote()"></textarea>
+      <textarea class="notebox slim" id="note" aria-label="今日备忘" placeholder="今天要推进的事 / 下一步…（⌘+Enter 保存）" oninput="saveNote()" onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter'){event.preventDefault();saveNoteManual();}"></textarea>
       <div class="ts-notebar">
         <span class="ts-savestate" id="noteSaveState" role="status"></span>
         <button class="btn" onclick="saveNoteManual()">保存备注</button>
@@ -3329,7 +3384,7 @@
         </div>
         <span class="zdaily-window" id="zdailyWindow">—</span>
         <button class="btn ghost zdaily-refresh" id="zdailySyncBtn" type="button" data-wb-action="zsxq-daily-sync">刷新简报</button>
-        <a class="zdaily-open" href="/zsxq-daily.html" target="_blank" rel="noopener">独立大页 ↗</a>
+        <button class="btn ghost zdaily-open" id="zdailyModalBtn" type="button" data-wb-action="open-zsxq-digest">展开详版</button>
       </div>
       <div class="zdaily-summary" id="zdailySummary" hidden></div>
       <div id="zdailyBody"></div>
@@ -4321,6 +4376,36 @@
   </div>
 </div>
 
+<!-- ── 知识星球简报：站内详版阅读弹窗 ── -->
+<div class="ov" id="zsxqDigestOv" aria-hidden="true">
+  <div class="modal modal-wide zdaily-modal" role="dialog" aria-modal="true" aria-labelledby="zdailyModalTitle">
+    <div class="zdaily-modal-head">
+      <div class="zdaily-modal-titlebox">
+        <h3 id="zdailyModalTitle">星球简报</h3>
+        <span class="tag" id="zdailyModalTag">—</span>
+      </div>
+      <div class="zdaily-modal-actions">
+        <div class="seg zdaily-seg" role="tablist" aria-label="详版简报周期">
+          <button class="segbtn on" id="zdailyModalDaily" type="button" role="tab" aria-selected="true" onclick="setZsxqDigestModalMode('daily')">今日 24h</button>
+          <button class="segbtn" id="zdailyModalWeekly" type="button" role="tab" aria-selected="false" onclick="setZsxqDigestModalMode('weekly')">本周 7 天</button>
+        </div>
+        <a class="zdaily-ext" id="zdailyModalExt" href="/zsxq-daily.html" target="_blank" rel="noopener">新标签页 ↗</a>
+        <button class="btn ghost" type="button" onclick="closeOv('zsxqDigestOv')">关闭</button>
+      </div>
+    </div>
+    <div class="zdaily-modal-meta" id="zdailyModalWindow">—</div>
+    <div class="zdaily-modal-bar">
+      <div class="zdaily-modal-cats" id="zdailyModalCats"></div>
+      <div class="zdaily-modal-controls">
+        <select id="zdailyModalGroup" aria-label="按星球筛选" onchange="setZsxqDigestGroup(this.value)"></select>
+        <input id="zdailyModalSearch" type="search" placeholder="搜索标题、正文或作者…" aria-label="搜索简报内容" oninput="setZsxqDigestQuery(this.value)">
+      </div>
+    </div>
+    <div class="zdaily-modal-list" id="zdailyModalBody"></div>
+    <div class="zdaily-modal-foot" id="zdailyModalFoot"></div>
+  </div>
+</div>
+
 <!-- ── 微信批奏折：只读回应草稿与原文核对弹窗 ── -->
 <div class="ov" id="wxReplyOv" aria-hidden="true">
   <div class="modal wx-modal" role="dialog" aria-modal="true" aria-labelledby="wxReplyTitle">
@@ -4402,6 +4487,7 @@ if(typeof document!=="undefined"&&typeof document.addEventListener==="function"&
     const arg=el.getAttribute("data-wb-arg")||"";
     if(act==="set-type" && typeof setType==="function") setType(arg);
     else if(act==="zsxq-digest-mode" && typeof setZsxqDigestMode==="function") setZsxqDigestMode(arg);
+    else if(act==="open-zsxq-digest" && typeof openZsxqDigestModal==="function") openZsxqDigestModal();
     else if(act==="zsxq-daily-sync" && typeof syncZsxqDaily==="function") syncZsxqDaily(el);
     else if(act==="social-sync" && typeof syncSocialPlatform==="function") syncSocialPlatform(arg,el);
   });
@@ -6734,7 +6820,7 @@ function renderSections(){
     return;
   }
   if(box) box.innerHTML=freshBar(s.freshness,undefined,curType==="news"||curType==="writing")+
-    (secNote?`<div class="no-note" style="margin:-6px 0 12px">${esc(secNote)}</div>`:"");
+    (secNote?`<div class="no-note fresh-secnote">${esc(secNote)}</div>`:"");
   if(curType==="news") renderNews(s);
   else if(curType==="writing") renderWriting(s);
   else if(curType==="review") renderReview(s);
@@ -10051,6 +10137,142 @@ function renderZsxqDaily(){
   if(foot) foot.textContent=[zsxqDaily.coverageNote||zsxqDaily.dataPolicy||"", zsxqDailyNote].filter(Boolean).join(" · ");
 }
 
+/* ── 星球简报站内详版弹窗（在线/离线通用，免跳新标签页） ── */
+let zsxqDigestCat="全部";
+let zsxqDigestGroup="";
+let zsxqDigestQuery="";
+
+function openZsxqDigestModal(){
+  zsxqDigestCat="全部";
+  zsxqDigestGroup="";
+  zsxqDigestQuery="";
+  const inp=$("zdailyModalSearch"); if(inp) inp.value="";
+  renderZsxqDigestModal();
+  openOv("zsxqDigestOv");
+}
+function setZsxqDigestModalMode(mode){
+  setZsxqDigestMode(mode);
+  zsxqDigestCat="全部";
+  zsxqDigestGroup="";
+  renderZsxqDigestModal();
+}
+function setZsxqDigestCat(cat){ zsxqDigestCat=cat||"全部"; renderZsxqDigestModal(); }
+function setZsxqDigestGroup(g){ zsxqDigestGroup=g||""; renderZsxqDigestModal(); }
+function setZsxqDigestQuery(q){ zsxqDigestQuery=String(q||"").trim().toLowerCase(); renderZsxqDigestModal(); }
+
+function renderZsxqDigestModal(){
+  const body=$("zdailyModalBody"), tag=$("zdailyModalTag"), win=$("zdailyModalWindow"),
+        catsBox=$("zdailyModalCats"), grpSel=$("zdailyModalGroup"), foot=$("zdailyModalFoot"),
+        ext=$("zdailyModalExt");
+  if(!body) return;
+  const bDaily=$("zdailyModalDaily"), bWeekly=$("zdailyModalWeekly");
+  if(bDaily){ bDaily.classList.toggle("on",zsxqDigestMode==="daily"); bDaily.setAttribute("aria-selected",String(zsxqDigestMode==="daily")); }
+  if(bWeekly){ bWeekly.classList.toggle("on",zsxqDigestMode==="weekly"); bWeekly.setAttribute("aria-selected",String(zsxqDigestMode==="weekly")); }
+  if(ext) ext.hidden=!SERVED;
+
+  if(guest){
+    if(tag) tag.textContent="访客模式";
+    if(win) win.textContent="脱敏演示 · 不读本机星球简报";
+    if(catsBox) catsBox.innerHTML="";
+    if(grpSel) grpSel.innerHTML=`<option value="">全部星球</option>`;
+    body.innerHTML=`<div class="zdaily-empty">访客模式下不加载个人知识星球日报/周报快照。</div>`;
+    if(foot) foot.textContent="";
+    return;
+  }
+  if(!zsxqDaily){
+    if(tag) tag.textContent="未生成";
+    if(win) win.textContent="暂无简报快照";
+    if(catsBox) catsBox.innerHTML="";
+    if(grpSel) grpSel.innerHTML=`<option value="">全部星球</option>`;
+    body.innerHTML=`<div class="zdaily-empty">${esc(zsxqDailyErr||"还没有知识星球简报快照：先跑 python3 scripts/sync/zsxq-daily-sync.py。")}</div>`;
+    if(foot) foot.textContent="";
+    return;
+  }
+  const fmtWin=iso=>String(iso||"").replace("T"," ").slice(5,16)||"未知";
+  const isWeekly=zsxqDigestMode==="weekly";
+  const wk=zsxqDaily.weekly||null;
+  if(isWeekly && !wk){
+    if(tag) tag.textContent="待生成周报";
+    if(win) win.textContent="过去 7 天滚动窗口";
+    if(catsBox) catsBox.innerHTML="";
+    body.innerHTML=`<div class="zdaily-empty">当前快照仅含 24h 日报，点击「刷新简报」或运行 <code>python3 scripts/sync/zsxq-daily-sync.py</code> 即可生成 7 天周报。</div>`;
+    if(foot) foot.textContent=[zsxqDaily.coverageNote||zsxqDaily.dataPolicy||"", zsxqDailyNote].filter(Boolean).join(" · ");
+    return;
+  }
+  const rawItems=isWeekly?(Array.isArray(wk.items)?wk.items:[]):(Array.isArray(zsxqDaily.items)?zsxqDaily.items:[]);
+  const ordered=isWeekly && Array.isArray(wk.highlights) && wk.highlights.length
+    ? [...wk.highlights, ...rawItems.filter(it=>!wk.highlights.some(h=>h.id===it.id))]
+    : rawItems;
+  const winStart=isWeekly?wk.windowStart:zsxqDaily.windowStart;
+  const winEnd=isWeekly?wk.windowEnd:zsxqDaily.windowEnd;
+  if(tag) tag.textContent=isWeekly
+    ? `本周 7 天 · 共 ${ordered.length} 条${wk.digestedCount?` · 精华 ${wk.digestedCount}`:""}`
+    : `今日 24h · 共 ${ordered.length} 条`;
+  if(win) win.textContent=`窗口 ${fmtWin(winStart)} → ${fmtWin(winEnd)} · 生成于 ${String(zsxqDaily.generatedAt||"").replace("T"," ").slice(0,16)}`;
+
+  // 分类统计按钮
+  const catCounts={};
+  ordered.forEach(it=>{ const c=it.category||"其他"; catCounts[c]=(catCounts[c]||0)+1; });
+  if(catsBox){
+    const cats=[["全部",ordered.length], ...Object.entries(catCounts).sort((a,b)=>b[1]-a[1])];
+    catsBox.innerHTML=cats.map(([c,n])=>{
+      const arg=esc(c).replace(/'/g,"\\'");
+      return `<button class="zdaily-catbtn${zsxqDigestCat===c?" on":""}" type="button" onclick="setZsxqDigestCat('${arg}')">${esc(c)} ${n}</button>`;
+    }).join("");
+  }
+  // 星球下拉
+  const grpCounts={};
+  ordered.forEach(it=>{ if(it.group) grpCounts[it.group]=(grpCounts[it.group]||0)+1; });
+  if(grpSel){
+    const opts=[`<option value="">全部星球 (${Object.keys(grpCounts).length})</option>`]
+      .concat(Object.entries(grpCounts).sort((a,b)=>b[1]-a[1]).map(([g,n])=>
+        `<option value="${esc(g)}"${zsxqDigestGroup===g?" selected":""}>${esc(g)} (${n})</option>`
+      ));
+    grpSel.innerHTML=opts.join("");
+  }
+
+  const filtered=ordered.filter(it=>{
+    if(zsxqDigestCat!=="全部" && (it.category||"其他")!==zsxqDigestCat) return false;
+    if(zsxqDigestGroup && it.group!==zsxqDigestGroup) return false;
+    if(zsxqDigestQuery){
+      const hay=[it.title,it.summary,it.excerpt,it.preview,it.group,it.author,it.category].join(" ").toLowerCase();
+      if(!hay.includes(zsxqDigestQuery)) return false;
+    }
+    return true;
+  });
+
+  if(!filtered.length){
+    body.innerHTML=`<div class="zdaily-empty">当前筛选条件下没有匹配的简报条目。</div>`;
+  }else{
+    body.innerHTML=filtered.map(it=>{
+      const href=safeUrl(it.url||it.mobileUrl||"");
+      const title=esc(it.title||"无标题");
+      const star=it.digested?`<span class="zdaily-star" title="精华">★ </span>`:"";
+      const link=href?`<a href="${href}" target="_blank" rel="noopener">${star}${title} ↗</a>`:`${star}${title}`;
+      const m=it.metrics||{};
+      const stats=[];
+      if(m.reads!=null) stats.push(`阅 ${m.reads}`);
+      if(m.likes) stats.push(`赞 ${m.likes}`);
+      if(m.comments) stats.push(`评 ${m.comments}`);
+      const excerpt=String(it.summary||it.excerpt||it.preview||"").trim();
+      return `<article class="zdaily-mitem">`+
+        `<div class="zdaily-mitem-top">`+
+          `<div class="zdaily-mitem-title">${link}</div>`+
+          `<span class="zdaily-cat">${esc(it.category||"其他")}</span>`+
+        `</div>`+
+        `<div class="zdaily-mitem-sub">`+
+          (it.group?`<span class="tag">${esc(it.group)}</span>`:"")+
+          (it.author?`<span>${esc(it.author)}</span>`:"")+
+          (it.publishedAt?`<span>${esc(fmtWin(it.publishedAt))}</span>`:"")+
+          (stats.length?`<span>${esc(stats.join(" · "))}</span>`:"")+
+        `</div>`+
+        (excerpt?`<div class="zdaily-mitem-excerpt">${esc(excerpt.slice(0,260))}${excerpt.length>260?"…":""}</div>`:"")+
+      `</article>`;
+    }).join("");
+  }
+  if(foot) foot.textContent=[zsxqDaily.coverageNote||zsxqDaily.dataPolicy||"", zsxqDailyNote].filter(Boolean).join(" · ");
+}
+
 function renderZsxqScreen(){
   renderZsxqDaily();
   const tag=$("zsxqScreenTag"), note=$("zsxqScreenNote"), statsBox=$("zsxqScreenStats");
@@ -10968,6 +11190,7 @@ function renderNews(s){
             ? `${esc(paused.map(f=>f.name).join("、"))} · 已从日常刷新中停用`
             : `${active.length} 个源在最近 ${s.feedStaleDays||100} 天内有更新`}</span></div>
       <div class="news-risk-actions">
+        <button class="btn primary" type="button" id="newsRefreshBtn" onclick="refreshAllFeeds(this)">刷新订阅</button>
         ${dead.length?`<button class="btn" type="button" onclick="focusDeadFeeds()">查看停更源</button>`:""}
         <button class="btn" type="button" onclick="probeFeeds()">探查新源</button>
         <button class="btn" type="button" onclick="openFeedManage()">管理</button>
@@ -13014,6 +13237,30 @@ function openOv(id){
   setTimeout(()=>{if(o.classList.contains("show")) focusModalStart(o);},0);
 }
 function openFeedManage(){ renderFeedManage(); openOv("feedManageOv"); }
+async function refreshAllFeeds(btn){
+  if(guest){ notify("访客模式不刷新真实订阅源。","warn"); return; }
+  if(!SERVED){ notify("刷新订阅需要本地同步服务（请用 127.0.0.1:8787 打开）。","warn"); return; }
+  const b=btn||$("newsRefreshBtn");
+  const old=b?b.textContent:"刷新订阅";
+  if(b){ b.disabled=true; b.textContent="刷新中…"; }
+  try{
+    const r=await fetch("/api/feeds/refresh",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({all:true})
+    });
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok || !j.ok) throw new Error(j.error||("HTTP "+r.status));
+    await loadSections();
+    renderSections();
+    renderTypeBar();
+    const tail=j.failed?`（${j.failed} 个源失败）`:"";
+    notify(`已刷新 ${j.refreshed||0} 个订阅源，新增 ${j.added||0} 条内容${tail}`,"info");
+  }catch(e){
+    notify("刷新订阅失败："+e.message,"err");
+  }finally{
+    if(b){ b.disabled=false; b.textContent=old; }
+  }
+}
 
 /* ---------- 数据来源弹窗 ----------
    把"每个信息源怎么管理"从口头解释变成页面里的一等公民：
@@ -13521,6 +13768,8 @@ let cmdItems=[],cmdActive=0;
 function cmdCommands(){
   const nav=TYPES.map(([id,label])=>({label:"跳到「"+label+"」",hint:"页签",run:()=>setType(id)}));
   const acts=guest?[]:[
+    {label:"打开微信批奏折",hint:"直达",run:()=>{setType("wechat");setWxView("brief");}},
+    {label:"展开星球简报详版",hint:"直达",run:()=>{setType("zsxq");openZsxqDigestModal();}},
     {label:"记一笔收益",hint:"动作",run:openEarn},
     {label:"添加项目",hint:"动作",run:openProj},
     {label:"立即同步 Notion",hint:"动作",run:runSync},

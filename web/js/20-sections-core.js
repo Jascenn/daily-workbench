@@ -904,7 +904,7 @@ function renderSections(){
     return;
   }
   if(box) box.innerHTML=freshBar(s.freshness,undefined,curType==="news"||curType==="writing")+
-    (secNote?`<div class="no-note" style="margin:-6px 0 12px">${esc(secNote)}</div>`:"");
+    (secNote?`<div class="no-note fresh-secnote">${esc(secNote)}</div>`:"");
   if(curType==="news") renderNews(s);
   else if(curType==="writing") renderWriting(s);
   else if(curType==="review") renderReview(s);

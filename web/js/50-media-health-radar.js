@@ -501,6 +501,7 @@ function renderNews(s){
             ? `${esc(paused.map(f=>f.name).join("、"))} · 已从日常刷新中停用`
             : `${active.length} 个源在最近 ${s.feedStaleDays||100} 天内有更新`}</span></div>
       <div class="news-risk-actions">
+        <button class="btn primary" type="button" id="newsRefreshBtn" onclick="refreshAllFeeds(this)">刷新订阅</button>
         ${dead.length?`<button class="btn" type="button" onclick="focusDeadFeeds()">查看停更源</button>`:""}
         <button class="btn" type="button" onclick="probeFeeds()">探查新源</button>
         <button class="btn" type="button" onclick="openFeedManage()">管理</button>

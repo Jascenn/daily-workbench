@@ -334,6 +334,36 @@
   </div>
 </div>
 
+<!-- ── 知识星球简报：站内详版阅读弹窗 ── -->
+<div class="ov" id="zsxqDigestOv" aria-hidden="true">
+  <div class="modal modal-wide zdaily-modal" role="dialog" aria-modal="true" aria-labelledby="zdailyModalTitle">
+    <div class="zdaily-modal-head">
+      <div class="zdaily-modal-titlebox">
+        <h3 id="zdailyModalTitle">星球简报</h3>
+        <span class="tag" id="zdailyModalTag">—</span>
+      </div>
+      <div class="zdaily-modal-actions">
+        <div class="seg zdaily-seg" role="tablist" aria-label="详版简报周期">
+          <button class="segbtn on" id="zdailyModalDaily" type="button" role="tab" aria-selected="true" onclick="setZsxqDigestModalMode('daily')">今日 24h</button>
+          <button class="segbtn" id="zdailyModalWeekly" type="button" role="tab" aria-selected="false" onclick="setZsxqDigestModalMode('weekly')">本周 7 天</button>
+        </div>
+        <a class="zdaily-ext" id="zdailyModalExt" href="/zsxq-daily.html" target="_blank" rel="noopener">新标签页 ↗</a>
+        <button class="btn ghost" type="button" onclick="closeOv('zsxqDigestOv')">关闭</button>
+      </div>
+    </div>
+    <div class="zdaily-modal-meta" id="zdailyModalWindow">—</div>
+    <div class="zdaily-modal-bar">
+      <div class="zdaily-modal-cats" id="zdailyModalCats"></div>
+      <div class="zdaily-modal-controls">
+        <select id="zdailyModalGroup" aria-label="按星球筛选" onchange="setZsxqDigestGroup(this.value)"></select>
+        <input id="zdailyModalSearch" type="search" placeholder="搜索标题、正文或作者…" aria-label="搜索简报内容" oninput="setZsxqDigestQuery(this.value)">
+      </div>
+    </div>
+    <div class="zdaily-modal-list" id="zdailyModalBody"></div>
+    <div class="zdaily-modal-foot" id="zdailyModalFoot"></div>
+  </div>
+</div>
+
 <!-- ── 微信批奏折：只读回应草稿与原文核对弹窗 ── -->
 <div class="ov" id="wxReplyOv" aria-hidden="true">
   <div class="modal wx-modal" role="dialog" aria-modal="true" aria-labelledby="wxReplyTitle">

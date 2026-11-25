@@ -309,6 +309,8 @@ let cmdItems=[],cmdActive=0;
 function cmdCommands(){
   const nav=TYPES.map(([id,label])=>({label:"跳到「"+label+"」",hint:"页签",run:()=>setType(id)}));
   const acts=guest?[]:[
+    {label:"打开微信批奏折",hint:"直达",run:()=>{setType("wechat");setWxView("brief");}},
+    {label:"展开星球简报详版",hint:"直达",run:()=>{setType("zsxq");openZsxqDigestModal();}},
     {label:"记一笔收益",hint:"动作",run:openEarn},
     {label:"添加项目",hint:"动作",run:openProj},
     {label:"立即同步 Notion",hint:"动作",run:runSync},
