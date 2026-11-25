@@ -26,16 +26,16 @@
     font-size:16px; line-height:1.75;
     -webkit-font-smoothing:antialiased;
   }
-  .wrap{max-width:960px; margin:0 auto; padding:0 24px;}
-  header{padding:96px 0 64px;}
+  .wrap{max-width:980px; margin:0 auto; padding:0 24px;}
+  header{padding:88px 0 56px;}
   .brand{display:flex; align-items:baseline; gap:12px; margin-bottom:20px; flex-wrap:wrap;}
-  .brand .logo{font-size:13px; letter-spacing:.18em; font-weight:600; color:var(--muted); text-transform:uppercase;}
+  .brand .logo{font-family:Georgia,"Times New Roman",serif; font-style:italic; font-size:15px; letter-spacing:.14em; color:var(--muted);}
   .brand h1{font-size:30px; font-weight:700; letter-spacing:-.01em;}
-  .brand .ver{font-size:12px; font-weight:600; color:var(--muted); border:1px solid var(--line); background:var(--card); padding:1px 8px; border-radius:999px;}
-  .tagline{font-size:22px; font-weight:600; line-height:1.6; max-width:660px; margin-bottom:16px;}
-  .sub{color:var(--muted); max-width:660px;}
+  .brand .ver{font-size:12px; font-weight:600; color:var(--muted); border:1px solid var(--line); background:var(--card); padding:1px 9px; border-radius:999px;}
+  .tagline{font-size:22px; font-weight:600; line-height:1.6; max-width:680px; margin-bottom:16px;}
+  .sub{color:var(--muted); max-width:680px;}
   .sub strong{color:var(--ink); font-weight:600;}
-  .pills{display:flex; flex-wrap:wrap; gap:8px; margin-top:28px;}
+  .pills{display:flex; flex-wrap:wrap; gap:8px; margin-top:26px;}
   .pill{
     font-size:13px; padding:4px 12px; border:1px solid var(--line);
     border-radius:999px; background:var(--card); color:var(--muted);
@@ -43,7 +43,7 @@
   section{padding:48px 0;}
   section + section{border-top:1px solid var(--line);}
   .eyebrow{font-size:13px; color:var(--muted); margin-bottom:8px;}
-  h2{font-size:24px; font-weight:700; margin-bottom:28px; letter-spacing:-.01em;}
+  h2{font-size:24px; font-weight:700; margin-bottom:26px; letter-spacing:-.01em;}
   .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px;}
   .feature{
     background:var(--card); border:1px solid var(--line); border-radius:12px;
@@ -51,11 +51,20 @@
   }
   .feature h3{font-size:16px; font-weight:600; margin-bottom:6px;}
   .feature p{font-size:15px; color:var(--muted);}
-  .shots{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
-  @media (max-width:720px){ .shots{grid-template-columns:1fr;} }
-  figure{background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden;}
+  .shots{display:grid; grid-template-columns:1fr 1fr; gap:18px;}
+  @media (max-width:760px){ .shots{grid-template-columns:1fr;} }
+  figure{background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; transition:border-color .15s;}
+  figure:hover{border-color:var(--muted);}
+  figure a{display:block; text-decoration:none; color:inherit;}
   figure img{width:100%; display:block;}
-  figcaption{font-size:13px; color:var(--muted); padding:10px 14px; border-top:1px solid var(--line);}
+  figcaption{font-size:13px; color:var(--muted); padding:10px 14px; border-top:1px solid var(--line); display:flex; justify-content:space-between; gap:8px;}
+  figcaption b{color:var(--ink); font-weight:600;}
+  .changelog-list{display:flex; flex-direction:column; border-top:1px solid var(--line);}
+  .cl-row{display:grid; grid-template-columns:110px 1fr; gap:16px; padding:14px 0; border-bottom:1px solid var(--line); font-size:15px;}
+  @media (max-width:600px){ .cl-row{grid-template-columns:1fr; gap:4px;} }
+  .cl-ver{font-weight:700; color:var(--ink); font-size:14px;}
+  .cl-desc{color:var(--muted);}
+  .cl-desc strong{color:var(--ink); font-weight:600;}
   ol{padding-left:0; list-style:none; counter-reset:step;}
   ol li{
     counter-increment:step; display:flex; gap:14px; align-items:baseline;
@@ -121,13 +130,25 @@
   </section>
 
   <section id="screenshots">
-    <p class="eyebrow">截图</p>
-    <h2>访客模式下的样子</h2>
+    <p class="eyebrow">实机截图 · v1.2.1</p>
+    <h2>访客模式下的样子（点击看大图）</h2>
     <div class="shots">
-      <figure><img src="screenshots/overview.png" alt="总览页截图" loading="lazy"><figcaption>总览 · 今日优先级与经营体检</figcaption></figure>
-      <figure><img src="screenshots/projects.png" alt="项目页截图" loading="lazy"><figcaption>项目 · 看板视图与需要处理</figcaption></figure>
-      <figure><img src="screenshots/news.png" alt="资讯页截图" loading="lazy"><figcaption>资讯 · 今日阅读与订阅源健康</figcaption></figure>
-      <figure><img src="screenshots/time.png" alt="时间页截图" loading="lazy"><figcaption>时间 · 番茄钟与世界时钟</figcaption></figure>
+      <figure><a href="screenshots/overview.png" target="_blank" rel="noopener"><img src="screenshots/overview.png" alt="总览页截图" loading="lazy"><figcaption><b>总览</b><span>今日三件事 · 晨间速览 · 经营证据</span></figcaption></a></figure>
+      <figure><a href="screenshots/wechat.png" target="_blank" rel="noopener"><img src="screenshots/wechat.png" alt="微信批奏折截图" loading="lazy"><figcaption><b>微信 · 批奏折</b><span>增量进展 · 自动重浮 · 只读草稿</span></figcaption></a></figure>
+      <figure><a href="screenshots/projects.png" target="_blank" rel="noopener"><img src="screenshots/projects.png" alt="项目页截图" loading="lazy"><figcaption><b>项目</b><span>看板视图 · 逾期预警 · 白名单回写</span></figcaption></a></figure>
+      <figure><a href="screenshots/news.png" target="_blank" rel="noopener"><img src="screenshots/news.png" alt="资讯页截图" loading="lazy"><figcaption><b>资讯</b><span>一键刷新订阅 · 选题雷达 · 源健康</span></figcaption></a></figure>
+      <figure><a href="screenshots/writing.png" target="_blank" rel="noopener"><img src="screenshots/writing.png" alt="写作页截图" loading="lazy"><figcaption><b>写作</b><span>Obsidian 原生 Markdown · 章节进度</span></figcaption></a></figure>
+      <figure><a href="screenshots/time.png" target="_blank" rel="noopener"><img src="screenshots/time.png" alt="时间页截图" loading="lazy"><figcaption><b>时间</b><span>番茄钟专注 · 世界时钟 · 工时记录</span></figcaption></a></figure>
+    </div>
+  </section>
+
+  <section id="releases">
+    <p class="eyebrow">持续迭代</p>
+    <h2>近期版本亮点</h2>
+    <div class="changelog-list">
+      <div class="cl-row"><div class="cl-ver">v1.2.1</div><div class="cl-desc"><strong>站内详版弹窗与 UI/UX 精修</strong>：知识星球简报支持站内宽弹窗（离线直开）、磨砂吸顶导航与 ⌘K 直达、资讯页一键「刷新订阅」、全站弹窗 160ms 微动效。</div></div>
+      <div class="cl-row"><div class="cl-ver">v1.2.0</div><div class="cl-desc"><strong>微信「批奏折」统一流</strong>：宽屏双列发丝线归并待办/商机/咨询/群提醒/白名单群选题，支持跨轮次进展 Diff、新消息自动重浮与只读三口吻草稿复制。</div></div>
+      <div class="cl-row"><div class="cl-ver">v1.1.0</div><div class="cl-desc"><strong>模块化架构与安全加固</strong>：前后端按领域拆包（零外部构建依赖 + CSS 0/0 门禁）、HttpOnly 会话 Cookie 与 CSP 安全头、DAG 并行同步与星球 24h/7 天双视图简报。</div></div>
     </div>
   </section>
 
@@ -145,7 +166,7 @@
     </p>
     <div class="links">
       <a href="https://github.com/Jascenn/daily-workbench">GitHub 仓库</a>
-      <a href="https://github.com/Jascenn/daily-workbench/blob/main/CHANGELOG.md">更新日志</a>
+      <a href="https://github.com/Jascenn/daily-workbench/blob/main/CHANGELOG.md">完整更新日志</a>
       <a href="https://github.com/Jascenn/daily-workbench/blob/main/SECURITY.md">安全说明</a>
       <a href="https://github.com/Jascenn/daily-workbench/blob/main/LICENSE">LICENSE</a>
     </div>
