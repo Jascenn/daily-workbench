@@ -1,5 +1,7 @@
 # 每日工作台（Daily Workbench）
 
+> **官网**：[https://workbench.lingyi.tools/](https://workbench.lingyi.tools/) · **更新日志**：[CHANGELOG.md](CHANGELOG.md)
+
 本地优先的个人经营工作台：Notion 数据同步 + 白名单回写 + 本地草稿，覆盖收益、项目、客户、时间、资讯、写作、自媒体运营、知识库与复盘。
 
 > **仓库说明**：这是 `daily-workbench` 的开源脱敏公开版（`v1.1.0`）。所有真实数据、客户信息、私有数据库 ID 与本机配置均不入库，可通过环境变量或 `~/.config/daily-workbench/` 本地配置接入。
