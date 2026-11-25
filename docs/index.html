@@ -3,177 +3,655 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>每日工作台 · 本地优先的个人经营工作台</title>
-<meta name="description" content="本地优先的个人经营工作台：Notion 数据同步 + 白名单回写 + 微信只读批奏折 + 知识星球简报，覆盖收益、项目、客户、微信、时间、资讯、写作、自媒体运营与复盘。">
+<title>LingYi · 每日工作台 — 本地优先的个人经营工作台</title>
+<meta name="description" content="本地优先的个人经营工作台：Notion 数据同步 + 白名单回写 + 微信只读批奏折 + 知识星球简报，零外部构建依赖，覆盖收益、项目、客户、微信、时间、资讯、写作、自媒体运营与复盘。">
 <link rel="canonical" href="https://workbench.lingyi.tools/">
+<meta property="og:title" content="LingYi · 每日工作台 — 本地优先的个人经营工作台">
+<meta property="og:description" content="把一天的经营、行动与消息，收拢进一张本地工作台。零外部构建依赖，数据完全归你自己。">
+<meta property="og:url" content="https://workbench.lingyi.tools/">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://workbench.lingyi.tools/screenshots/overview.png">
 <style>
   :root{
     --bg:#f7f4ef; --card:#ffffff; --ink:#1b2330; --muted:#5c6675;
-    --line:#e5dfd7; --wash:#f1ede7; --accent:#1b2330;
-    --pos:#0f7a37; --warn:#a15c00;
+    --line:#e5dfd7; --line-strong:#9aa2ae; --wash:#f1ede7;
+    --accent:#1b2330; --accent-hover:#3d4656;
+    --ok:#0f7a37; --warn:#a15c00; --pos:#c8292c;
+    --sticky-bg:rgba(247,244,239,.86);
+    --shadow-sm:0 1px 2px rgba(20,30,60,.04),0 6px 18px rgba(20,30,60,.04);
+    --shadow-win:0 2px 6px rgba(20,30,60,.06),0 20px 56px rgba(20,30,60,.11);
+    --code-bg:#141b28; --code-fg:#e7ecf5;
+    --radius-sm:6px; --radius-md:10px; --radius-lg:16px; --radius-full:999px;
   }
-  @media (prefers-color-scheme: dark){
-    :root{
-      --bg:#0f1420; --card:#161d2c; --ink:#e7ecf5; --muted:#a7b2c7;
-      --line:#2d3b57; --wash:#1a2233; --accent:#e7ecf5;
-    }
+  [data-theme="dark"]{
+    --bg:#0f1420; --card:#161d2c; --ink:#e7ecf5; --muted:#a7b2c7;
+    --line:#2a3752; --line-strong:#5d6c88; --wash:#1a2233;
+    --accent:#e7ecf5; --accent-hover:#c3cbdb;
+    --ok:#4ade80; --warn:#fbbf24; --pos:#ff6b6e;
+    --sticky-bg:rgba(15,20,32,.86);
+    --shadow-sm:0 1px 3px rgba(0,0,0,.28),0 6px 20px rgba(0,0,0,.24);
+    --shadow-win:0 8px 28px rgba(0,0,0,.45),0 28px 64px rgba(0,0,0,.45);
+    --code-bg:#0a0e17; --code-fg:#e7ecf5;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
   html{scroll-behavior:smooth;}
   body{
-    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
     background:var(--bg); color:var(--ink);
-    font-size:16px; line-height:1.75;
+    font-size:15px; line-height:1.7;
+    font-variant-numeric:tabular-nums;
     -webkit-font-smoothing:antialiased;
   }
-  .wrap{max-width:980px; margin:0 auto; padding:0 24px;}
-  header{padding:88px 0 56px;}
-  .brand{display:flex; align-items:baseline; gap:12px; margin-bottom:20px; flex-wrap:wrap;}
-  .brand .logo{font-family:Georgia,"Times New Roman",serif; font-style:italic; font-size:15px; letter-spacing:.14em; color:var(--muted);}
-  .brand h1{font-size:30px; font-weight:700; letter-spacing:-.01em;}
-  .brand .ver{font-size:12px; font-weight:600; color:var(--muted); border:1px solid var(--line); background:var(--card); padding:1px 9px; border-radius:999px;}
-  .tagline{font-size:22px; font-weight:600; line-height:1.6; max-width:680px; margin-bottom:16px;}
-  .sub{color:var(--muted); max-width:680px;}
-  .sub strong{color:var(--ink); font-weight:600;}
-  .pills{display:flex; flex-wrap:wrap; gap:8px; margin-top:26px;}
-  .pill{
-    font-size:13px; padding:4px 12px; border:1px solid var(--line);
-    border-radius:999px; background:var(--card); color:var(--muted);
+  a{color:inherit;}
+  .wrap{max-width:1080px; margin:0 auto; padding:0 24px;}
+
+  /* ── 1:1 复刻工作台原生品牌字样 ── */
+  .brand{display:inline-flex; align-items:center; gap:10px; text-decoration:none; color:var(--ink);}
+  .brand-word{font-family:Georgia,'Times New Roman',serif; font-variant:small-caps; font-style:italic; letter-spacing:.14em; font-weight:400; font-size:20px; line-height:1;}
+  .brand-sep{width:1px; height:20px; background:var(--line-strong); opacity:.55; display:inline-block;}
+  .brand-name{font-size:19px; font-weight:700; letter-spacing:.3px; line-height:1;}
+
+  /* ── 顶部吸顶磨砂导航 ── */
+  .topbar{
+    position:sticky; top:0; z-index:40;
+    background:var(--sticky-bg);
+    backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--line);
   }
-  section{padding:48px 0;}
-  section + section{border-top:1px solid var(--line);}
-  .eyebrow{font-size:13px; color:var(--muted); margin-bottom:8px;}
-  h2{font-size:24px; font-weight:700; margin-bottom:26px; letter-spacing:-.01em;}
-  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px;}
-  .feature{
-    background:var(--card); border:1px solid var(--line); border-radius:12px;
-    padding:20px 22px;
+  .topbar-in{
+    max-width:1080px; margin:0 auto; padding:12px 24px;
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
   }
-  .feature h3{font-size:16px; font-weight:600; margin-bottom:6px;}
-  .feature p{font-size:15px; color:var(--muted);}
-  .shots{display:grid; grid-template-columns:1fr 1fr; gap:18px;}
-  @media (max-width:760px){ .shots{grid-template-columns:1fr;} }
-  figure{background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; transition:border-color .15s;}
-  figure:hover{border-color:var(--muted);}
-  figure a{display:block; text-decoration:none; color:inherit;}
-  figure img{width:100%; display:block;}
-  figcaption{font-size:13px; color:var(--muted); padding:10px 14px; border-top:1px solid var(--line); display:flex; justify-content:space-between; gap:8px;}
-  figcaption b{color:var(--ink); font-weight:600;}
-  .changelog-list{display:flex; flex-direction:column; border-top:1px solid var(--line);}
-  .cl-row{display:grid; grid-template-columns:110px 1fr; gap:16px; padding:14px 0; border-bottom:1px solid var(--line); font-size:15px;}
-  @media (max-width:600px){ .cl-row{grid-template-columns:1fr; gap:4px;} }
-  .cl-ver{font-weight:700; color:var(--ink); font-size:14px;}
-  .cl-desc{color:var(--muted);}
-  .cl-desc strong{color:var(--ink); font-weight:600;}
-  ol{padding-left:0; list-style:none; counter-reset:step;}
-  ol li{
-    counter-increment:step; display:flex; gap:14px; align-items:baseline;
-    padding:14px 0; border-bottom:1px solid var(--line); font-size:15px;
+  .nav-links{display:flex; align-items:center; gap:22px; font-size:14px; color:var(--muted);}
+  .nav-links a{text-decoration:none; transition:color .14s;}
+  .nav-links a:hover{color:var(--ink);}
+  .nav-acts{display:flex; align-items:center; gap:8px;}
+  .btn{
+    display:inline-flex; align-items:center; gap:6px;
+    font:inherit; font-size:13px; font-weight:600; text-decoration:none;
+    padding:7px 14px; border-radius:var(--radius-sm); cursor:pointer;
+    border:1px solid var(--line); background:var(--card); color:var(--ink);
+    transition:border-color .14s, background-color .14s;
   }
-  ol li:last-child{border-bottom:none;}
-  ol li::before{
-    content:counter(step); flex:none; width:24px; height:24px;
-    border-radius:999px; background:var(--wash); color:var(--muted);
-    font-size:13px; font-weight:600; display:inline-flex;
-    align-items:center; justify-content:center; transform:translateY(3px);
+  .btn:hover{border-color:var(--line-strong);}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:var(--bg);}
+  .btn.primary:hover{background:var(--accent-hover); border-color:var(--accent-hover);}
+  .btn.ghost{background:transparent;}
+  @media (max-width:860px){ .nav-links{display:none;} }
+
+  /* ── Hero 首屏（UI-as-Hero） ── */
+  .hero{padding:64px 0 40px; text-align:center;}
+  .hero-badge{
+    display:inline-flex; align-items:center; gap:8px;
+    font-size:12px; font-weight:600; color:var(--muted);
+    background:var(--card); border:1px solid var(--line);
+    padding:4px 12px; border-radius:var(--radius-full); margin-bottom:20px;
+    text-decoration:none; transition:border-color .14s;
   }
-  code{
-    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:14px;
-    background:var(--wash); border:1px solid var(--line); border-radius:6px;
-    padding:2px 7px; white-space:nowrap;
+  .hero-badge:hover{border-color:var(--line-strong); color:var(--ink);}
+  .hero-badge i{width:7px; height:7px; border-radius:999px; background:var(--ok); display:inline-block;}
+  .hero h1{
+    font-size:clamp(30px,4.4vw,46px); font-weight:750; line-height:1.22;
+    letter-spacing:-.025em; max-width:780px; margin:0 auto 16px;
   }
-  .note{font-size:15px; color:var(--muted); margin-top:20px;}
-  .links{display:flex; flex-wrap:wrap; gap:12px; margin-top:28px;}
-  .links a{
-    font-size:15px; color:var(--ink); text-decoration:none;
-    border:1px solid var(--line); background:var(--card);
-    border-radius:8px; padding:8px 16px; transition:background .15s;
+  .hero-sub{
+    font-size:16px; color:var(--muted); max-width:640px; margin:0 auto 26px; line-height:1.75;
   }
-  .links a:hover{background:var(--wash);}
-  footer{border-top:1px solid var(--line); padding:36px 0 64px; color:var(--muted); font-size:14px;}
-  footer a{color:var(--muted);}
+  .hero-sub strong{color:var(--ink); font-weight:600;}
+  .hero-cta{display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap; margin-bottom:18px;}
+  .hero-cta .btn{padding:10px 18px; font-size:14px; border-radius:var(--radius-md);}
+
+  /* 一键复制启动指令条 */
+  .cmd-pill{
+    display:inline-flex; align-items:center; gap:10px; max-width:100%;
+    padding:7px 10px 7px 14px; border-radius:var(--radius-md);
+    background:var(--card); border:1px solid var(--line);
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px; color:var(--muted);
+    margin-bottom:36px;
+  }
+  .cmd-pill span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:520px;}
+  .cmd-pill b{color:var(--ink); font-weight:600;}
+  .copy-btn{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;
+    font-size:12px; font-weight:600; color:var(--ink);
+    background:var(--wash); border:1px solid var(--line); border-radius:var(--radius-sm);
+    padding:3px 9px; cursor:pointer; flex:none;
+  }
+  .copy-btn:hover{border-color:var(--line-strong);}
+
+  /* ── 交互式 6 视角产品窗口 ── */
+  .stage-tabs{
+    display:inline-flex; align-items:center; gap:3px; padding:4px;
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius-md);
+    margin-bottom:14px; max-width:100%; overflow-x:auto;
+  }
+  .stab{
+    font:inherit; font-size:13px; font-weight:600; color:var(--muted);
+    background:transparent; border:0; border-radius:var(--radius-sm);
+    padding:6px 13px; cursor:pointer; white-space:nowrap;
+    transition:background-color .14s, color .14s;
+  }
+  .stab:hover{color:var(--ink); background:var(--wash);}
+  .stab.on{background:var(--accent); color:var(--bg);}
+  .win-frame{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-win); overflow:hidden; text-align:left;
+  }
+  .win-bar{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:10px 16px; background:var(--wash); border-bottom:1px solid var(--line);
+    font-size:12px; color:var(--muted);
+  }
+  .win-dots{display:flex; gap:6px;}
+  .win-dots i{width:10px; height:10px; border-radius:999px; background:var(--line-strong); opacity:.45; display:block;}
+  .win-caption{flex:1; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .win-caption b{color:var(--ink);}
+  .win-img-wrap{position:relative; cursor:zoom-in; background:var(--bg);}
+  .win-img-wrap img{display:block; width:100%; height:auto;}
+
+  /* ── 通用区块 ── */
+  section.sec{padding:64px 0; border-top:1px solid var(--line);}
+  .sec-eyebrow{font-size:12px; font-weight:700; color:var(--muted); letter-spacing:.08em; text-transform:uppercase; margin-bottom:8px;}
+  .sec-head{display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:28px;}
+  .sec h2{font-size:26px; font-weight:750; letter-spacing:-.02em; line-height:1.3;}
+  .sec-lead{font-size:15px; color:var(--muted); max-width:560px;}
+
+  /* ── Bento 差异化网格 ── */
+  .bento{display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:14px;}
+  .bcard{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius-lg);
+    padding:22px 24px; box-shadow:var(--shadow-sm); display:flex; flex-direction:column; gap:8px;
+  }
+  .bcard.span3{grid-column:span 3;}
+  .bcard.span2{grid-column:span 2;}
+  .bcard.span6{grid-column:span 6;}
+  .bcard-k{font-size:12px; font-weight:700; color:var(--muted); display:flex; align-items:center; justify-content:space-between;}
+  .bcard h3{font-size:18px; font-weight:700; letter-spacing:-.01em;}
+  .bcard p{font-size:14px; color:var(--muted); line-height:1.68;}
+  .bcard .mini-tags{display:flex; flex-wrap:wrap; gap:6px; margin-top:auto; padding-top:8px;}
+  .bcard .mini-tags span{font-size:12px; color:var(--muted); background:var(--bg); border:1px solid var(--line); border-radius:var(--radius-full); padding:1px 9px;}
+  .module-matrix{
+    display:grid; grid-template-columns:repeat(3,minmax(0,1fr));
+    border-top:1px solid var(--line); margin-top:8px;
+  }
+  .mitem{padding:14px 16px 10px 0; border-bottom:1px solid var(--line); border-right:1px solid var(--line);}
+  .mitem:nth-child(3n){border-right:0; padding-right:0;}
+  .mitem:nth-child(3n+2),.mitem:nth-child(3n){padding-left:16px;}
+  .mitem:nth-last-child(-n+3){border-bottom:0;}
+  .mitem b{display:block; font-size:15px; margin-bottom:3px;}
+  .mitem span{font-size:13.5px; color:var(--muted); line-height:1.55; display:block;}
+  @media (max-width:860px){
+    .bcard.span3,.bcard.span2{grid-column:span 6;}
+    .module-matrix{grid-template-columns:1fr;}
+    .mitem,.mitem:nth-child(3n+2),.mitem:nth-child(3n){border-right:0; padding:12px 0;}
+    .mitem:nth-last-child(-n+3){border-bottom:1px solid var(--line);}
+    .mitem:last-child{border-bottom:0;}
+  }
+
+  /* ── 数据边界与信任架构 ── */
+  .trust-grid{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px;}
+  .tcard{background:var(--card); border:1px solid var(--line); border-radius:var(--radius-lg); padding:22px;}
+  .tcard-badge{display:inline-block; font-size:12px; font-weight:700; padding:2px 9px; border-radius:var(--radius-full); margin-bottom:10px; border:1px solid var(--line); background:var(--bg);}
+  .tcard-badge.ok{color:var(--ok); border-color:var(--ok);}
+  .tcard-badge.warn{color:var(--warn); border-color:var(--warn);}
+  .tcard h3{font-size:17px; margin-bottom:8px;}
+  .tcard ul{list-style:none; display:flex; flex-direction:column; gap:6px; font-size:14px; color:var(--muted);}
+  .tcard li::before{content:"· "; color:var(--ink); font-weight:700;}
+  @media (max-width:820px){ .trust-grid{grid-template-columns:1fr;} }
+
+  /* ── 快速开始（三场景 Tab + 代码块 + 环境要求） ── */
+  .qs-card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius-lg); padding:22px 24px; box-shadow:var(--shadow-sm);}
+  .qs-tabs{display:flex; gap:6px; flex-wrap:wrap; padding-bottom:14px; margin-bottom:16px; border-bottom:1px solid var(--line);}
+  .qtab{
+    font:inherit; font-size:13.5px; font-weight:600; color:var(--muted);
+    background:var(--bg); border:1px solid var(--line); border-radius:var(--radius-sm);
+    padding:6px 13px; cursor:pointer;
+  }
+  .qtab.on{background:var(--accent); color:var(--bg); border-color:var(--accent);}
+  .qs-panel[hidden]{display:none;}
+  .qs-steps{display:grid; grid-template-columns:1.2fr .8fr; gap:20px; align-items:start;}
+  @media (max-width:820px){ .qs-steps{grid-template-columns:1fr;} }
+  .codebox{
+    position:relative; background:var(--code-bg); color:var(--code-fg);
+    border-radius:var(--radius-md); padding:16px 18px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px; line-height:1.7;
+    overflow-x:auto;
+  }
+  .codebox .copy-btn{position:absolute; top:10px; right:10px; background:rgba(255,255,255,.12); color:#fff; border-color:rgba(255,255,255,.2);}
+  .qs-notes{display:flex; flex-direction:column; gap:10px; font-size:14px; color:var(--muted);}
+  .qs-notes b{color:var(--ink);}
+  .req-strip{
+    display:flex; flex-wrap:wrap; gap:10px 22px; margin-top:16px; padding-top:14px;
+    border-top:1px dashed var(--line); font-size:13px; color:var(--muted);
+  }
+  .req-strip b{color:var(--ink);}
+
+  /* ── FAQ & 更新日志 ── */
+  .two-col{display:grid; grid-template-columns:1.15fr .85fr; gap:24px; align-items:start;}
+  @media (max-width:860px){ .two-col{grid-template-columns:1fr;} }
+  .faq-list{border-top:1px solid var(--line);}
+  .faq-list details{border-bottom:1px solid var(--line); padding:13px 0;}
+  .faq-list summary{cursor:pointer; list-style:none; font-weight:600; font-size:15px; display:flex; justify-content:space-between; align-items:center; gap:12px;}
+  .faq-list summary::-webkit-details-marker{display:none;}
+  .faq-list summary::after{content:"＋"; color:var(--muted); font-size:16px;}
+  .faq-list details[open] summary::after{content:"－";}
+  .faq-list p{margin-top:8px; font-size:14px; color:var(--muted); line-height:1.68;}
+
+  .cl-box{background:var(--card); border:1px solid var(--line); border-radius:var(--radius-lg); padding:18px 20px;}
+  .cl-item{padding:12px 0; border-bottom:1px solid var(--line);}
+  .cl-item:first-child{padding-top:2px;}
+  .cl-item:last-child{border-bottom:0; padding-bottom:2px;}
+  .cl-top{display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;}
+  .cl-ver{font-weight:700; font-size:14px;}
+  .cl-date{font-size:12px; color:var(--muted);}
+  .cl-item p{font-size:13.5px; color:var(--muted); line-height:1.6;}
+  .cl-more{display:inline-block; margin-top:12px; font-size:13px; font-weight:600; text-decoration:underline; text-underline-offset:3px;}
+
+  /* ── 完整多列产品页脚 ── */
+  footer{border-top:1px solid var(--line); padding:52px 0 44px; background:var(--card);}
+  .foot-grid{display:grid; grid-template-columns:1.6fr 1fr 1fr 1fr 1fr; gap:24px;}
+  @media (max-width:860px){ .foot-grid{grid-template-columns:repeat(2,1fr);} }
+  @media (max-width:520px){ .foot-grid{grid-template-columns:1fr;} }
+  .foot-brand p{font-size:13.5px; color:var(--muted); margin-top:12px; max-width:280px; line-height:1.65;}
+  .foot-col h4{font-size:13px; font-weight:700; color:var(--ink); margin-bottom:10px;}
+  .foot-col ul{list-style:none; display:flex; flex-direction:column; gap:7px; font-size:13.5px; color:var(--muted);}
+  .foot-col a{text-decoration:none; transition:color .14s;}
+  .foot-col a:hover{color:var(--ink); text-decoration:underline; text-underline-offset:3px;}
+  .foot-bottom{
+    margin-top:34px; padding-top:18px; border-top:1px solid var(--line);
+    display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
+    font-size:12.5px; color:var(--muted);
+  }
+
+  /* 全屏截图灯箱 */
+  .lightbox{
+    position:fixed; inset:0; z-index:80; background:rgba(10,16,30,.78);
+    display:none; align-items:center; justify-content:center; padding:24px; cursor:zoom-out;
+  }
+  .lightbox.open{display:flex;}
+  .lightbox img{max-width:min(1260px,96vw); max-height:92vh; border-radius:var(--radius-md); box-shadow:var(--shadow-win);}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div class="brand"><span class="logo">LingYi</span><h1>每日工作台</h1><span class="ver">v1.2.1</span></div>
-    <p class="tagline">本地优先的个人经营工作台</p>
-    <p class="sub">
-      数据只读拉取自 <strong>Notion / 微信 MCP / 自有订阅库</strong>，回写走<strong>白名单动作</strong>，草稿与计时只存本地。
-      一个页面看清楚：总览、项目、客户、微信批奏折、时间、资讯、写作、自媒体与复盘。
+
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="#">
+      <span class="brand-word">LingYi</span>
+      <span class="brand-sep" aria-hidden="true"></span>
+      <span class="brand-name">每日工作台</span>
+    </a>
+    <nav class="nav-links" aria-label="主导航">
+      <a href="#preview">交互预览</a>
+      <a href="#features">核心能力</a>
+      <a href="#trust">数据边界</a>
+      <a href="#quickstart">快速开始</a>
+      <a href="#faq">常见问题</a>
+      <a href="https://lingyi.me/" target="_blank" rel="noopener">作者博客 ↗</a>
+    </nav>
+    <div class="nav-acts">
+      <button class="btn ghost" id="themeBtn" type="button" onclick="toggleSiteTheme()">深色</button>
+      <a class="btn primary" href="https://github.com/Jascenn/daily-workbench" target="_blank" rel="noopener">GitHub ↗</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- ══ Hero：UI-as-Hero + 交互式 6 视角产品窗口 ══ -->
+  <section class="hero" id="preview">
+    <a class="hero-badge" href="#releases"><i></i> v1.2.1 已发布 · 微信批奏折 & 星球简报详版弹窗 →</a>
+    <h1>把一天的经营、行动与消息，<br>收拢进一张本地工作台。</h1>
+    <p class="hero-sub">
+      面向一人公司与独立开发者的<strong>本地优先经营工作台</strong>。
+      纯 Python 标准库驱动、零外部构建依赖；数据只读拉取自 <strong>Notion / 微信 MCP / 自有订阅库</strong>，写回严格走白名单，所有草稿与记录留在你自己的硬盘里。
     </p>
-    <div class="pills">
-      <span class="pill">本地优先</span>
-      <span class="pill">零构建依赖</span>
-      <span class="pill">Notion 白名单回写</span>
-      <span class="pill">微信只读批奏折</span>
-      <span class="pill">星球 24h / 7 天简报</span>
-      <span class="pill">访客脱敏模式</span>
+    <div class="hero-cta">
+      <a class="btn primary" href="#quickstart">30 秒本地跑起来</a>
+      <a class="btn" href="https://github.com/Jascenn/daily-workbench" target="_blank" rel="noopener">查看开源代码</a>
+      <a class="btn ghost" href="https://github.com/Jascenn/daily-workbench/blob/main/CHANGELOG.md" target="_blank" rel="noopener">完整更新日志</a>
     </div>
-  </header>
+    <div class="cmd-pill">
+      <span>$ <b>git clone https://github.com/Jascenn/daily-workbench.git && cd daily-workbench && python3 app.py</b></span>
+      <button class="copy-btn" type="button" onclick="copyText(this,'git clone https://github.com/Jascenn/daily-workbench.git && cd daily-workbench && python3 app.py')">复制</button>
+    </div>
 
-  <section id="features">
-    <p class="eyebrow">九个视角</p>
-    <h2>每类事各有一个专注视角</h2>
-    <div class="grid">
-      <div class="feature"><h3>总览</h3><p>今天先做三件事、晨间速览（微信 / 雷达 / 星球）、经营体检、月度目标与当日时间线，一眼定优先级。</p></div>
-      <div class="feature"><h3>项目</h3><p>看板 / 树状 / 日历三种视图，逾期与状态冲突直接标出，支持白名单回写 Notion。</p></div>
-      <div class="feature"><h3>客户</h3><p>客户跟进、需求与收款节奏，跟进记录与 Notion 数据库联动。</p></div>
-      <div class="feature"><h3>微信 · 批奏折</h3><p>本地 MCP 只读快照 + 增量进展对比，支持已阅/已处理自动重浮、白名单群选题与只读三口吻草稿复制。</p></div>
-      <div class="feature"><h3>时间</h3><p>番茄钟专注、按项目工时与世界时钟，计时记录可单条回写。</p></div>
-      <div class="feature"><h3>资讯</h3><p>自有订阅库健康检查、一键刷新订阅、选题雷达与博客级站内阅读排版。</p></div>
-      <div class="feature"><h3>写作</h3><p>Obsidian 原生 Markdown 工作流：本地写作、章节进度与版本备份。</p></div>
-      <div class="feature"><h3>自媒体与星球</h3><p>公众号、X、小红书与知识星球一站式运营，内置 24h 日报 / 7 天周报站内详版弹窗。</p></div>
-      <div class="feature"><h3>复盘</h3><p>按周 / 月沉淀调试与经营复盘笔记，复用清晰阅读排版随时回查。</p></div>
+    <!-- 交互式 6 视角切换器 -->
+    <div>
+      <div class="stage-tabs" role="tablist" aria-label="工作台视角预览">
+        <button class="stab on" type="button" data-shot="overview" onclick="pickShot('overview',this)">总览</button>
+        <button class="stab" type="button" data-shot="wechat" onclick="pickShot('wechat',this)">微信 · 批奏折</button>
+        <button class="stab" type="button" data-shot="projects" onclick="pickShot('projects',this)">项目</button>
+        <button class="stab" type="button" data-shot="news" onclick="pickShot('news',this)">资讯</button>
+        <button class="stab" type="button" data-shot="writing" onclick="pickShot('writing',this)">写作</button>
+        <button class="stab" type="button" data-shot="time" onclick="pickShot('time',this)">时间</button>
+      </div>
+      <div class="win-frame">
+        <div class="win-bar">
+          <span class="win-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="win-caption" id="winCaption"><b>总览</b> · 今日先做三件事、晨间速览（微信/雷达/星球）、经营 KPI 与月度目标</span>
+          <span>点击放大</span>
+        </div>
+        <div class="win-img-wrap" onclick="openLightbox()">
+          <img id="stageImg" src="screenshots/overview.png" alt="每日工作台总览页实机截图">
+        </div>
+      </div>
     </div>
   </section>
 
-  <section id="screenshots">
-    <p class="eyebrow">实机截图 · v1.2.1</p>
-    <h2>访客模式下的样子（点击看大图）</h2>
-    <div class="shots">
-      <figure><a href="screenshots/overview.png" target="_blank" rel="noopener"><img src="screenshots/overview.png" alt="总览页截图" loading="lazy"><figcaption><b>总览</b><span>今日三件事 · 晨间速览 · 经营证据</span></figcaption></a></figure>
-      <figure><a href="screenshots/wechat.png" target="_blank" rel="noopener"><img src="screenshots/wechat.png" alt="微信批奏折截图" loading="lazy"><figcaption><b>微信 · 批奏折</b><span>增量进展 · 自动重浮 · 只读草稿</span></figcaption></a></figure>
-      <figure><a href="screenshots/projects.png" target="_blank" rel="noopener"><img src="screenshots/projects.png" alt="项目页截图" loading="lazy"><figcaption><b>项目</b><span>看板视图 · 逾期预警 · 白名单回写</span></figcaption></a></figure>
-      <figure><a href="screenshots/news.png" target="_blank" rel="noopener"><img src="screenshots/news.png" alt="资讯页截图" loading="lazy"><figcaption><b>资讯</b><span>一键刷新订阅 · 选题雷达 · 源健康</span></figcaption></a></figure>
-      <figure><a href="screenshots/writing.png" target="_blank" rel="noopener"><img src="screenshots/writing.png" alt="写作页截图" loading="lazy"><figcaption><b>写作</b><span>Obsidian 原生 Markdown · 章节进度</span></figcaption></a></figure>
-      <figure><a href="screenshots/time.png" target="_blank" rel="noopener"><img src="screenshots/time.png" alt="时间页截图" loading="lazy"><figcaption><b>时间</b><span>番茄钟专注 · 世界时钟 · 工时记录</span></figcaption></a></figure>
+  <!-- ══ Bento 差异化能力 ══ -->
+  <section class="sec" id="features">
+    <p class="sec-eyebrow">Core Capabilities</p>
+    <div class="sec-head">
+      <h2>九个专注视角，先给下一步，再给证据</h2>
+      <p class="sec-lead">不是把十几个仪表盘硬塞进一张大表，而是按“早上定优先级 → 白天推进 → 晚上复盘”的真实节奏组织。</p>
+    </div>
+    <div class="bento">
+      <article class="bcard span3">
+        <div class="bcard-k"><span>差异化能力 · 01</span><span>严格只读 · 绝不代发</span></div>
+        <h3>微信 · 批奏折统一流</h3>
+        <p>把微信 MCP 里的私聊待回复、商机机会、客户咨询、群 @ 我与白名单高价值群选题归并进双列发丝线视图。支持跨轮次进展 Diff（旧摘要 → 最新进展）、按最新消息时间自动重浮、以及本地模型三口吻回应草稿一键复制。</p>
+        <div class="mini-tags"><span>增量 Diff</span><span>新消息自动重浮</span><span>三口吻草稿</span><span>白名单群选题</span></div>
+      </article>
+      <article class="bcard span3">
+        <div class="bcard-k"><span>差异化能力 · 02</span><span>总览驾驶舱</span></div>
+        <h3>晨间速览 + 经营目标闭环</h3>
+        <p>打开工作台第一眼先看「今天先做这三件事」与 3 列发丝线「晨间速览」，再看月度净额目标进度与缺口测算、经营体检与收支流水。全局支持 <code>⌘K</code> 命令面板毫秒级跳转与查账。</p>
+        <div class="mini-tags"><span>晨间速览</span><span>月度净额目标</span><span>⌘K 命令面板</span><span>备忘 ⌘+Enter</span></div>
+      </article>
+      <article class="bcard span6">
+        <div class="bcard-k"><span>完整覆盖九大工作流</span><span>单一真源 · 发丝线编辑台美学</span></div>
+        <div class="module-matrix">
+          <div class="mitem"><b>项目推进</b><span>看板 / 树状 / 日历三视图，自动标出逾期与状态冲突，支持白名单回写 Notion。</span></div>
+          <div class="mitem"><b>客户跟进</b><span>客户需求、项目关联与收款节奏集中跟进，和 Notion 客户库双向协同。</span></div>
+          <div class="mitem"><b>自媒体与知识星球</b><span>聚合公众号、X、小红书与知识星球，内置 24h 日报 / 7 天周报站内详版弹窗。</span></div>
+          <div class="mitem"><b>资讯与选题雷达</b><span>自有 RSS 订阅库一键刷新、停更源预警、选题雷达打分与博客级站内阅读排版。</span></div>
+          <div class="mitem"><b>Obsidian 写作</b><span>直接读写本地 Obsidian Markdown，统计章节与正文字数，支持回收站版本恢复。</span></div>
+          <div class="mitem"><b>时间与复盘</b><span>番茄钟专注、按项目工时回写、多时区世界时钟，以及按周/月沉淀复盘笔记。</span></div>
+        </div>
+      </article>
     </div>
   </section>
 
-  <section id="releases">
-    <p class="eyebrow">持续迭代</p>
-    <h2>近期版本亮点</h2>
-    <div class="changelog-list">
-      <div class="cl-row"><div class="cl-ver">v1.2.1</div><div class="cl-desc"><strong>站内详版弹窗与 UI/UX 精修</strong>：知识星球简报支持站内宽弹窗（离线直开）、磨砂吸顶导航与 ⌘K 直达、资讯页一键「刷新订阅」、全站弹窗 160ms 微动效。</div></div>
-      <div class="cl-row"><div class="cl-ver">v1.2.0</div><div class="cl-desc"><strong>微信「批奏折」统一流</strong>：宽屏双列发丝线归并待办/商机/咨询/群提醒/白名单群选题，支持跨轮次进展 Diff、新消息自动重浮与只读三口吻草稿复制。</div></div>
-      <div class="cl-row"><div class="cl-ver">v1.1.0</div><div class="cl-desc"><strong>模块化架构与安全加固</strong>：前后端按领域拆包（零外部构建依赖 + CSS 0/0 门禁）、HttpOnly 会话 Cookie 与 CSP 安全头、DAG 并行同步与星球 24h/7 天双视图简报。</div></div>
+  <!-- ══ 数据归你自己 · 安全与架构边界 ══ -->
+  <section class="sec" id="trust">
+    <p class="sec-eyebrow">Local-First Architecture</p>
+    <div class="sec-head">
+      <h2>数据归你自己，每一条读写都有明确边界</h2>
+      <p class="sec-lead">工具只做你看得见、控得住的事：不上传云端、不静默写外部账号、断网也能打开。</p>
+    </div>
+    <div class="trust-grid">
+      <div class="tcard">
+        <span class="tcard-badge ok">严格只读边界</span>
+        <h3>绝不替你发消息或改历史</h3>
+        <ul>
+          <li>微信页只读本地 MCP 快照，绝不自动发送消息或修改会话状态</li>
+          <li>语音转写与语义摘要优先走本机 Ollama / SenseVoice，不上传第三方</li>
+          <li>AI 判断一律标注“仅供参考”，原文证据一键核对</li>
+        </ul>
+      </div>
+      <div class="tcard">
+        <span class="tcard-badge warn">显式白名单回写</span>
+        <h3>写回 Notion 必须人工确认</h3>
+        <ul>
+          <li>仅对项目、客户、专注记录开放显式字段白名单回写</li>
+          <li>本机服务默认仅监听 <code>127.0.0.1:8787</code>，支持 HttpOnly 会话 Cookie 与 CSP 安全头</li>
+          <li>入口链接自动抹除地址栏 <code>?token=</code>，不留本地明文令牌</li>
+        </ul>
+      </div>
+      <div class="tcard">
+        <span class="tcard-badge">零构建 · 离线兜底</span>
+        <h3>没有 npm 黑盒，十年后照样能跑</h3>
+        <ul>
+          <li>后端纯 Python 标准库，前端模块化由纯 Python 脚本拼装为单文件</li>
+          <li>支持生成自包含离线页 <code>workbench.local.html</code>，断网双击即看</li>
+          <li>内置访客脱敏模式，演示与截图与真实经营数据 100% 物理隔离</li>
+        </ul>
+      </div>
     </div>
   </section>
 
-  <section id="quickstart">
-    <p class="eyebrow">快速开始</p>
-    <h2>三步跑起来</h2>
-    <ol>
-      <li><span>克隆仓库：<code>git clone https://github.com/Jascenn/daily-workbench.git</code></span></li>
-      <li><span>启动本地服务：<code>python3 app.py</code>（仅依赖 Python 标准库，零外部构建链）</span></li>
-      <li><span>按启动日志打开带 token 的本地链接（自动下发 HttpOnly 会话 Cookie 并抹除 URL 令牌）</span></li>
-    </ol>
-    <p class="note">
-      不配置 Notion 也能直接用：首次打开可进入<strong>访客模式</strong>，全部展示示例数据，
-      与真实账号、收益和自媒体数据完全隔离；也支持生成离线单文件 <code>workbench.local.html</code> 兜底查看。
-    </p>
-    <div class="links">
-      <a href="https://github.com/Jascenn/daily-workbench">GitHub 仓库</a>
-      <a href="https://github.com/Jascenn/daily-workbench/blob/main/CHANGELOG.md">完整更新日志</a>
-      <a href="https://github.com/Jascenn/daily-workbench/blob/main/SECURITY.md">安全说明</a>
-      <a href="https://github.com/Jascenn/daily-workbench/blob/main/LICENSE">LICENSE</a>
+  <!-- ══ 完整快速开始 ══ -->
+  <section class="sec" id="quickstart">
+    <p class="sec-eyebrow">Quick Start</p>
+    <div class="sec-head">
+      <h2>从 30 秒体验到完整接入你的日常工作流</h2>
+      <p class="sec-lead">不需要任何账号或 API Key 也能先跑起来；按需逐步接入 Notion、微信 MCP 与 Obsidian。</p>
+    </div>
+    <div class="qs-card">
+      <div class="qs-tabs" role="tablist">
+        <button class="qtab on" type="button" onclick="pickQs('local',this)">① 30 秒本地跑起来（免配置）</button>
+        <button class="qtab" type="button" onclick="pickQs('sync',this)">② 接入 Notion / 微信 / 订阅源</button>
+        <button class="qtab" type="button" onclick="pickQs('offline',this)">③ 离线单文件与常驻服务</button>
+      </div>
+
+      <div class="qs-panel" id="qs-local">
+        <div class="qs-steps">
+          <div class="codebox">
+            <button class="copy-btn" type="button" onclick="copyText(this,'git clone https://github.com/Jascenn/daily-workbench.git\ncd daily-workbench\npython3 app.py')">复制</button>
+<pre>git clone https://github.com/Jascenn/daily-workbench.git
+cd daily-workbench
+python3 app.py</pre>
+          </div>
+          <div class="qs-notes">
+            <div><b>1. 零依赖启动：</b>直接用系统自带的 Python 3 运行，无需安装 Node、Docker 或数据库。</div>
+            <div><b>2. 安全登录：</b>打开终端输出的带 token 链接，服务端会自动签发 <code>HttpOnly</code> 会话 Cookie 并清除地址栏令牌。</div>
+            <div><b>3. 访客体验：</b>未配置 Notion 时点击右上角「更多 → 访客模式」，即可完整体验 9 个页面的脱敏示例数据。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="qs-panel" id="qs-sync" hidden>
+        <div class="qs-steps">
+          <div class="codebox">
+            <button class="copy-btn" type="button" onclick="copyText(this,'# 1. 一键并行同步 Notion / 资讯 / 自媒体 / 微信 / 雷达\nbash scripts/sync-now.sh\n\n# 2. 单独刷新知识星球 24h 日报 + 7 天周报\npython3 scripts/sync/zsxq-daily-sync.py\n\n# 3. 单独刷新微信只读批奏折快照\npython3 scripts/sync/wechat-sync.py')">复制</button>
+<pre># 1. 一键并行同步 Notion / 资讯 / 自媒体 / 微信 / 雷达
+bash scripts/sync-now.sh
+
+# 2. 单独刷新知识星球 24h 日报 + 7 天周报
+python3 scripts/sync/zsxq-daily-sync.py
+
+# 3. 单独刷新微信只读批奏折快照
+python3 scripts/sync/wechat-sync.py</pre>
+          </div>
+          <div class="qs-notes">
+            <div><b>Notion 接入：</b>在 <code>~/.config/daily-workbench/</code> 放入 Notion Token 与数据库配置，即可拉取收支/项目/客户并开启白名单回写。</div>
+            <div><b>微信批奏折：</b>配合本地只读微信 MCP + 可选 <code>wechat-groups.json</code> 白名单群配置，自动生成进展 Diff 与群选题。</div>
+            <div><b>Obsidian 写作与复盘：</b>配置 Vault 路径后自动扫描章节字数、复盘笔记并生成固定 Vault 深链。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="qs-panel" id="qs-offline" hidden>
+        <div class="qs-steps">
+          <div class="codebox">
+            <button class="copy-btn" type="button" onclick="copyText(this,'# 重新拼装单文件前端并执行 CSS 门禁检查\npython3 scripts/build-workbench.py --check --lint-css\n\n# 生成可双击离线打开的单文件快照\npython3 scripts/sync/make-local.py\n\n# 运行 800+ 前端逻辑测试\nnode scripts/tests/test-workbench-logic.mjs')">复制</button>
+<pre># 重新拼装单文件前端并执行 CSS 门禁检查
+python3 scripts/build-workbench.py --check --lint-css
+
+# 生成可双击离线打开的单文件快照
+python3 scripts/sync/make-local.py
+
+# 运行 800+ 前端逻辑测试
+node scripts/tests/test-workbench-logic.mjs</pre>
+          </div>
+          <div class="qs-notes">
+            <div><b>离线兜底页：</b><code>make-local.py</code> 会把最新快照内嵌进 <code>workbench.local.html</code>，断网或停服时也能直接双击查看（自动备份轮转留 10 份）。</div>
+            <div><b>macOS 常驻：</b>可配 <code>launchd</code> 让 <code>app.py</code> 随开机静默运行在 <code>127.0.0.1:8787</code>，并定时触发晨间同步。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="req-strip">
+        <span><b>运行环境：</b>macOS / Linux · Python 3.10+</span>
+        <span><b>前端构建：</b>0 外部依赖（纯 Python 拼装）</span>
+        <span><b>可选增强：</b>Ollama（qwen3:8b）/ Notion API / 微信 MCP / Obsidian</span>
+      </div>
     </div>
   </section>
-</div>
+
+  <!-- ══ 常见问题 + 近期更新日志 ══ -->
+  <section class="sec" id="faq">
+    <div class="two-col">
+      <div>
+        <p class="sec-eyebrow">FAQ</p>
+        <h2>常见问题</h2>
+        <div class="faq-list">
+          <details open>
+            <summary>没有配置 Notion 或微信 MCP，能先体验吗？</summary>
+            <p>完全可以。启动 <code>python3 app.py</code> 后切到「访客模式」，系统会在内存中注入一套完整的脱敏示例数据（覆盖收益、项目、客户、微信批奏折、资讯、写作与时间），不读也不写任何真实文件。</p>
+          </details>
+          <details>
+            <summary>微信「批奏折」会帮我自动回复消息吗？</summary>
+            <p>绝对不会。微信层从架构上就是严格只读的：只拉取本地只读快照与生成三口吻草稿复制到剪贴板，服务端不具备发微信能力（<code>/api/wechat/action</code> 保持 501 禁用），确保零社死风险。</p>
+          </details>
+          <details>
+            <summary>为什么坚持零前端构建链（不用 React / Vite）？</summary>
+            <p>个人工作台要陪你用很多年，而不是每隔半年修一次 <code>node_modules</code> 依赖冲突。当前采用 <code>web/</code> 模块化源码 + 纯 Python 拼装与 CSS 重复门禁，既保持模块化可维护性，又做到单文件离线可双击打开。</p>
+          </details>
+          <details>
+            <summary>我的经营与聊天数据存在哪里？会上传云端吗？</summary>
+            <p>全部快照、缓存、状态与草稿均存在你本机目录与浏览器 <code>localStorage</code> 中，服务端默认仅监听 <code>127.0.0.1</code>，不向任何第三方遥测或云端上报。</p>
+          </details>
+          <details>
+            <summary>支持深色模式和手机/窄屏查看吗？</summary>
+            <p>支持。整套界面基于语义化设计令牌构建，浅色暖米纸与深色夜墨双主题一键切换，宽屏双列与手机窄屏单列自适应。</p>
+          </details>
+        </div>
+      </div>
+
+      <div id="releases">
+        <p class="sec-eyebrow">Changelog</p>
+        <h2>近期更新</h2>
+        <div class="cl-box">
+          <div class="cl-item">
+            <div class="cl-top"><span class="cl-ver">v1.2.1</span><span class="cl-date">2026-11-25</span></div>
+            <p>知识星球简报升级为站内详版阅读弹窗（离线直开）；全站磨砂吸顶导航、晨间速览发丝线、知识星球指标矩阵与弹窗 160ms 微动效；资讯页新增一键「刷新订阅」。</p>
+          </div>
+          <div class="cl-item">
+            <div class="cl-top"><span class="cl-ver">v1.2.0</span><span class="cl-date">2026-11-24</span></div>
+            <p>接入微信「批奏折」统一流（双列发丝线 + 类型×状态筛选 + 新消息自动重浮）、只读三口吻回应草稿弹窗、跨轮次进展 Diff 与白名单群选题。</p>
+          </div>
+          <div class="cl-item">
+            <div class="cl-top"><span class="cl-ver">v1.1.0</span><span class="cl-date">2026-11-24</span></div>
+            <p>前后端按领域模块化拆包（零外部构建依赖 + CSS 0/0 门禁）、HttpOnly 会话 Cookie 与 CSP 安全加固、4 组 DAG 并行同步、知识星球 24h/7 天双视图简报。</p>
+          </div>
+          <a class="cl-more" href="https://github.com/Jascenn/daily-workbench/blob/main/CHANGELOG.md" target="_blank" rel="noopener">查看完整更新日志（CHANGELOG.md）→</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
 <footer>
-  <div class="wrap">LingYi · 每日工作台（<a href="https://workbench.lingyi.tools/">workbench.lingyi.tools</a>）· 本地优先，数据归你自己。</div>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a class="brand" href="#">
+          <span class="brand-word">LingYi</span>
+          <span class="brand-sep" aria-hidden="true"></span>
+          <span class="brand-name">每日工作台</span>
+        </a>
+        <p>本地优先的个人经营工作台。纯 Python 标准库驱动、数据完全归你自己，为独立开发者与一人公司日常推进而建。</p>
+      </div>
+      <div class="foot-col">
+        <h4>产品</h4>
+        <ul>
+          <li><a href="#preview">交互预览</a></li>
+          <li><a href="#features">九大视角</a></li>
+          <li><a href="#trust">数据与安全边界</a></li>
+          <li><a href="#faq">常见问题</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h4>文档与架构</h4>
+        <ul>
+          <li><a href="#quickstart">快速开始</a></li>
+          <li><a href="https://github.com/Jascenn/daily-workbench/blob/main/docs/DESIGN.md" target="_blank" rel="noopener">设计文档</a></li>
+          <li><a href="https://github.com/Jascenn/daily-workbench/blob/main/docs/sync-pipeline.md" target="_blank" rel="noopener">同步流水线</a></li>
+          <li><a href="https://github.com/Jascenn/daily-workbench/blob/main/SECURITY.md" target="_blank" rel="noopener">安全说明</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h4>开源与版本</h4>
+        <ul>
+          <li><a href="https://github.com/Jascenn/daily-workbench" target="_blank" rel="noopener">GitHub 仓库</a></li>
+          <li><a href="https://github.com/Jascenn/daily-workbench/blob/main/CHANGELOG.md" target="_blank" rel="noopener">更新日志</a></li>
+          <li><a href="https://github.com/Jascenn/daily-workbench/issues" target="_blank" rel="noopener">问题反馈</a></li>
+          <li><a href="https://github.com/Jascenn/daily-workbench/blob/main/LICENSE" target="_blank" rel="noopener">开源协议</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h4>凌一 · 作者</h4>
+        <ul>
+          <li><a href="https://lingyi.me/" target="_blank" rel="noopener">个人博客（lingyi.me）</a></li>
+          <li><a href="https://lingyi.tools/" target="_blank" rel="noopener">工具合集（lingyi.tools）</a></li>
+          <li><a href="https://lingyi.me/rss.xml" target="_blank" rel="noopener">博客 RSS 订阅</a></li>
+          <li><a href="https://github.com/Jascenn" target="_blank" rel="noopener">GitHub 主页</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2026 LingYi · 每日工作台（workbench.lingyi.tools）· v1.2.1</span>
+      <span>本地优先 · 零云端依赖 · 数据归你自己</span>
+    </div>
+  </div>
 </footer>
+
+<div class="lightbox" id="lightbox" onclick="this.classList.remove('open')">
+  <img id="lightboxImg" src="" alt="放大预览">
+</div>
+
+<script>
+const SHOTS = {
+  overview: { src: "screenshots/overview.png", cap: "<b>总览</b> · 今日先做三件事、晨间速览（微信/雷达/星球）、经营 KPI 与月度目标" },
+  wechat:   { src: "screenshots/wechat.png",   cap: "<b>微信 · 批奏折</b> · 双列发丝线归并待办/商机/咨询/群选题，支持进展 Diff 与只读三口吻草稿" },
+  projects: { src: "screenshots/projects.png", cap: "<b>项目</b> · 看板 / 树状 / 日历三视图，逾期与状态冲突自动预警，支持白名单回写 Notion" },
+  news:     { src: "screenshots/news.png",     cap: "<b>资讯</b> · 自有订阅库一键「刷新订阅」、选题雷达与博客级站内阅读排版" },
+  writing:  { src: "screenshots/writing.png",  cap: "<b>写作</b> · Obsidian 原生 Markdown 工作流，实时统计章节与正文字数" },
+  time:     { src: "screenshots/time.png",     cap: "<b>时间</b> · 番茄钟专注、按项目工时记录与多时区世界时钟" }
+};
+function pickShot(key, btn){
+  const item = SHOTS[key]; if(!item) return;
+  document.getElementById("stageImg").src = item.src;
+  document.getElementById("winCaption").innerHTML = item.cap;
+  document.querySelectorAll(".stage-tabs .stab").forEach(b=>b.classList.toggle("on", b===btn));
+}
+function openLightbox(){
+  document.getElementById("lightboxImg").src = document.getElementById("stageImg").src;
+  document.getElementById("lightbox").classList.add("open");
+}
+function pickQs(id, btn){
+  ["local","sync","offline"].forEach(k=>{
+    const el = document.getElementById("qs-"+k);
+    if(el) el.hidden = (k!==id);
+  });
+  document.querySelectorAll(".qs-tabs .qtab").forEach(b=>b.classList.toggle("on", b===btn));
+}
+function copyText(btn, text){
+  try{ navigator.clipboard.writeText(text); }catch(e){}
+  const old = btn.textContent;
+  btn.textContent = "已复制 ✓";
+  setTimeout(()=>{ btn.textContent = old; }, 1600);
+}
+function toggleSiteTheme(){
+  const cur = document.documentElement.getAttribute("data-theme")==="dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", cur);
+  document.getElementById("themeBtn").textContent = cur==="dark" ? "浅色" : "深色";
+  try{ localStorage.setItem("site_theme", cur); }catch(e){}
+}
+(function(){
+  try{
+    const saved = localStorage.getItem("site_theme");
+    const init = saved || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    if(init==="dark"){
+      document.documentElement.setAttribute("data-theme","dark");
+      document.getElementById("themeBtn").textContent = "浅色";
+    }
+  }catch(e){}
+})();
+document.addEventListener("keydown", e=>{
+  if(e.key==="Escape") document.getElementById("lightbox").classList.remove("open");
+});
+</script>
 </body>
 </html>
