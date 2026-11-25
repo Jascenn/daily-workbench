@@ -6,6 +6,8 @@
 <title>LingYi · 每日工作台 — 本地优先的个人经营工作台</title>
 <meta name="description" content="本地优先的个人经营工作台：Notion 数据同步 + 白名单回写 + 微信只读批奏折 + 知识星球简报，零外部构建依赖，覆盖收益、项目、客户、微信、时间、资讯、写作、自媒体运营与复盘。">
 <link rel="canonical" href="https://workbench.lingyi.tools/">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <meta property="og:title" content="LingYi · 每日工作台 — 本地优先的个人经营工作台">
 <meta property="og:description" content="把一天的经营、行动与消息，收拢进一张本地工作台。零外部构建依赖，数据完全归你自己。">
 <meta property="og:url" content="https://workbench.lingyi.tools/">
@@ -47,6 +49,7 @@
 
   /* ── 1:1 复刻工作台原生品牌字样 ── */
   .brand{display:inline-flex; align-items:center; gap:10px; text-decoration:none; color:var(--ink);}
+  .brand-mark{width:26px; height:26px; display:block; flex:none; border-radius:6px;}
   .brand-word{font-family:Georgia,'Times New Roman',serif; font-variant:small-caps; font-style:italic; letter-spacing:.14em; font-weight:400; font-size:20px; line-height:1;}
   .brand-sep{width:1px; height:20px; background:var(--line-strong); opacity:.55; display:inline-block;}
   .brand-name{font-size:19px; font-weight:700; letter-spacing:.3px; line-height:1;}
@@ -277,6 +280,7 @@
 <header class="topbar">
   <div class="topbar-in">
     <a class="brand" href="#">
+      <img class="brand-mark" src="favicon.svg" alt="" width="26" height="26">
       <span class="brand-word">LingYi</span>
       <span class="brand-sep" aria-hidden="true"></span>
       <span class="brand-name">每日工作台</span>
@@ -547,7 +551,8 @@ node scripts/tests/test-workbench-logic.mjs</pre>
     <div class="foot-grid">
       <div class="foot-brand">
         <a class="brand" href="#">
-          <span class="brand-word">LingYi</span>
+          <img class="brand-mark" src="favicon.svg" alt="" width="26" height="26">
+      <span class="brand-word">LingYi</span>
           <span class="brand-sep" aria-hidden="true"></span>
           <span class="brand-name">每日工作台</span>
         </a>
