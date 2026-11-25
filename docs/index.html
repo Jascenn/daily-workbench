@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>每日工作台 · 本地优先的个人经营工作台</title>
-<meta name="description" content="本地优先的个人经营工作台：Notion 数据同步 + 白名单回写 + 本地草稿，覆盖收益、项目、客户、时间、资讯、写作、自媒体运营与复盘。">
+<meta name="description" content="本地优先的个人经营工作台：Notion 数据同步 + 白名单回写 + 微信只读批奏折 + 知识星球简报，覆盖收益、项目、客户、微信、时间、资讯、写作、自媒体运营与复盘。">
+<link rel="canonical" href="https://workbench.lingyi.tools/">
 <style>
   :root{
     --bg:#f7f4ef; --card:#ffffff; --ink:#1b2330; --muted:#5c6675;
@@ -27,11 +28,12 @@
   }
   .wrap{max-width:960px; margin:0 auto; padding:0 24px;}
   header{padding:96px 0 64px;}
-  .brand{display:flex; align-items:baseline; gap:12px; margin-bottom:20px;}
+  .brand{display:flex; align-items:baseline; gap:12px; margin-bottom:20px; flex-wrap:wrap;}
   .brand .logo{font-size:13px; letter-spacing:.18em; font-weight:600; color:var(--muted); text-transform:uppercase;}
   .brand h1{font-size:30px; font-weight:700; letter-spacing:-.01em;}
-  .tagline{font-size:22px; font-weight:600; line-height:1.6; max-width:640px; margin-bottom:16px;}
-  .sub{color:var(--muted); max-width:640px;}
+  .brand .ver{font-size:12px; font-weight:600; color:var(--muted); border:1px solid var(--line); background:var(--card); padding:1px 8px; border-radius:999px;}
+  .tagline{font-size:22px; font-weight:600; line-height:1.6; max-width:660px; margin-bottom:16px;}
+  .sub{color:var(--muted); max-width:660px;}
   .sub strong{color:var(--ink); font-weight:600;}
   .pills{display:flex; flex-wrap:wrap; gap:8px; margin-top:28px;}
   .pill{
@@ -86,33 +88,35 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="brand"><span class="logo">LingYi</span><h1>每日工作台</h1></div>
+    <div class="brand"><span class="logo">LingYi</span><h1>每日工作台</h1><span class="ver">v1.2.1</span></div>
     <p class="tagline">本地优先的个人经营工作台</p>
     <p class="sub">
-      数据只读拉取自 <strong>Notion</strong>，回写走<strong>白名单动作</strong>，草稿与计时只存本地。
-      一个页面看清楚：收益、项目、客户、时间、资讯、写作、自媒体运营与复盘。
+      数据只读拉取自 <strong>Notion / 微信 MCP / 自有订阅库</strong>，回写走<strong>白名单动作</strong>，草稿与计时只存本地。
+      一个页面看清楚：总览、项目、客户、微信批奏折、时间、资讯、写作、自媒体与复盘。
     </p>
     <div class="pills">
       <span class="pill">本地优先</span>
-      <span class="pill">Notion 同步</span>
-      <span class="pill">白名单回写</span>
-      <span class="pill">访客模式</span>
-      <span class="pill">单文件部署</span>
+      <span class="pill">零构建依赖</span>
+      <span class="pill">Notion 白名单回写</span>
+      <span class="pill">微信只读批奏折</span>
+      <span class="pill">星球 24h / 7 天简报</span>
+      <span class="pill">访客脱敏模式</span>
     </div>
   </header>
 
   <section id="features">
-    <p class="eyebrow">八个页面</p>
+    <p class="eyebrow">九个视角</p>
     <h2>每类事各有一个专注视角</h2>
     <div class="grid">
-      <div class="feature"><h3>总览</h3><p>今天先做什么、经营体检、月度目标与当日时间线，一眼定优先级。</p></div>
-      <div class="feature"><h3>项目</h3><p>看板 / 树状 / 日历三种视图，逾期与状态冲突直接标出，可回写 Notion。</p></div>
+      <div class="feature"><h3>总览</h3><p>今天先做三件事、晨间速览（微信 / 雷达 / 星球）、经营体检、月度目标与当日时间线，一眼定优先级。</p></div>
+      <div class="feature"><h3>项目</h3><p>看板 / 树状 / 日历三种视图，逾期与状态冲突直接标出，支持白名单回写 Notion。</p></div>
       <div class="feature"><h3>客户</h3><p>客户跟进、需求与收款节奏，跟进记录与 Notion 数据库联动。</p></div>
+      <div class="feature"><h3>微信 · 批奏折</h3><p>本地 MCP 只读快照 + 增量进展对比，支持已阅/已处理自动重浮、白名单群选题与只读三口吻草稿复制。</p></div>
       <div class="feature"><h3>时间</h3><p>番茄钟专注、按项目工时与世界时钟，计时记录可单条回写。</p></div>
-      <div class="feature"><h3>资讯</h3><p>订阅源健康检查、未读优先的今日阅读队列，阅读排版对齐博客。</p></div>
-      <div class="feature"><h3>写作</h3><p>Obsidian 式草稿箱：本地写作、版本可回收，写完再同步。</p></div>
-      <div class="feature"><h3>自媒体运营</h3><p>公众号、知识星球等渠道的内容表现与更新节奏，集中管理。</p></div>
-      <div class="feature"><h3>复盘</h3><p>按周 / 月生成复盘文档，复用资讯阅读排版预览，沉淀到 Notion。</p></div>
+      <div class="feature"><h3>资讯</h3><p>自有订阅库健康检查、一键刷新订阅、选题雷达与博客级站内阅读排版。</p></div>
+      <div class="feature"><h3>写作</h3><p>Obsidian 原生 Markdown 工作流：本地写作、章节进度与版本备份。</p></div>
+      <div class="feature"><h3>自媒体与星球</h3><p>公众号、X、小红书与知识星球一站式运营，内置 24h 日报 / 7 天周报站内详版弹窗。</p></div>
+      <div class="feature"><h3>复盘</h3><p>按周 / 月沉淀调试与经营复盘笔记，复用清晰阅读排版随时回查。</p></div>
     </div>
   </section>
 
@@ -132,12 +136,12 @@
     <h2>三步跑起来</h2>
     <ol>
       <li><span>克隆仓库：<code>git clone https://github.com/Jascenn/daily-workbench.git</code></span></li>
-      <li><span>启动本地服务：<code>python3 app.py</code>（仅依赖标准库）</span></li>
-      <li><span>按启动日志打开带 token 的本地链接，即可进入工作台</span></li>
+      <li><span>启动本地服务：<code>python3 app.py</code>（仅依赖 Python 标准库，零外部构建链）</span></li>
+      <li><span>按启动日志打开带 token 的本地链接（自动下发 HttpOnly 会话 Cookie 并抹除 URL 令牌）</span></li>
     </ol>
     <p class="note">
       不配置 Notion 也能直接用：首次打开可进入<strong>访客模式</strong>，全部展示示例数据，
-      与真实账号、收益和自媒体数据完全隔离。
+      与真实账号、收益和自媒体数据完全隔离；也支持生成离线单文件 <code>workbench.local.html</code> 兜底查看。
     </p>
     <div class="links">
       <a href="https://github.com/Jascenn/daily-workbench">GitHub 仓库</a>
@@ -148,7 +152,7 @@
   </section>
 </div>
 <footer>
-  <div class="wrap">LingYi · 每日工作台 · 本地优先，数据归你自己。</div>
+  <div class="wrap">LingYi · 每日工作台（<a href="https://workbench.lingyi.tools/">workbench.lingyi.tools</a>）· 本地优先，数据归你自己。</div>
 </footer>
 </body>
 </html>
