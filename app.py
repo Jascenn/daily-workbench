@@ -122,10 +122,10 @@ CLIENT_BODY_BYTES = 64 * 1024
 MAX_WRITING_REQUEST_BYTES = writing_store.MAX_CHAPTER_BYTES + 64 * 1024
 WRITING_BACKUP_DIR = os.path.join(BACKUP_DIR, "obsidian-writing")
 NTN = "/usr/local/bin/ntn"
-DS_FOCUS = "00000000-0000-4000-8000-000000000001"  # 今日番茄追踪表
-DS_PROJECT = "00000000-0000-4000-8000-000000000002"  # 项目管理
-DS_TASKS = "00000000-0000-4000-8000-000000000003"  # 待办数据库
-DS_RECORDS = "00000000-0000-4000-8000-000000000004"  # 日常记录 - 日历视图
+DS_FOCUS = "238b66ad-8b35-81bc-8fb4-000b255bc3da"  # 今日番茄追踪表
+DS_PROJECT = "264b66ad-8b35-806b-bb64-000bb903657c"  # 项目管理
+DS_TASKS = "238b66ad-8b35-81f2-9a82-000b56e129f1"  # 待办数据库
+DS_RECORDS = "f75bd828-b11d-42c6-9af8-a81debb43da7"  # 日常记录 - 日历视图
 # ntn 走 macOS 系统代理（当前为 Surge）。若再注入 HTTP(S)_PROXY，
 # 会和系统代理叠加，实测表现为间歇性 TLS 失败和
 # “Failed to execute public API request”。这里主动清掉重复的代理环境变量。
@@ -184,7 +184,7 @@ ALLOWED_HOSTS = {"127.0.0.1:8787", "localhost:8787"}
 #
 # 页面自身 CSS/JS 全内联；这里额外放行两个固定品牌图片，不开目录访问。
 # /zsxq-daily.html 是独立日报页：HTML 本身不含真实数据，数据只走 /zsxq-daily.json（令牌门）。
-STATIC_ALLOW = {"/workbench.html", "/zsxq-daily.html", "/assets/lingyi-logo.png", "/assets/favicon.png"}
+STATIC_ALLOW = {"/workbench.html", "/zsxq-daily.html", "/assets/lingyi-logo.png", "/assets/favicon.png", "/assets/favicon.svg"}
 
 # 同一时刻只允许一次同步，避免连点造成并发跑脚本。
 _sync_lock = threading.Lock()
